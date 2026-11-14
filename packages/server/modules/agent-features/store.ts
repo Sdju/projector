@@ -143,6 +143,16 @@ export async function featureEnabled(
   return (await enabledFeatures(agentId, features)).includes(featureId);
 }
 
+/** One enabled feature's own instruction, without the other features' text; empty when it is off. */
+export async function featureText(
+  agentId: string,
+  featureId: string,
+  features?: string[],
+): Promise<string> {
+  if (!(await featureEnabled(agentId, featureId, features))) return "";
+  return agentFeatureCatalog.get(featureId)?.instruction().trim() ?? "";
+}
+
 /**
  * The instructions of every feature the agent has on, or an empty string. `features` is the chat's
  * own choice (an empty list means none); without it the user's defaults for the agent apply.

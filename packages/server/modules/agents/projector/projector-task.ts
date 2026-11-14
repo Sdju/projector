@@ -4,7 +4,10 @@ import { streamText, stepCountIs, tool } from "ai";
 import { z } from "zod";
 import { os } from "@ai-projector/core/modules/os/index.ts";
 import type { AgentTaskPatch } from "@ai-projector/core/modules/agent-task/index.ts";
-import type { AgentRoleSnapshot } from "@ai-projector/core/modules/agent-role/index.ts";
+import {
+  renderRoleTemplate,
+  type AgentRoleSnapshot,
+} from "@ai-projector/core/modules/agent-role/index.ts";
 import type { AgentEmitter, AgentSelection } from "../../agent/index.ts";
 import { readAgentRole } from "../../agent-roles/index.ts";
 import { recordTaskSpend } from "../../spend/index.ts";
@@ -49,7 +52,7 @@ export interface ProjectorTaskRequest {
 
 async function taskRole(
   request: ProjectorTaskRequest,
-): Promise<{ name?: string; selection: AgentSelection; prompt?: string }> {
+): Promise<{ name?: string; selection: AgentSelection; prompt?: string; template?: boolean }> {
   const id = request.role?.trim();
   if (id) {
     const role = await readAgentRole(id, request.projectId);
@@ -61,6 +64,7 @@ async function taskRole(
       name: role.name,
       selection: role.selection,
       ...(role.prompt ? { prompt: role.prompt } : {}),
+      ...(role.template ? { template: true } : {}),
     };
   }
   const inherited = request.parentRole;
@@ -68,6 +72,7 @@ async function taskRole(
     ...(inherited?.name ? { name: inherited.name } : {}),
     selection: inherited?.selection ?? {},
     ...(inherited?.prompt ? { prompt: inherited.prompt } : {}),
+    ...(inherited?.template ? { template: true } : {}),
   };
 }
 
@@ -258,11 +263,24 @@ export async function runProjectorTask(
     startedAt,
   });
   try {
+    const taskSystem = role.prompt
+      ? role.template
+        ? renderRoleTemplate(role.prompt, {
+            system: TASK_PROMPT,
+            project: `Проект: ${request.cwd ?? process.cwd()}`,
+            role: `Роль «${role.name ?? "Projector"}»`,
+            features: "",
+            widgets: "",
+            memory: "",
+            skills: "",
+            mcp: "",
+            summary: "",
+          }).trim()
+        : `${TASK_PROMPT}\n\nИнструкции роли «${role.name ?? "Projector"}»:\n${role.prompt}`
+      : TASK_PROMPT;
     const result = streamText({
       model,
-      system: role.prompt
-        ? `${TASK_PROMPT}\n\nИнструкции роли «${role.name ?? "Projector"}»:\n${role.prompt}`
-        : TASK_PROMPT,
+      system: taskSystem,
       prompt: `Проект: ${request.cwd ?? process.cwd()}\n\n${request.description}\n\n${request.prompt}`,
       tools: taskTools(request.cwd, signal),
       stopWhen: stepCountIs(TASK_LIMITS.steps > 0 ? TASK_LIMITS.steps : Number.POSITIVE_INFINITY),

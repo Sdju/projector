@@ -40,7 +40,8 @@ test("project roles are inert until their file is trusted", async () => {
     name: "Ревьюер проекта",
     agent: "projector",
     selection: { provider: "env:test" },
-    prompt: "Сверяйся с AGENTS.md.",
+    prompt: "{system}\n\nСверяйся с AGENTS.md.\n\n{project}",
+    template: true,
     skills: ["review"],
     mcp: [],
   });
@@ -54,7 +55,8 @@ test("project roles are inert until their file is trusted", async () => {
   expect(role).toMatchObject({
     kind: "chat",
     name: "Ревьюер проекта",
-    prompt: "Сверяйся с AGENTS.md.",
+    prompt: "{system}\n\nСверяйся с AGENTS.md.\n\n{project}",
+    template: true,
     skills: ["review"],
     mcp: [],
   });
@@ -64,7 +66,8 @@ test("project roles are inert until their file is trusted", async () => {
   expect(trusted.trusted).toBe(true);
   expect(await readProjectAgentRole("p1", role.id)).toMatchObject({
     name: "Ревьюер проекта",
-    prompt: "Сверяйся с AGENTS.md.",
+    prompt: "{system}\n\nСверяйся с AGENTS.md.\n\n{project}",
+    template: true,
     skills: ["review"],
     mcp: [],
   });

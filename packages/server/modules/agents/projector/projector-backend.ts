@@ -11,8 +11,8 @@ import type { Project } from "../../projects/index.ts";
 import { createAgentTools } from "./agent-tools.ts";
 import { taskRunnerFor } from "./projector-task.ts";
 import { createSideTools, SIDE_LIMITS, sideAbort, sideSystem } from "./projector-side.ts";
-import { buildSystemPrompt } from "./prompts.ts";
-import { enabledFeatureText, featureEnabled } from "../../agent-features/index.ts";
+import { projectorSystem } from "./projector-system.ts";
+import { featureEnabled } from "../../agent-features/index.ts";
 import {
   createQwenOpenAI,
   envFallbackFromProcess,
@@ -32,11 +32,9 @@ import {
 import { createTurnInput } from "./projector-input.ts";
 import { budgetNote, turnBudget } from "./projector-budget.ts";
 import { isRetryable, MAX_RETRIES, pause, retryDelay } from "./projector-retry.ts";
-import { connectMcp, mcpSection, type McpConnection } from "./projector-mcp.ts";
-import { expandSlash, listSkills, skillsForRole, skillsSection } from "./projector-skills.ts";
-import { memorySection } from "./projector-memory.ts";
+import { connectMcp, type McpConnection } from "./projector-mcp.ts";
+import { expandSlash, listSkills, skillsForRole } from "./projector-skills.ts";
 import { loadHooks, runStopHooks, withHooks } from "./projector-hooks.ts";
-import { projectInstructions } from "./project-instructions.ts";
 import { createBashReviewer } from "./projector-review.ts";
 import { controls, THINKING, TRUST } from "./projector-controls.ts";
 import { toMessages, userMessage } from "./projector-history.ts";
@@ -45,11 +43,8 @@ import {
   compactChat,
   compactHistory,
   splitAtCompaction,
-  summarySection,
 } from "./projector-compaction.ts";
-import { rolePromptText } from "../../agent-roles/index.ts";
 import { trustedProjectWidgets } from "../../project-widgets/index.ts";
-import { widgetCatalog } from "./widgets.ts";
 
 /** The window of a model that has none registered in the provider settings; the context ring is measured against it. */
 const DEFAULT_CONTEXT_SIZE = Number(process.env.PROJECTOR_AGENT_CONTEXT_TOKENS) || 128_000;
@@ -221,17 +216,12 @@ async function turn(
 
   const system = side
     ? sideSystem(options.cwd, summary)
-    : buildSystemPrompt(
-        (await enabledFeatureText("projector", options.features)) +
-          (projectWidgets.length ? `\n\n${widgetCatalog.extraGuide(projectWidgets)}` : ""),
-      ) +
-      (options.cwd ? `\nТекущий проект: ${options.cwd}` : "") +
-      (await projectInstructions(options.cwd)) +
-      (await memorySection(options.cwd)) +
-      mcpSection(mcp) +
-      skillsSection(skills) +
-      summarySection(summary) +
-      rolePromptText(options.role);
+    : await projectorSystem(options, {
+        projectWidgets,
+        skills,
+        mcp,
+        summary,
+      });
   const budget = turnBudget(side ? SIDE_LIMITS : undefined);
   const wanted = options.selection?.[THINKING];
   let answering = model;
@@ -305,7 +295,7 @@ async function turn(
       const aborted = options.abort?.aborted === true;
       const overBudget =
         (continuing || aborted) &&
-        (await Promise.all(budget.stopWhen.map((stop) => stop({ steps })))).some(Boolean);
+        (await Promise.all(budget.stopWhen.map(async (stop) => stop({ steps })))).some(Boolean);
       if (overBudget || aborted || !continuing) break;
       attempt = -1;
       continue;

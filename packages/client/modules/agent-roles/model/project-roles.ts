@@ -144,7 +144,7 @@ export function useProjectRoleSettings(projectId: () => string) {
     palette: false,
     title: "Сохранить роль проекта",
     description:
-      "Меняет chat-роль в .projector/roles.json: название, агента, настройки, промпт, навыки и MCP. Не переданные поля сохраняются; пустой массив skills или mcp выключает их. Любая запись меняет хеш файла и отзывает доверие.",
+      "Меняет chat-роль в .projector/roles.json: название, агента, настройки, промпт, шаблон контекста, навыки и MCP. template: true включает подстановки {system}, {features}, {widgets}, {project}, {memory}, {skills}, {mcp}, {role} и {summary}. Не переданные поля сохраняются; пустой массив skills или mcp выключает их. Любая запись меняет хеш файла и отзывает доверие.",
     arguments: {
       role: "string: id роли проекта",
       name: "string: название",
@@ -152,6 +152,7 @@ export function useProjectRoleSettings(projectId: () => string) {
       description: "string: описание",
       selection: "object: control id → value",
       prompt: "string: дополнительные инструкции роли",
+      template: "boolean: включить шаблон контекста",
       skills: "array: имена навыков",
       mcp: "array: имена MCP-серверов",
     },
@@ -177,6 +178,7 @@ export function useProjectRoleSettings(projectId: () => string) {
             ? (args.selection as Record<string, string>)
             : known.selection,
         prompt: typeof args.prompt === "string" ? args.prompt : known.prompt,
+        template: typeof args.template === "boolean" ? args.template : known.template,
         skills: names(args.skills, known.skills),
         mcp: names(args.mcp, known.mcp),
       });

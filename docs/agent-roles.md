@@ -8,7 +8,7 @@
 - **Chat-роли** — пользовательские пресеты, которые открывают обычный чат выбранного агента из меню «+», запускают фоновые задания и read-only субагента `task`.
 - **Роли проекта** — те же chat-роли, но из `.projector/roles.json`; работают только после явного доверия к файлу.
 
-Chat-роль может не только выбирать модель и controls, но и добавлять свой промпт, ограничивать навыки и MCP-серверы. Служебные роли остаются с фиксированным промптом и без инструментов.
+Chat-роль может не только выбирать модель и controls, но и добавлять свой промпт, шаблонизировать контекст (`{system}`, `{widgets}` и другие подстановки), ограничивать навыки и MCP-серверы. Служебные роли остаются с фиксированным промптом и без инструментов.
 
 ## Служебные роли
 
@@ -35,6 +35,7 @@ interface AgentRoleSnapshot {
   selection: Record<string, string>;
   permissionMode?: "default" | "auto" | "bypassPermissions";
   prompt?: string;
+  template?: boolean;
   skills?: string[];
   mcp?: string[];
 }
@@ -53,11 +54,31 @@ interface AgentRoleSnapshot {
 
 Эти поля необязательны и входят в снимок роли, поэтому начатые чаты и задания сохраняют своё поведение после правки файла.
 
-- **`prompt`** — дополнительные инструкции (до 8000 символов). Они добавляются к системному промпту агента, а не заменяют его: инструменты, правила безопасности и штатные ограничения остаются. У Projector текст идёт в конец системного промпта; у Claude Code — в `systemPrompt.append`; у ACP-агентов — в первое сообщение сессии рядом с возможностями Projector.
+- **`prompt`** — дополнительные инструкции (до 8000 символов). Без `template` они добавляются к системному промпту агента, а не заменяют его: инструменты, правила безопасности и штатные ограничения остаются. У Projector текст идёт в конец системного промпта; у Claude Code — в `systemPrompt.append`; у ACP-агентов — в первое сообщение сессии рядом с возможностями Projector. С `template: true` промпт становится шаблоном и собирает контекст сам (см. ниже).
 - **`skills`** — имена навыков и команд. Поле отсутствует — роль видит всё, что находит Projector, включая встроенные навыки; пустой массив — ничего; список — только эти имена. Projector перечисляет выбранные навыки в промпте и разрешает `use_skill` только для них. Внешним агентам роль передаёт имена и пути к `SKILL.md` / `commands/<имя>.md`, чтобы они прочитали инструкцию по необходимости; их собственные нативные навыки список роли не отключает. Подробности — [навыки и команды](agent-skills.md).
 - **`mcp`** — имена MCP-серверов. Поле отсутствует — подключаются все настроенные серверы; пустой массив — ни один; список — только эти. Projector фильтрует серверы до подключения. Claude Code при явном списке получает только их (`strictMcpConfig`), включая встроенные `projector-ide` и `projector-widgets`, если возможности включены. ACP-агенты получают выбранные серверы из `.mcp.json` проекта и пользовательского файла, если их тип поддерживается агентом.
 - **Где менять.** В карточке chat-роли: поле «промпт роли», списки навыков и MCP с режимами «все», «только выбранные» и «не добавлять». Для глобальной роли ресурсы читаются из первого проекта каталога; для роли проекта — из самого проекта.
 - **Отказ агента.** Если сервер или навык из списка больше не существует, роль не падает: отсутствующие имена перечисляются внешнему агенту как недоступные, а Projector просто не показывает их.
+
+### Шаблон контекста
+
+Флаг **`template`** превращает промпт роли в шаблон. Он включается переключателем «Шаблонизировать контекст» в карточке роли или полем `template: true` в `.projector/roles.json`. В шаблоне подставляются:
+
+| Подстановка  | Что вставляет                                                                                   |
+| ------------ | ----------------------------------------------------------------------------------------------- |
+| `{system}`   | базовый системный промпт Projector без динамических разделов                                    |
+| `{features}` | инструкции включённых возможностей агента (виджеты, IDE и другие) и доверенных виджетов проекта |
+| `{widgets}`  | только инструкции виджетов и доверенных виджетов проекта                                        |
+| `{project}`  | путь проекта и его `AGENTS.md` / `CLAUDE.md`                                                    |
+| `{memory}`   | заметки пользователя и проекта                                                                  |
+| `{skills}`   | навыки роли: у Projector — список для `use_skill`, у внешнего агента — пути к `SKILL.md`        |
+| `{mcp}`      | подключённые MCP-серверы и предупреждение о внешних данных                                      |
+| `{role}`     | название роли в рамке: `Роль «…»`                                                               |
+| `{summary}`  | сжатая история чата после компакции                                                             |
+
+У Projector шаблон **заменяет** системный промпт: разделы попадают в него только там, где стоит подстановка. Поэтому без `{system}` базовые правила Projector не включаются — это осознанный выбор автора роли. Остальные подстановки можно располагать в любом порядке; неизвестные `{…}` остаются как написаны. `{features}` уже содержит инструкции виджетов, поэтому вместе с `{widgets}` их не ставят.
+
+У внешнего агента доступны `{role}`, `{project}` и `{skills}`; `{system}`, `{features}`, `{widgets}`, `{memory}`, `{mcp}` и `{summary}` пусты, потому что свой системный промпт и возможности агент получает отдельно. У внешнего агента `{project}` — только путь проекта, без файлов инструкций. Тот же шаблон применяется в `task` и в фоновых заданиях: у `task` `{system}` — его собственный промпт, `{project}` — папка проекта.
 
 ## Фоновые задания
 
@@ -79,7 +100,8 @@ API принимает `role` в `POST /api/agent/jobs`; `backend` можно н
       "kind": "chat",
       "agent": "claude-code",
       "selection": { "model": "claude-sonnet" },
-      "prompt": "Сверяй изменения с AGENTS.md и сначала читай diff.",
+      "prompt": "{system}\n\nТы — ревьюер проекта.\n\n{project}\n\n{widgets}",
+      "template": true,
       "skills": ["review"],
       "mcp": ["github"]
     }
@@ -107,11 +129,13 @@ API: `GET /api/agent/project-roles?projectId=`, `POST /api/agent/project-roles`,
 - конкретная модель из провайдеров Projector — использовать её только для этой роли;
 - **Как в чате** кнопкой — удалить сохранённый выбор.
 
-У chat-роли задаются название, агент, описание, controls, промпт, навыки и MCP. Список controls читается у агента в первом проекте каталога; для агентов без проекта доступны их умолчания. Новая роль создаётся кнопкой «Добавить роль» с именем «Новая роль» и агентом Projector, затем редактируется.
+У chat-роли задаются название, агент, описание, controls, промпт, шаблон контекста, навыки и MCP. Список controls читается у агента в первом проекте каталога; для агентов без проекта доступны их умолчания. Новая роль создаётся кнопкой «Добавить роль» с именем «Новая роль» и агентом Projector, затем редактируется.
 
 Проектные роли настраиваются отдельно, на странице настроек проекта: раздел **«Роли проекта»** показывает файл `.projector/roles.json`, состояние доверия к его текущему хешу и те же карточки ролей. Глобальный раздел «Роли агентов» к проекту не привязан.
 
 Сохранённая модель может исчезнуть из списка провайдеров. Настройки не скрывают её: она показывается как «недоступна», а вызов продолжает работать по обычному fallback провайдера.
+
+Встроенный навык `agent-roles` описывает проектирование ролей: выбор вида, поля, шаблон контекста, команды правки, доверие к проектному файлу и проверку снимка.
 
 Файл: `$XDG_DATA_HOME/projector/agent/roles.json`.
 
@@ -141,9 +165,9 @@ API: `GET /api/agent/project-roles?projectId=`, `POST /api/agent/project-roles`,
 
 ## API
 
-- `GET /api/agent/roles` — `{ roles, file }`; у каждой роли `id`, `name`, `description`, `kind`, `agent`, `selection`, `prompt`, `skills`, `mcp`, `builtin` и `inherited`.
-- `POST /api/agent/roles` — `{ role: { name, agent, selection, description?, prompt?, skills?, mcp? } }`; создаёт chat-роль и возвращает `created`.
-- `PUT /api/agent/roles/:id` — для служебной роли `{ selection: { provider } }`; для chat-роли `{ role: { name, agent, selection, description?, prompt?, skills?, mcp? } }`.
+- `GET /api/agent/roles` — `{ roles, file }`; у каждой роли `id`, `name`, `description`, `kind`, `agent`, `selection`, `prompt`, `template`, `skills`, `mcp`, `builtin` и `inherited`.
+- `POST /api/agent/roles` — `{ role: { name, agent, selection, description?, prompt?, template?, skills?, mcp? } }`; создаёт chat-роль и возвращает `created`.
+- `PUT /api/agent/roles/:id` — для служебной роли `{ selection: { provider } }`; для chat-роли `{ role: { name, agent, selection, description?, prompt?, template?, skills?, mcp? } }`.
 - `DELETE /api/agent/roles/:id` — удаляет chat-роль; служебную удалить нельзя.
 - `POST /api/agent/roles/:id/reset` — удаляет сохранённую модель служебной роли.
 
@@ -157,7 +181,7 @@ API: `GET /api/agent/project-roles?projectId=`, `POST /api/agent/project-roles`,
 - `ide.agent.roles.set` `{ role, provider }` — выбрать модель служебной роли; пустая строка — как в чате.
 - `ide.agent.roles.reset` `{ role }` — вернуть наследование.
 - `ide.agent.roles.create` — создать chat-роль.
-- `ide.agent.roles.save` `{ role, name, agent, description?, selection?, prompt?, skills?, mcp? }` — сохранить chat-роль; не переданные поля остаются как были, пустые `skills`/`mcp` выключают набор.
+- `ide.agent.roles.save` `{ role, name, agent, description?, selection?, prompt?, template?, skills?, mcp? }` — сохранить chat-роль; не переданные поля остаются как были, пустые `skills`/`mcp` выключают набор, `template: true` включает подстановки контекста.
 - `ide.agent.roles.delete` `{ role }` — удалить chat-роль.
 
 Рабочая область проекта:
@@ -168,20 +192,21 @@ API: `GET /api/agent/project-roles?projectId=`, `POST /api/agent/project-roles`,
 
 ## Устройство
 
-| Место                                                     | Что                                                                                            |
-| --------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
-| `packages/core/modules/agent-role`                        | Контракт `AgentRole`, `AgentRoleSnapshot`, reserved ids, нормализация и `resolveRoleSelection` |
-| `packages/server/modules/agent-roles`                     | `roles.json`, chat-роли, слияние встроенных ролей, `serviceRoleSelection`                      |
-| `packages/server/modules/agent-roles/runtime.ts`          | `rolePromptText`, `roleContext` и фильтр имён для промпта, навыков и MCP                       |
-| `packages/server/modules/agent-mcp`                       | Общий разбор `agent/mcp.json` и `.mcp.json`, выбор серверов роли и форматы Claude/ACP          |
-| `packages/server/modules/agent/role-store.ts`             | Снимок роли в `chats.role`                                                                     |
-| `packages/server/routes/api/agent-roles.ts`               | HTTP API                                                                                       |
-| `packages/server/modules/agents/projector/*`              | Доктор и Lens получают выбор роли перед `quietChatModel`                                       |
-| `packages/server/modules/judge/verdict.ts`                | Судья получает выбор роли перед `quietChatModel`                                               |
-| `packages/client/modules/agent-roles`                     | API, каталог ролей, настройки и редактор chat-роли                                             |
-| `packages/client/modules/agent-core/model/role-apply.ts`  | Применение снимка к состоянию чата                                                             |
-| `packages/client/modules/agent/model/role-commands.ts`    | `ide.agent.role.open`, `ide.agent.role.edit` и `ide.agent.roles.chat.list`                     |
-| `packages/client/modules/workspace/ui/NewSessionMenu.vue` | Секция «Роли» в меню «+»: открытие чата и переход к редактору                                  |
+| Место                                                          | Что                                                                                            |
+| -------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| `packages/core/modules/agent-role`                             | Контракт `AgentRole`, `AgentRoleSnapshot`, reserved ids, нормализация и `resolveRoleSelection` |
+| `packages/server/modules/agent-roles`                          | `roles.json`, chat-роли, слияние встроенных ролей, `serviceRoleSelection`                      |
+| `packages/server/modules/agent-roles/runtime.ts`               | `rolePromptText`, `roleTemplateTitle`, `roleContext` и фильтр имён для промпта, навыков и MCP  |
+| `packages/server/modules/agents/projector/projector-system.ts` | Сборка системного промпта Projector и подстановки шаблона роли                                 |
+| `packages/server/modules/agent-mcp`                            | Общий разбор `agent/mcp.json` и `.mcp.json`, выбор серверов роли и форматы Claude/ACP          |
+| `packages/server/modules/agent/role-store.ts`                  | Снимок роли в `chats.role`                                                                     |
+| `packages/server/routes/api/agent-roles.ts`                    | HTTP API                                                                                       |
+| `packages/server/modules/agents/projector/*`                   | Доктор и Lens получают выбор роли перед `quietChatModel`                                       |
+| `packages/server/modules/judge/verdict.ts`                     | Судья получает выбор роли перед `quietChatModel`                                               |
+| `packages/client/modules/agent-roles`                          | API, каталог ролей, настройки и редактор chat-роли                                             |
+| `packages/client/modules/agent-core/model/role-apply.ts`       | Применение снимка к состоянию чата                                                             |
+| `packages/client/modules/agent/model/role-commands.ts`         | `ide.agent.role.open`, `ide.agent.role.edit` и `ide.agent.roles.chat.list`                     |
+| `packages/client/modules/workspace/ui/NewSessionMenu.vue`      | Секция «Роли» в меню «+»: открытие чата и переход к редактору                                  |
 
 `serviceRoleSelection(id, fallback)` возвращает `{ ...fallback, ...role.selection }`: явный выбор роли побеждает модель чата. Неизвестный провайдер не ломает вызов — `resolveOpenAIProvider` выбирает активного провайдера, как и раньше.
 
@@ -194,6 +219,7 @@ API: `GET /api/agent/project-roles?projectId=`, `POST /api/agent/project-roles`,
 - Список навыков роли отключает `use_skill` только у Projector. Claude Code, Codex, Cursor и Kimi сохраняют свои нативные навыки и правила; роль лишь добавляет выбранные пути в промпт.
 - Служебную роль нельзя запустить как чат, фоновое задание или `task`.
 - Смена роли внутри начатого чата не поддерживается: роль фиксируется снимком. Новую роль открывает меню «+».
+- Шаблон контекста у Projector заменяет системный промпт: без `{system}` базовые правила и границы безопасности не подставляются. У внешних агентов шаблон дополняет их собственный промпт.
 - Список controls chat-роли берётся из первого проекта каталога; значения, которых нет у агента сейчас, показываются как «недоступно».
 
 ## Проверки

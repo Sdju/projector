@@ -12,4 +12,4 @@ description: Настройка возможностей, ролей, модел
 - **Контролы и сессии внешних агентов (в scope чата):**
   - `ide.agent.controls.list` показывает текущие модель, усилие и режим; `ide.agent.control.set` (`id`, `value`) меняет их со следующего сообщения.
   - `ide.agent.sessions.list` перечисляет прошлые сессии; `ide.agent.session.resume` (`sessionId`) открывает её в этом чате; `ide.agent.session.delete` (`sessionId`, `confirm: true`) удаляет навсегда (только по явной просьбе).
-- **Редактор chat-роли:** `ide.agent.role.edit` с `role` из `ide.agent.roles.chat.list` (глобальная открывает раздел `agent-roles`, проектная — настройки проекта, раздел `roles`).
+- **Редактор chat-роли:** `ide.agent.role.edit` с `role` из `ide.agent.roles.chat.list` (глобальная открывает раздел `agent-roles`, проектная — настройки проекта, раздел `roles`). Проектирование ролей, шаблоны контекста и доверие к проектному файлу — в навыке `agent-roles`.

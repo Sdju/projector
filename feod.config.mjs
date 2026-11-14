@@ -110,10 +110,6 @@ export default {
             ceiling: 402,
             plan: "Вынести чтение файлов и ассетов GitLab в отдельный files.ts",
           },
-          "packages/server/modules/agents/projector/projector-backend.ts": {
-            ceiling: 409,
-            plan: "Вынести настройку инструментов хода (guard, review, task runner) в projector-turn-setup.ts.",
-          },
         },
       },
       confine: adapters,

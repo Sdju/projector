@@ -95,13 +95,21 @@ test("roles API creates, updates and deletes a chat role", async () => {
           description: "Проверяет изменения",
           agent: "projector",
           selection: { provider: "test:model" },
+          prompt: "{system}\n\n{role}",
+          template: true,
         },
       }),
     });
     expect(createdResponse.status).toBe(201);
     const created = await createdResponse.json();
     const role = created.created;
-    expect(role).toMatchObject({ kind: "chat", name: "Ревьюер", agent: "projector" });
+    expect(role).toMatchObject({
+      kind: "chat",
+      name: "Ревьюер",
+      agent: "projector",
+      prompt: "{system}\n\n{role}",
+      template: true,
+    });
     expect(role.id).toMatch(/^role-/);
     expect(created.roles.map((item) => item.id)).toContain(role.id);
 
@@ -109,6 +117,8 @@ test("roles API creates, updates and deletes a chat role", async () => {
       roleId: role.id,
       name: role.name,
       selection: role.selection,
+      prompt: role.prompt,
+      template: role.template,
     };
     const historyWrite = await fetch(`${origin}/api/agent/history/role-chat`, {
       method: "PUT",

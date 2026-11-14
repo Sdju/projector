@@ -25,6 +25,8 @@ export interface AgentRole {
   isolate?: boolean;
   /** Extra instructions appended after the agent's own system prompt for this role. */
   prompt?: string;
+  /** The prompt is a context template with `{system}`, `{widgets}` and similar placeholders. */
+  template?: boolean;
   /** Skill and command names the role may use: omitted means all, `[]` means none. */
   skills?: string[];
   /** MCP server names the role may connect to: omitted means all, `[]` means none. */
@@ -40,6 +42,7 @@ export interface AgentRoleSnapshot {
   selection: AgentRoleSelection;
   permissionMode?: AgentRolePermissionMode;
   prompt?: string;
+  template?: boolean;
   skills?: string[];
   mcp?: string[];
 }
@@ -122,6 +125,48 @@ export const ROLE_LIMITS = {
   resource: 80,
 } as const;
 
+/**
+ * What a templated role prompt may insert. `system` is the agent's base system prompt (Projector
+ * builds it; external agents keep their own), `features` and `widgets` are the enabled abilities,
+ * `project` and `memory` are the project folder, instructions and notes, `skills` and `mcp` are the
+ * role's resources, `role` is the role title and `summary` is the compacted chat history.
+ */
+export type AgentRoleTemplateVariable =
+  | "system"
+  | "features"
+  | "widgets"
+  | "project"
+  | "memory"
+  | "skills"
+  | "mcp"
+  | "role"
+  | "summary";
+
+export const ROLE_TEMPLATE_VARIABLES: readonly AgentRoleTemplateVariable[] = [
+  "system",
+  "features",
+  "widgets",
+  "project",
+  "memory",
+  "skills",
+  "mcp",
+  "role",
+  "summary",
+];
+
+/** The texts a template can insert; a missing key leaves its placeholder untouched. */
+export type AgentRoleTemplateValues = Partial<Record<AgentRoleTemplateVariable, string>>;
+
+const ROLE_TEMPLATE_PATTERN = new RegExp(`\\{(${ROLE_TEMPLATE_VARIABLES.join("|")})\\}`, "g");
+
+/** Replaces the known placeholders and keeps anything else, including `{custom}`, as written. */
+export function renderRoleTemplate(template: string, values: AgentRoleTemplateValues): string {
+  return template.replace(ROLE_TEMPLATE_PATTERN, (placeholder, name: AgentRoleTemplateVariable) => {
+    const value = values[name];
+    return value === undefined ? placeholder : value;
+  });
+}
+
 /** Skill, command and MCP server names: ordered, unique and bounded. `[]` is a real choice. */
 export function normalizeRoleResources(value: unknown): string[] | undefined {
   if (!Array.isArray(value)) return undefined;
@@ -200,6 +245,7 @@ export function normalizeAgentRole(value: unknown): AgentRole | undefined {
     ...(permissionMode ? { permissionMode } : {}),
     ...(row.isolate === true ? { isolate: true } : {}),
     ...(prompt ? { prompt } : {}),
+    ...(kind === "chat" && row.template === true ? { template: true } : {}),
     ...(skills !== undefined ? { skills } : {}),
     ...(mcp !== undefined ? { mcp } : {}),
   };
@@ -226,6 +272,7 @@ export function snapshotOfRole(role: AgentRole): AgentRoleSnapshot {
     selection: { ...role.selection },
     ...(role.permissionMode ? { permissionMode: role.permissionMode } : {}),
     ...(role.prompt ? { prompt: role.prompt } : {}),
+    ...(role.template ? { template: true } : {}),
     ...(role.skills !== undefined ? { skills: [...role.skills] } : {}),
     ...(role.mcp !== undefined ? { mcp: [...role.mcp] } : {}),
   };
@@ -254,6 +301,7 @@ export function normalizeRoleSnapshot(value: unknown): AgentRoleSnapshot | undef
     selection: normalizeRoleSelection(row.selection),
     ...(permissionMode ? { permissionMode } : {}),
     ...(prompt ? { prompt } : {}),
+    ...(row.template === true ? { template: true } : {}),
     ...(skills !== undefined ? { skills } : {}),
     ...(mcp !== undefined ? { mcp } : {}),
   };

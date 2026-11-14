@@ -15,6 +15,7 @@ export {
   featurePrompt,
   featureSettings,
   featuresFile,
+  featureText,
   sessionTitleWithoutInjected,
   setFeatureAgent,
   splitFeaturePrompt,
