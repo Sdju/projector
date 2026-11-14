@@ -13,6 +13,10 @@ import IconEye from "~icons/lucide/eye";
 import IconEyeOff from "~icons/lucide/eye-off";
 import IconSidebar from "~icons/lucide/panel-left";
 import IconReset from "~icons/lucide/rotate-ccw";
+import IconMaximize from "~icons/lucide/maximize-2";
+import UiKbd from "../../../common/ui/UiKbd.vue";
+import { zenMode } from "../../../common/utilities/zen-mode.ts";
+import { useOptionalIdeCommands } from "../../ide/index.ts";
 
 /**
  * Остров управления раскладкой: наглядные готовые варианты, видимость блоков и сброс.
@@ -39,6 +43,14 @@ const menu = useIslandMenu({
 });
 const { open, toggle, close } = menu;
 const shownBlocks = computed(() => props.groups.filter((group) => group.role));
+const ide = useOptionalIdeCommands();
+const zenShortcut = computed(() => {
+  ide?.revision.value;
+  const scope = ide?.api.getScopes().find((item) => item.context.surface === "editor");
+  return scope
+    ? ide?.api.describeCommand(scope.id, "ide.workbench.zen.toggle")?.shortcut
+    : ide?.api.describeCommand("workbench", "ide.workbench.zen.toggle")?.shortcut;
+});
 
 function run(id: string, args?: unknown, keepOpen = false) {
   emit("command", id, args);
@@ -128,6 +140,18 @@ function run(id: string, args?: unknown, keepOpen = false) {
         />
       </UiActionRow>
     </UiStack>
+    <UiActionRow
+      :gap="2"
+      :fill="false"
+      class="block"
+      :aria-pressed="zenMode"
+      data-command="ide.workbench.zen.toggle"
+      @click="run('ide.workbench.zen.toggle')"
+    >
+      <IconMaximize aria-hidden="true" />
+      <UiActionCopy :grow="false" title="Режим Zen" description="Только активный блок" />
+      <UiKbd v-if="zenShortcut" class="zen-kbd">{{ zenShortcut }}</UiKbd>
+    </UiActionRow>
     <UiActionRow
       :gap="2"
       :fill="false"
@@ -224,6 +248,9 @@ function run(id: string, args?: unknown, keepOpen = false) {
   width: 14px;
   height: 14px;
   flex-shrink: 0;
+}
+.zen-kbd {
+  margin-left: auto;
 }
 .reset {
   margin: 0 var(--sp-1) var(--sp-1);

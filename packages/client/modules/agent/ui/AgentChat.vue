@@ -5,16 +5,47 @@ import { useIdeCommands } from "../../ide/index.ts";
 import { workspaceRequest } from "../../workspace-api/index.ts";
 import { AgentFeaturesIsland } from "../../agent-features/index.ts";
 import { AgentJudgeIsland } from "../modules/settings/index.ts";
-import { agentCommandHandler } from "../../agent-core/index.ts";
-import { agentLabel, isBuiltinAgent } from "../../agent-core/index.ts";
+import {
+  activateChat,
+  agentCommandHandler,
+  agentLabel,
+  chatTasks,
+  chatsOf,
+  fetchMcpServers,
+  isBuiltinAgent,
+  provideChatContext,
+  registerChat,
+  shownPlan,
+  useAgent,
+  type AgentBackendId,
+  type ChatController,
+  type ChatUsage,
+  type RewindScope,
+} from "../../agent-core/index.ts";
 import { openAgentChat } from "../model/open-agent.ts";
 import { chatDropHandlers } from "../lib/chat-drop.ts";
 import { useChatBranch } from "../model/chat-branch.ts";
 import { useChatReadout } from "../model/chat-readout.ts";
-import { useAgent } from "../../agent-core/index.ts";
-import { useChatJobs } from "../modules/jobs/index.ts";
-import { lensActions, useAgentLens } from "../../agent-turns/index.ts";
-import { useSideQuestion } from "../modules/panels/index.ts";
+import { AgentActivityDock, AgentJobRequests, useChatJobs } from "../modules/jobs/index.ts";
+import {
+  AgentPermissions,
+  AgentQuestions,
+  AgentSecrets,
+  AgentTaskView,
+  AgentTurn,
+  lensActions,
+  useAgentLens,
+  useChatTaskView,
+} from "../../agent-turns/index.ts";
+import {
+  AgentRewind,
+  AgentSideQuestion,
+  AgentWorktree,
+  useMcpServers,
+  useRewindPanel,
+  useSideQuestion,
+  useWorktreePanel,
+} from "../modules/panels/index.ts";
 import { useAutoCompact } from "../model/use-auto-compact.ts";
 import { useChatInputActions, useChatRetry } from "../model/use-chat-input-actions.ts";
 import { useAnswerForm } from "../model/answer-form.ts";
@@ -25,46 +56,22 @@ import UiBadge from "../../../common/ui/UiBadge.vue";
 import UiButton from "../../../common/ui/UiButton.vue";
 import UiLoader from "../../../common/ui/UiLoader.vue";
 import AgentWelcome from "./AgentWelcome.vue";
-import { AgentTurn } from "../../agent-turns/index.ts";
-import { AgentComposer } from "../modules/composer/index.ts";
-import { AgentActivityDock } from "../modules/jobs/index.ts";
-import { AgentJobRequests } from "../modules/jobs/index.ts";
-import { AgentQuestions, AgentSecrets } from "../../agent-turns/index.ts";
-import { AgentPermissions } from "../../agent-turns/index.ts";
+import { AgentComposer, AgentControls } from "../modules/composer/index.ts";
 import AgentContextMeter from "./AgentContextMeter.vue";
 import AgentChipPreview from "./AgentChipPreview.vue";
 import ImageModal from "../../../common/ui/ImageModal.vue";
-import { AgentControls } from "../modules/composer/index.ts";
 import AgentSessions from "./AgentSessions.vue";
-import { AgentSideQuestion } from "../modules/panels/index.ts";
-import { AgentTaskView } from "../../agent-turns/index.ts";
 import AgentChatMenu from "./AgentChatMenu.vue";
-import { chatTasks } from "../../agent-core/index.ts";
-import { useChatTaskView } from "../../agent-turns/index.ts";
 import { useChipActions } from "../model/use-chip-actions.ts";
-import { provideChatContext } from "../../agent-core/index.ts";
-import { AgentRewind } from "../modules/panels/index.ts";
-import { AgentWorktree } from "../modules/panels/index.ts";
 import { exportChat, downloadChat as saveChatMarkdown } from "../lib/export.ts";
-import { copyText } from "../lib/clipboard.ts";
-import { shownPlan } from "../../agent-core/index.ts";
 import { previousUser } from "../lib/previous-user.ts";
-import { fetchMcpServers } from "../../agent-core/index.ts";
-import { useMcpServers } from "../modules/panels/index.ts";
-import {
-  activateChat,
-  chatsOf,
-  registerChat,
-  type ChatController,
-} from "../../agent-core/index.ts";
 import { AgentSecretShow, useSecretShows } from "../../agent-secret-show/index.ts";
 import { useChatScroll } from "../model/chat-scroll.ts";
 import { useChatWindow } from "../model/chat-window.ts";
+import { useChatZenFocus } from "../model/chat-zen.ts";
+import { useChatCopy } from "../model/use-chat-copy.ts";
 import { useAgentChatTabTitle } from "../model/chat-titles.ts";
-import { useRewindPanel } from "../modules/panels/index.ts";
-import { useWorktreePanel } from "../modules/panels/index.ts";
 import { chatUsageByTurn } from "../model/chat-usage.ts";
-import type { AgentBackendId, ChatUsage, RewindScope } from "../../agent-core/index.ts";
 import type { AgentPresetView } from "@ai-projector/core/modules/agent-preset/index.ts";
 import type { AgentRoleSnapshot } from "@ai-projector/core/modules/agent-role/index.ts";
 import IconArrowDown from "~icons/lucide/arrow-down";
@@ -300,6 +307,13 @@ const {
   },
 });
 rememberScroll = rememberChatScroll;
+const zenMode = useChatZenFocus({
+  projectId: props.projectId,
+  chatKey,
+  viewed: viewingTask,
+  root,
+  focusComposer: () => composer.value?.focus(),
+});
 // The project folder: edited files and dropped paths are shown relative to it.
 const projectRoot = ref("");
 void workspaceRequest<{ root: string }>(props.projectId, "root")
@@ -449,14 +463,12 @@ onBeforeUnmount(registerChat(controller));
 const { open: openChip, image: chipPreview } = useChipActions(props.projectId, api, (message) => {
   error.value = message;
 });
-const copied = ref("");
-const copyError = ref("");
+const { copied, copyError, copyMessage } = useChatCopy();
 function dismissError() {
   error.value = "";
   copyError.value = "";
 }
 const { retryableError, retryFailed } = useChatRetry(turns, busy, error, copyError, retryMessage);
-let copyTimer: ReturnType<typeof setTimeout> | undefined;
 // Components in the answers write back into this chat; a busy agent queues the message.
 provide(widgetReplyKey, (text) => {
   void toBottom();
@@ -475,28 +487,14 @@ const { submit, continueTurn, suggest, newChat } = useChatInputActions({
   },
   focus: () => composer.value?.focus(),
 });
-async function copyMessage(id: string, text: string) {
-  if (!(await copyText(text))) {
-    copyError.value = "Не удалось скопировать ответ";
-    return;
-  }
-  copied.value = id;
-  copyError.value = "";
-  clearTimeout(copyTimer);
-  copyTimer = setTimeout(() => {
-    copied.value = "";
-  }, 2000);
-}
-onBeforeUnmount(() => {
-  release();
-  clearTimeout(copyTimer);
-});
+onBeforeUnmount(() => release());
 </script>
 
 <template>
   <UiPanel
     ref="panel"
     class="agent-chat"
+    :class="{ zen: zenMode }"
     aria-label="Чат с агентом"
     @focusin="activateChat(controller)"
     @pointerdown.capture="activateChat(controller)"
@@ -505,7 +503,14 @@ onBeforeUnmount(() => {
     @dragleave="chatDrop.dragleave"
     @drop="chatDrop.drop"
   >
-    <UiInline class="chat-tools" :gap="1" align="normal" justify="end">
+    <UiInline
+      v-show="!zenMode"
+      :inert="zenMode"
+      class="chat-tools"
+      :gap="1"
+      align="normal"
+      justify="end"
+    >
       <UiBadge
         v-if="roleSnapshot"
         tone="info"
@@ -643,7 +648,7 @@ onBeforeUnmount(() => {
       @tab="taskInTab(viewed.task.id)"
     />
     <div class="dock">
-      <p v-if="editing" class="edit-hint" role="status">
+      <p v-if="editing && !zenMode" class="edit-hint" role="status">
         Правка сообщения: новое заменит выделенное и всё после него, старый вариант останется
         версией.
         <button type="button" @click="cancelEdit">Отмена</button>
@@ -659,7 +664,7 @@ onBeforeUnmount(() => {
         <AgentJobRequests v-if="!plain" :jobs="jobsState.jobs" @answered="jobsState.refresh" />
       </div>
       <AgentRewind
-        v-if="rewinding"
+        v-if="rewinding && !zenMode"
         :key="rewinding.id"
         :can-files="canRewindFiles(rewinding.id)"
         :preview="rewindPreview"
@@ -673,7 +678,7 @@ onBeforeUnmount(() => {
         @cancel="closeRewind"
       />
       <AgentWorktree
-        v-if="copy"
+        v-if="copy && !zenMode"
         :branch="copy.branch"
         :info="copyInfo"
         :working="copyWorking || busy"
@@ -681,9 +686,11 @@ onBeforeUnmount(() => {
         @merge="endCopy(mergeCopy)"
         @discard="endCopy(discardCopy)"
       />
-      <AgentSideQuestion v-if="side.state.open" :side="side" />
+      <AgentSideQuestion v-if="side.state.open && !zenMode" :side="side" />
       <p
-        v-if="capabilities.compact && contextShare >= capabilities.compact.hintAt && !busy"
+        v-if="
+          capabilities.compact && contextShare >= capabilities.compact.hintAt && !busy && !zenMode
+        "
         class="compact-hint"
         :class="{ urgent: contextShare >= capabilities.compact.autoAt }"
         role="status"
@@ -696,6 +703,7 @@ onBeforeUnmount(() => {
         <button type="button" @click="compact">Сжать сейчас</button>
       </p>
       <AgentActivityDock
+        v-if="!zenMode"
         :jobs="jobsState.jobs"
         :chat="chatKey"
         :tasks="tasks"
@@ -716,7 +724,7 @@ onBeforeUnmount(() => {
       />
     </div>
     <AgentComposer
-      v-show="!viewed"
+      v-show="!viewed && !zenMode"
       ref="composer"
       v-model="draft"
       v-model:parts="draftParts"
@@ -882,6 +890,12 @@ onBeforeUnmount(() => {
   width: 100%;
   max-width: var(--chat-width);
   margin: auto;
+}
+.agent-chat.zen .chat-log {
+  padding-bottom: var(--sp-6);
+}
+.agent-chat.zen .dock:has(.requests) {
+  padding-bottom: var(--sp-4);
 }
 @container (max-width: 500px) {
   .chat-log {

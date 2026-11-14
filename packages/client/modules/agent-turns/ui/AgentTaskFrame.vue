@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import UiSpinner from "../../../common/ui/UiSpinner.vue";
+import { zenMode } from "../../../common/utilities/zen-mode.ts";
 import IconBot from "~icons/lucide/bot";
 import IconTerminal from "~icons/lucide/terminal";
 
@@ -19,7 +20,7 @@ withDefaults(
 
 <template>
   <section class="task-frame" :aria-label="label">
-    <header class="head">
+    <header v-show="!zenMode" class="head">
       <slot name="leading" />
       <component :is="kind === 'shell' ? IconTerminal : IconBot" class="kind" aria-hidden="true" />
       <div class="titles">

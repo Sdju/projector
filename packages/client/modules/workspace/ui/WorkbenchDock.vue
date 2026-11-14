@@ -26,6 +26,7 @@ const props = defineProps<{
   projectId: string;
   mobile?: boolean;
   mobileSurface?: "editor" | "files" | "terminal";
+  zen?: boolean;
   workbench: ReturnType<typeof useWorkbenchLayout>;
   files: ReturnType<typeof useOpenFiles>;
   tabActions: (id: string) => ContextMenuItem[];
@@ -51,6 +52,7 @@ const hostOf = (key: string) => props.panelHosts.hosts[key] ?? null;
     v-model:layout="workbench.layout.value"
     :mobile="mobile"
     :mobile-surface="mobileSurface"
+    :zen="zen"
     :terminal-panel="(id) => terminalPanels.has(id) || id.startsWith('terminal:')"
     :describe="workbench.describePanel"
     :project-id="projectId"

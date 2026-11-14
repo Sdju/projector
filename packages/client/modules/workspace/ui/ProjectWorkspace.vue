@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import UiLoader from "../../../common/ui/UiLoader.vue";
+import UiButton from "../../../common/ui/UiButton.vue";
 import UiResizeHandle from "../../../common/ui/UiResizeHandle.vue";
+import IconMinimize from "~icons/lucide/minimize-2";
 import { computed, onBeforeUnmount, ref } from "vue";
 import {
   workspaceProfile,
@@ -48,6 +50,7 @@ import { useWorkspaceRefresh } from "../lib/workspace-refresh.ts";
 import { useMobileSurfaces, registerMobileCommands } from "../lib/mobile-surfaces.ts";
 import { useSurfaceSwipe } from "../lib/surface-swipe.ts";
 import { registerProjectWidgetCommands } from "../../project-widgets/index.ts";
+import { useWorkspaceZen } from "../lib/zen.ts";
 const props = defineProps<{
   projectId: string;
   projectSettingsDirty?: boolean;
@@ -78,6 +81,7 @@ const editorCommands = useCommandScope(`editor:${props.projectId}`, () => ({
   surface: "editor",
   projectId: props.projectId,
 }));
+const { zenMode, shortcut: zenShortcut } = useWorkspaceZen(editorCommands);
 useSurfaceSwipe({
   workspace: workspaceElement,
   mobile,
@@ -491,6 +495,7 @@ onBeforeUnmount(() => overview.cancel());
       'sidebar-hidden': sidebarInvisible,
       'has-aside': asideVisible,
       'aside-hidden': asideHidden,
+      zen: zenMode,
     }"
     :data-surface="mobile ? mobileSurface : undefined"
     :style="sizes"
@@ -518,6 +523,7 @@ onBeforeUnmount(() => overview.cancel());
       <WorkspaceSidebar
         ref="sidebar"
         v-model:section="section"
+        :inert="zenMode"
         :project-id="projectId"
         :capabilities="capabilities"
         :sections="sections"
@@ -564,7 +570,7 @@ onBeforeUnmount(() => overview.cancel());
     />
     <section
       class="dock-pane"
-      :inert="mobile && mobileSidebarOpen"
+      :inert="mobile && mobileSidebarOpen && !zenMode"
       aria-label="Блоки редактора и терминалов"
       @focusin="editorFocus"
       @keydown.capture="editorKeydown"
@@ -575,6 +581,7 @@ onBeforeUnmount(() => overview.cancel());
         :workbench="workbench"
         :mobile="mobile"
         :mobile-surface="mobileSurface"
+        :zen="zenMode"
         :files="files"
         :tab-actions="tabActions"
         :panel-hosts="panelHosts"
@@ -589,6 +596,7 @@ onBeforeUnmount(() => overview.cancel());
       v-if="asideVisible"
       ref="asidePanel"
       class="aside"
+      :inert="zenMode"
       v-model:section="asideSection"
       side="right"
       :project-id="projectId"
@@ -621,6 +629,8 @@ onBeforeUnmount(() => overview.cancel());
     />
     <MobileSurfaces
       v-if="mobile"
+      v-show="!zenMode"
+      :inert="zenMode"
       :terminals="capabilities.terminals"
       :surface="mobileSurface"
       @command="(id, args) => editorCommands.run(id, args)"
@@ -631,7 +641,19 @@ onBeforeUnmount(() => overview.cancel());
       @cancel="terminals.cancelClose"
       @confirm="terminals.confirmClose"
     />
-    <StatusBar v-if="!mobile" class="workspace-status" />
+    <StatusBar v-if="!mobile" v-show="!zenMode" :inert="zenMode" class="workspace-status" />
+    <UiButton
+      v-if="zenMode"
+      shape="icon"
+      size="sm"
+      class="zen-exit"
+      :title="`Выйти из режима Zen (${zenShortcut ? `${zenShortcut} · ` : ''}Esc)`"
+      aria-label="Выйти из режима Zen"
+      data-command="ide.workbench.zen.toggle"
+      @click="editorCommands.run('ide.workbench.zen.toggle', { on: false })"
+    >
+      <IconMinimize aria-hidden="true" />
+    </UiButton>
   </div>
 </template>
 
@@ -779,5 +801,51 @@ onBeforeUnmount(() => overview.cancel());
   grid-column: 1 / -1;
   grid-row: 4;
   margin-top: var(--island-gap);
+}
+.workspace.zen,
+.workspace.zen.sidebar-hidden,
+.workspace.zen.has-aside,
+.workspace.zen.sidebar-hidden.has-aside,
+.workspace.zen.has-aside.aside-hidden,
+.workspace.zen.sidebar-hidden.has-aside.aside-hidden {
+  position: relative;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+  column-gap: 0;
+}
+.workspace.zen > .sidebar,
+.workspace.zen > .aside,
+.workspace.zen > .tree-resize,
+.workspace.zen > .sidebar-backdrop,
+.workspace.zen > .workspace-status,
+.workspace.zen > .mobile-surfaces {
+  display: none;
+}
+.workspace.zen .dock-pane {
+  grid-column: 1;
+  grid-row: 1;
+  overflow: hidden;
+  border: 0;
+  border-radius: 0;
+}
+.zen-exit {
+  position: absolute;
+  top: max(var(--sp-2), env(safe-area-inset-top));
+  right: max(var(--sp-2), env(safe-area-inset-right));
+  z-index: var(--z-expanded);
+  border: 1px solid var(--line);
+  background: var(--bg-2);
+  box-shadow: var(--shadow-popover);
+  opacity: 0.45;
+  transition:
+    opacity var(--t-fast),
+    background var(--t-fast),
+    color var(--t-fast);
+}
+.zen-exit:hover,
+.zen-exit:focus-visible {
+  opacity: 1;
+  background: var(--bg-3);
+  color: var(--text);
 }
 </style>

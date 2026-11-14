@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from "vue";
+import { zenMode } from "../../../common/utilities/zen-mode.ts";
 import UiButton from "../../../common/ui/UiButton.vue";
 import UiLoader from "../../../common/ui/UiLoader.vue";
 import { useElapsedClock } from "../../agent-core/index.ts";
@@ -84,7 +85,7 @@ const outcome = computed(() => {
     :meta="meta"
     :running="task.status === 'running'"
     :kind="task.kind"
-    @keydown.esc="emit('back')"
+    @keydown.esc="!zenMode && emit('back')"
   >
     <template #leading>
       <UiButton
@@ -122,7 +123,7 @@ const outcome = computed(() => {
         <IconTab aria-hidden="true" />
       </UiButton>
     </template>
-    <div v-if="lens.state.open" class="task-lens">
+    <div v-if="lens.state.open && !zenMode" class="task-lens">
       <AgentLensPanel :lens="lens" />
     </div>
     <div v-if="turns.length" class="body conversation" role="log" aria-label="Чат сабагента">

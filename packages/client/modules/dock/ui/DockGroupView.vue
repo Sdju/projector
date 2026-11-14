@@ -25,6 +25,8 @@ const body = ref<HTMLElement>();
 const zone = ref<DockZone | "">("");
 const focused = computed(() => dock.layout().focused === props.group.id);
 const maximized = computed(() => dock.layout().maximized === props.group.id);
+const zen = computed(() => dock.zen?.() ?? false);
+const zenActive = computed(() => zen.value && focused.value);
 const tabs = computed(() => props.group.panels.map((id) => dock.describe(id)));
 
 function zoneAt(event: DragEvent): DockZone {
@@ -126,12 +128,18 @@ const focus = () => {
     as="section"
     sizing="flex"
     class="dock-group"
-    :class="{ focused, maximized }"
+    :class="{ focused, maximized, zen: zenActive }"
+    :inert="zen && !focused"
     :data-group="group.id"
     @pointerdown.capture="focus"
     @focusin="focus"
   >
-    <header class="dock-header" @dragenter.capture="clearZone" @dragover.capture="clearZone">
+    <header
+      v-show="!zenActive"
+      class="dock-header"
+      @dragenter.capture="clearZone"
+      @dragover.capture="clearZone"
+    >
       <div v-if="dock.slots.leading" class="dock-leading">
         <DockSlot :render="dock.slots.leading" :args="{ group }" />
       </div>
@@ -213,10 +221,15 @@ const focus = () => {
 .dock-group.focused {
   border-color: var(--line-strong);
 }
-.dock-group.maximized {
+.dock-group.maximized,
+.dock-group.zen {
   position: absolute;
   inset: 0;
   z-index: var(--z-sticky);
+}
+.dock-group.zen {
+  border-width: 0;
+  border-radius: 0;
 }
 .dock-header {
   display: flex;

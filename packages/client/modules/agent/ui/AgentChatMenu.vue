@@ -11,6 +11,9 @@ import IconMessageCircleQuestion from "~icons/lucide/message-circle-question";
 import IconScanEye from "~icons/lucide/scan-eye";
 import IconScale from "~icons/lucide/scale";
 import IconSparkles from "~icons/lucide/sparkles";
+import IconMaximize from "~icons/lucide/maximize-2";
+import { toggleZenMode, zenAvailable, zenMode } from "../../../common/utilities/zen-mode.ts";
+import { useOptionalIdeCommands } from "../../ide/index.ts";
 
 /** Secondary chat actions, kept out of the header so it stays a short row of durable controls. */
 defineProps<{
@@ -41,6 +44,15 @@ const menu = useIslandMenu({
   returnFocus: "button",
 });
 defineExpose({ anchor: () => menu.trigger.value });
+const ide = useOptionalIdeCommands();
+function toggleZen() {
+  menu.close();
+  if (ide)
+    void ide.api
+      .executeCommand("ide.workbench.zen.toggle", undefined, { scope: "workbench" })
+      .catch(ide.reportError);
+  else toggleZenMode();
+}
 function run(action: "lens" | "side" | "features" | "judge" | "download" | "isolate") {
   menu.close();
   switch (action) {
@@ -133,6 +145,21 @@ function run(action: "lens" | "side" | "features" | "judge" | "download" | "isol
           <span class="hint">git worktree: файлы не меняются до слияния</span>
         </span>
         <IconCheck v-if="isolate" class="state" aria-hidden="true" />
+      </button>
+      <button
+        v-if="zenAvailable"
+        type="button"
+        class="item"
+        :aria-pressed="zenMode"
+        data-command="ide.workbench.zen.toggle"
+        @click="toggleZen"
+      >
+        <IconMaximize aria-hidden="true" />
+        <span class="text">
+          <span class="title">Режим Zen</span>
+          <span class="hint">Скрыть панели, ввод и детали работы</span>
+        </span>
+        <IconCheck v-if="zenMode" class="state" aria-hidden="true" />
       </button>
     </UiIsland>
   </div>

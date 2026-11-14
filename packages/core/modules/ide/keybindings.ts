@@ -3,6 +3,7 @@ const tree = { surface: "fileTree" };
 export const defaultKeybindings: Keybinding[] = [
   { key: "Mod+Shift+P", command: "ide.workbench.commandPalette.open", allowInput: true },
   { key: "F1", command: "ide.workbench.commandPalette.open", allowInput: true },
+  { key: "Mod+Shift+Z", command: "ide.workbench.zen.toggle", allowInput: true },
   { key: "F2", command: "ide.fileTree.file.rename", when: { ...tree, entryKind: "file" } },
   {
     key: "F2",

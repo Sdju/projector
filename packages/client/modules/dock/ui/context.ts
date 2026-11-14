@@ -16,6 +16,7 @@ export interface DockTabInfo {
 /** Всё, что вложенные узлы раскладки получают от `DockLayout`, не передавая это через props. */
 export interface DockContext {
   layout: () => DockLayout;
+  zen?: () => boolean;
   slots: Slots;
   projectId: string;
   commandNamespace: string;

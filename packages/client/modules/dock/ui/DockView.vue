@@ -16,6 +16,7 @@ const props = defineProps<{
   layout: DockLayout;
   mobile?: boolean;
   mobileSurface?: "editor" | "files" | "terminal";
+  zen?: boolean;
   terminalPanel?: (id: string) => boolean;
   describe: (id: string) => DockTabInfo;
   projectId: string;
@@ -36,6 +37,7 @@ const emit = defineEmits<{
 const slots: Slots = useSlots();
 provide(dockKey, {
   layout: () => props.layout,
+  zen: () => !!props.zen,
   slots,
   get projectId() {
     return props.projectId;
@@ -61,7 +63,7 @@ useEventListener(window, "drop", () => (tabDrag.value = undefined));
 </script>
 
 <template>
-  <div class="dock" :class="{ mobile: mobile }">
+  <div class="dock" :class="{ mobile: mobile, zen: zen }">
     <MobileDock
       v-if="mobile && terminalPanel"
       :surface="mobileSurface ?? 'editor'"
@@ -94,5 +96,10 @@ useEventListener(window, "drop", () => (tabDrag.value = undefined));
 .dock.mobile {
   height: 100%;
   min-height: 0;
+}
+.dock.zen {
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
 }
 </style>

@@ -138,7 +138,7 @@ Local and GitHub/GitLab profiles put the global work inbox in that rail as secti
 
 ## Reload and server mode
 
-Global `workbench` scope: `ide.workbench.pages.reload` reloads all same-origin pages (BroadcastChannel). `ide.workbench.server.restart` confirms, calls `POST /api/app/restart`, waits for a new PID in `/api/health` (60 s timeout), then reloads; `ide.workbench.server.mode.dev|prod` call `POST /api/app/mode` with `{ mode }` (detached `projector mode <mode>`, see [usage](usage.md)). All of them end terminals and child processes. `ide.workbench.pwa.install` opens the saved browser install prompt, `ide.workbench.fullscreen.toggle` uses the Fullscreen API (also in the mobile surface pill and the scope of every project workspace).
+Global `workbench` scope: `ide.workbench.pages.reload` reloads all same-origin pages (BroadcastChannel). `ide.workbench.server.restart` confirms, calls `POST /api/app/restart`, waits for a new PID in `/api/health` (60 s timeout), then reloads; `ide.workbench.server.mode.dev|prod` call `POST /api/app/mode` with `{ mode }` (detached `projector mode <mode>`, see [usage](usage.md)). All of them end terminals and child processes. `ide.workbench.pwa.install` opens the saved browser install prompt, `ide.workbench.fullscreen.toggle` uses the Fullscreen API (also in the mobile surface pill and the scope of every project workspace). `ide.workbench.zen.toggle` (`Mod+Shift+Z`, optional `{ on?: boolean }`) expands the active dock panel to the full window and hides sidebars, shell header, status bar, dock tabs and chat chrome (composer, tools, turn actions/footers, work/changes blocks and activity dock); exit via `Esc`, the shortcut or the corner button.
 
 ## Git commands
 

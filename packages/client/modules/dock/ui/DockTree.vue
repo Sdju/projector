@@ -14,6 +14,7 @@ import DockGroupView from "./DockGroupView.vue";
 defineOptions({ name: "DockTree" });
 const props = defineProps<{ node: DockNodeData }>();
 const dock = inject(dockKey)!;
+const zen = computed(() => dock.zen?.() ?? false);
 const element = ref<HTMLElement>();
 const split = computed(() => (props.node.type === "split" ? props.node : undefined));
 const visibleChildren = computed(() => split.value?.children.filter(isNodeVisible) ?? []);
@@ -75,7 +76,7 @@ function sashKey(event: KeyboardEvent, index: number) {
 
 <template>
   <DockGroupView v-if="node.type === 'group'" :group="node" />
-  <div v-else ref="element" class="dock-split" :class="split!.direction">
+  <div v-else ref="element" class="dock-split" :class="[split!.direction, { zen }]">
     <template v-for="(child, index) in visibleChildren" :key="child.id">
       <UiResizeHandle
         v-if="index"
@@ -154,5 +155,8 @@ function sashKey(event: KeyboardEvent, index: number) {
   .dock-sash {
     display: none;
   }
+}
+.dock-split.zen {
+  height: 100%;
 }
 </style>
