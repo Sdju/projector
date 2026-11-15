@@ -498,7 +498,10 @@ onBeforeUnmount(() => overview.cancel());
           :inbox="tabTypes.has('inbox')"
           @command="(id, args) => editorCommands.run(id, args)"
         >
-          <template #terminal-actions><slot name="terminal-actions" /></template>
+          <template v-if="$slots['project-run']" #project-run><slot name="project-run" /></template>
+          <template v-if="$slots['project-repository']" #project-repository
+            ><slot name="project-repository"
+          /></template>
           <template #terminal-status><slot name="terminal-status" /></template>
         </WorkbenchToolbar>
       </Teleport>

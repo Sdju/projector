@@ -331,8 +331,10 @@ watch(
       :save-project-settings="() => settings?.save()"
       :tab-views="tabViews"
     >
-      <template #terminal-actions>
+      <template #project-run>
         <RunMenu :project="project" />
+      </template>
+      <template v-if="gitlabRepository || githubRepository" #project-repository>
         <UiButton
           v-if="gitlabRepository"
           shape="icon"

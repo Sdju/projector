@@ -12,6 +12,8 @@ export function useIslandMenu(options: {
   items?: string;
   horizontalArrows?: boolean;
   closeOnTab?: boolean;
+  /** Additional teleported surfaces that belong to this menu. */
+  ignore?: string[];
 }) {
   const open = ref(false);
   const trigger = ref<HTMLElement>();
@@ -110,7 +112,7 @@ export function useIslandMenu(options: {
       trackFocus();
     }
   }
-  onClickOutside(island, () => close(false), { ignore: [trigger] });
+  onClickOutside(island, () => close(false), { ignore: [trigger, ...(options.ignore ?? [])] });
   useEventListener(window, "resize", () => close());
   useEventListener(window, "blur", () => close(false));
   onBeforeUnmount(() => {

@@ -59,6 +59,7 @@ import { routes as ideKeybindingsRoutes } from "../routes/api/ide/keybindings.ts
 import { routes as ideCommandsRoutes } from "../routes/api/ide/commands.ts";
 import { routes as editorSettingsRoutes } from "../routes/api/ide/editor.ts";
 import { routes as appearanceRoutes } from "../routes/api/appearance.ts";
+import { routes as hiddenActionsRoutes } from "../routes/api/ide/hidden-actions.ts";
 import { routes as trustNoticesRoutes } from "../routes/api/trust-notices.ts";
 import { routes as pluginsRoutes } from "../routes/api/plugins.ts";
 import { routes as filesExcludeRoutes } from "../routes/api/ide/files-exclude.ts";
@@ -86,6 +87,7 @@ const dispatch = createRouteDispatcher([
   ...filesExcludeRoutes,
   ...editorSettingsRoutes,
   ...appearanceRoutes,
+  ...hiddenActionsRoutes,
   ...pluginsRoutes,
   ...trustNoticesRoutes,
   ...ideKeybindingsRoutes,
