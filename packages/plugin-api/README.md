@@ -31,7 +31,7 @@ import { definePlugin, type PluginApi } from "@ai-projector/plugin-api";
 cd packages/plugin-api
 pnpm pack
 mkdir -p /tmp/my-plugin/node_modules/@ai-projector
-tar -xzf ai-projector-plugin-api-0.12.0.tgz \
+tar -xzf ai-projector-plugin-api-0.13.0.tgz \
   -C /tmp/my-plugin/node_modules/@ai-projector
 mv /tmp/my-plugin/node_modules/@ai-projector/package /tmp/my-plugin/node_modules/@ai-projector/plugin-api
 ```
