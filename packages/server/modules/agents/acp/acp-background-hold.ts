@@ -47,10 +47,12 @@ export function createBackgroundHold() {
     get keepsProcess() {
       return pending.size > 0 || soft.size > 0;
     },
-    wait(signal?: AbortSignal): Promise<void> {
+    wait(signal?: AbortSignal, poll?: () => void): Promise<void> {
       if (!pending.size || signal?.aborted) return Promise.resolve();
       return new Promise((resolve) => {
+        let timer: ReturnType<typeof setInterval> | undefined;
         const done = () => {
+          if (timer !== undefined) clearInterval(timer);
           signal?.removeEventListener("abort", done);
           const index = waiters.indexOf(done);
           if (index >= 0) waiters.splice(index, 1);
@@ -58,6 +60,15 @@ export function createBackgroundHold() {
         };
         waiters.push(done);
         signal?.addEventListener("abort", done, { once: true });
+        if (poll) {
+          timer = setInterval(() => {
+            try {
+              poll();
+            } catch {
+              /* A poll failure must not drop the wait; the next tick or a notify can still clear. */
+            }
+          }, 1000);
+        }
         if (!pending.size || signal?.aborted) done();
       });
     },

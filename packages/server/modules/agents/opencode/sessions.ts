@@ -61,6 +61,50 @@ export async function openCodeSessionMeta(
   return meta;
 }
 
+/**
+ * How a child session ended, when OpenCode has parked it. ACP does not push the background
+ * `<subagent state=…>` notify onto the live prompt wire — only into the next model turn — so the
+ * hard-hold path reads this to clear tasks that already finished.
+ */
+export type OpenCodeIdleStatus = "done" | "error" | "stopped";
+
+export function openCodeIdleOutcomes(ids: string[]): Map<string, OpenCodeIdleStatus> {
+  const out = new Map<string, OpenCodeIdleStatus>();
+  if (!ids.length) return out;
+  let db: DatabaseSync | undefined;
+  try {
+    db = new DatabaseSync(openCodeDatabasePath(), { readOnly: true, timeout: 500 });
+    const table = sessionTable(db);
+    if (!table) return out;
+    const columnsInfo = db.prepare(`PRAGMA table_info(${table})`).all() as { name?: string }[];
+    const hasIdle = columnsInfo.some((column) => column.name === "idle_outcome");
+    const hasSuspended = columnsInfo.some((column) => column.name === "time_suspended");
+    if (!hasIdle && !hasSuspended) return out;
+    const placeholders = ids.map(() => "?").join(", ");
+    const columns = [
+      "id",
+      ...(hasIdle ? ["idle_outcome"] : []),
+      ...(hasSuspended ? ["time_suspended"] : []),
+    ].join(", ");
+    const rows = db
+      .prepare(`SELECT ${columns} FROM ${table} WHERE id IN (${placeholders})`)
+      .all(...ids) as { id: string; idle_outcome?: unknown; time_suspended?: unknown }[];
+    for (const row of rows) {
+      const idle = typeof row.idle_outcome === "string" ? row.idle_outcome : "";
+      if (idle === "succeeded") out.set(row.id, "done");
+      else if (idle === "failed") out.set(row.id, "error");
+      else if (idle === "interrupted" || idle === "cancelled") out.set(row.id, "stopped");
+      else if (typeof row.time_suspended === "number" && row.time_suspended > 0)
+        out.set(row.id, "stopped");
+    }
+  } catch {
+    /* Missing DB or schema: keep holding until a later notify. */
+  } finally {
+    db?.close();
+  }
+  return out;
+}
+
 /** Marks sessions started by a subagent, so history can show them as branches of their chat. */
 export async function withOpenCodeBranches(
   sessions: AgentSessionInfo[],

@@ -131,6 +131,8 @@ child.stdout.on(
     record("<", line);
     send("<", line);
     observe(line, false);
+    // Soft keep-alive with no client: each agent line defers the idle SIGTERM (long background work).
+    if ((!client || client.destroyed) && keepAliveAfterTurn()) armIdle();
   }),
 );
 child.stderr.setEncoding("utf8");

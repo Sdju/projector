@@ -228,15 +228,15 @@ async function run(options: AgentRunOptions, id: AgentBackendId): Promise<void> 
     if (stopReason === "end_turn" || stopReason === "cancelled") {
       mapper.finish();
       options.emit("done", { text: mapper.text.trim(), added: [] });
+      if (mapper.pendingBackground)
+        options.emit("status", { phase: "background", provider: program.label, model: "" });
       await mapper.waitBackground(options.abort);
       keepProcess = mapper.keepsProcess;
       if (options.run && keepProcess) await markAcpKeepAlive(options.run.id);
     } else options.emit("error", { error: stopReasonError(stopReason) });
   } catch (error) {
     if (!options.abort?.aborted)
-      options.emit("error", {
-        error: error instanceof Error ? error.message : "Агент недоступен",
-      });
+      options.emit("error", { error: error instanceof Error ? error.message : "Агент недоступен" });
   } finally {
     options.abort?.removeEventListener("abort", abort);
     await connection.close({ stop: !keepProcess || !!options.abort?.aborted });

@@ -2,30 +2,34 @@
 
 Рабочий материал. Связано с [acp-background-lifecycle](acp-background-lifecycle.md) и UI Lens — [agent-lens.md](../agent-lens.md).
 
-## Факт из сессии `a5f7310ac7ae` (2026-11-15)
+## Факты
 
-Три `subagent` с `rawInput.background: true` вернули текст:
+### `a5f7310ac7ae` (до фикса)
 
-`The subagent is working in the background (sessionID: ses_…). You will be notified…`
+Три `subagent` с `background: true` → prose receipt `sessionID: ses_…`. Диалект не разбирал текст → задача `done` без session. После `end_turn` процесс `exit 130`.
 
-Дочерние сессии продолжали слать `session/update` с `_meta["opencode/child-session"]` до `stopReason: end_turn`, затем процесс вышел с кодом 130 (убийство хоста). `keep-alive` не писался.
+### `94e7d49f2853` (после soft keep-alive)
 
-## Причины
+- Keep-alive файл появился (~01:57), процесс прожил до idle (~02:27, `PROJECTOR_AGENT_IDLE_MS` = 30 мин) → снова `exit 130`.
+- После `end_turn` дети ещё слали `session/request_permission` (L938), затем `$/cancel_request`.
+- Soft close рвёт ACP: approvals после ответа родителя некуда отвечать; idle SIGTERM убивает долгий фон.
 
-1. **`dialect.end` не разбирал prose-receipt** — только JSON `{"sessionID","status":"running"}`. Задача закрывалась как `done` без `session` / `background`.
-2. **JSON-путь ставил `untracked: true`** — soft keep-alive и `settleAnswerTasks` не держали процесс и строку задачи.
-3. Хост после `end_turn` + `connection.close()` слал SIGTERM дереву OpenCode → обрыв детей.
+OpenCode держит детей на **том же** соединении (stream + permissions + notify), в отличие от Kimi (completion — следующий ход).
 
 ## Сделано
 
-- [x] Разбор prose `sessionID: ses_…` и JSON.
-- [x] Патч: `background: true`, `hold: false`, **без** `untracked`; `session` из receipt.
-- [x] Старт с `rawInput.background: true` сразу помечает soft hold.
-- [x] Тест в `acp-events.cases.mjs`.
-- [ ] Уведомление о завершении ребёнка → финальный статус задачи (следующий ход / notification).
-- [ ] Lens по `task.session` для фонового сабагента (после появления session в патче уже возможно).
+- [x] Разбор prose/JSON `sessionID`.
+- [x] Патч: `background: true`, **без** `untracked`, **hard hold** (не `hold: false`).
+- [x] Notify `<subagent sessionID state=completed|failed|error|cancelled>` снимает hold (если придёт по ACP).
+- [x] `poll` + `idle_outcome` в БД OpenCode: notify часто только во внутренний следующий ход, не на ACP-wire — иначе задачи вечно `running`.
+- [x] При `readAgentHistory` для `opencode:*` — settle уже сохранённых `running` по `idle_outcome` (иначе после reload вкладки они снова «активны»).
+- [x] `acp-backend`: при `pendingBackground > 0` после `done` — `status.phase=background`, сокет жив до `waitBackground`.
+- [x] Клиент: после `done` не сбрасывает `run`, пока есть hard-held tasks → permissions/rejoin на том же стриме.
+- [x] Host: при keep-alive без клиента каждый stdout сбрасывает idle (страховка для soft-пути Kimi).
+- [x] Тесты hard hold + notify / keep-run в `acp-events.cases.mjs` и `agent-elapsed.cases.mjs`.
 
 ## Критерий
 
-- После `end_turn` в trace нет немедленного `! {"exit":…}` при живых background-сабагентах (есть `keep-alive`, host → `armIdle`).
-- В острове задача `running` с `session`, а не мгновенный `done`.
+- После `end_turn` connection не закрывается, пока pending background > 0.
+- Permission детей после ответа родителя обрабатываются.
+- Нет idle SIGTERM на активном фоне с открытым сокетом.

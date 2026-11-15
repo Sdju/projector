@@ -166,10 +166,19 @@ function historyState<Turns>(id: string, turns: Turns) {
   };
 }
 
+/** OpenCode may leave background tasks `running` in history; settle from its DB on read. */
+async function loadHistoryForClient(id: string) {
+  const turns = await readAgentHistory(id);
+  if (!id.startsWith("opencode:")) return turns;
+  const { settleOpenCodeHistoryTasks } = await import("../../modules/agents/opencode/index.ts");
+  if (!settleOpenCodeHistoryTasks(turns)) return turns;
+  return writeAgentHistory(id, turns);
+}
+
 export const routes: RouteDefinition[] = [
   route("GET", "/api/agent/history/:id", async ({ res, params }) => {
     const id = decodeURIComponent(params.id!);
-    json(res, 200, historyState(id, await readAgentHistory(id)));
+    json(res, 200, historyState(id, await loadHistoryForClient(id)));
   }),
   route("PUT", "/api/agent/history/:id", async ({ req, res, params }) => {
     const id = decodeURIComponent(params.id!);

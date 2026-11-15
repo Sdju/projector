@@ -60,9 +60,9 @@ Kimi не держит сокет (`hold: false`), поэтому одного A
 
 Минимум для первой поставки: A+B так, что один ход не убивает сабагентов; политика очереди сообщений — отдельным пунктом.
 
-### E. OpenCode (не блокирует Kimi)
+### E. OpenCode
 
-Сейчас background + `untracked` гасится на `done`. После A имеет смысл для OpenCode убрать `untracked`, когда harness реально шлёт конец ребёнка; иначе оставить как «состояние неизвестно». Не смешивать с Kimi в одном PR без нужды.
+Фоновые сабагенты — **hard hold** (не `hold: false`): после `end_turn` тот же ACP нужен для `request_permission` и notify. Soft keep-alive рвал сокет → permissions не доходили в UI. См. [opencode-background-subagents](opencode-background-subagents.md).
 
 ## Критерий готовности
 

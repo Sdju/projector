@@ -292,7 +292,10 @@ export function createAcpEventMapper(
      * connection must stay open so later `session/update` can clear the set.
      */
     waitBackground(signal?: AbortSignal): Promise<void> {
-      return background.wait(signal);
+      return background.wait(signal, () => {
+        const patches = dialect.poll?.() ?? [];
+        if (patches.length) emitTasks(patches);
+      });
     },
   };
 }

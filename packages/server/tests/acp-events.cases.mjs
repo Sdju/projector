@@ -1,4 +1,4 @@
-import { expect, test } from "vite-plus/test";
+import { expect, test, vi } from "vite-plus/test";
 import {
   createAcpEventMapper,
   createAcpReplayCollector,
@@ -447,7 +447,59 @@ test("opencode replay stores the cleaned read result", () => {
   expect(collector.turns[0].tools[0]).toMatchObject({ status: "done", detail: "const a = 1;" });
 });
 
-test("opencode background subagent text receipt is a soft keep-alive task", async () => {
+test("opencode background subagent hold clears when OpenCode idle_outcome is set", async () => {
+  vi.useFakeTimers();
+  try {
+    const events = [];
+    const outcomes = new Map();
+    const mapper = createAcpEventMapper(
+      (type, data) => events.push([type, data]),
+      "OpenCode",
+      createOpencodeDialect({
+        idleOutcomes: (ids) => {
+          const found = new Map();
+          for (const id of ids) if (outcomes.has(id)) found.set(id, outcomes.get(id));
+          return found;
+        },
+      }),
+    );
+    mapper.handleUpdate("s", {
+      sessionUpdate: "tool_call_update",
+      toolCallId: "sub",
+      status: "in_progress",
+      rawInput: { agent: "general", background: true, description: "Fix trust" },
+    });
+    mapper.handleUpdate(
+      "s",
+      readResult(
+        "sub",
+        "The subagent is working in the background (sessionID: ses_idle1). You will be notified automatically when it finishes.\n",
+      ),
+    );
+    expect(mapper.pendingBackground).toBe(1);
+    let released = false;
+    const waiting = mapper.waitBackground().then(() => {
+      released = true;
+    });
+    await Promise.resolve();
+    expect(released).toBe(false);
+    outcomes.set("ses_idle1", "done");
+    await vi.advanceTimersByTimeAsync(1000);
+    await waiting;
+    expect(released).toBe(true);
+    expect(mapper.pendingBackground).toBe(0);
+    expect(events.filter(([type]) => type === "task").at(-1)?.[1]).toMatchObject({
+      id: "sub",
+      status: "done",
+      background: true,
+      session: "ses_idle1",
+    });
+  } finally {
+    vi.useRealTimers();
+  }
+});
+
+test("opencode background subagent holds the connection until notify", async () => {
   const events = [];
   const mapper = createAcpEventMapper(
     (type, data) => events.push([type, data]),
@@ -473,7 +525,7 @@ test("opencode background subagent text receipt is a soft keep-alive task", asyn
       prompt: "do it",
     },
   });
-  expect(mapper.pendingBackground).toBe(0);
+  expect(mapper.pendingBackground).toBe(1);
   expect(mapper.keepsProcess).toBe(true);
   mapper.handleUpdate(
     "s",
@@ -482,9 +534,23 @@ test("opencode background subagent text receipt is a soft keep-alive task", asyn
       "The subagent is working in the background (sessionID: ses_child1). You will be notified automatically when it finishes.\n",
     ),
   );
+  expect(mapper.pendingBackground).toBe(1);
+  let released = false;
+  const waiting = mapper.waitBackground().then(() => {
+    released = true;
+  });
+  await Promise.resolve();
+  expect(released).toBe(false);
+  mapper.handleUpdate("s", {
+    sessionUpdate: "agent_message_chunk",
+    content: {
+      type: "text",
+      text: '<subagent sessionID="ses_child1" state="completed">\nok\n</subagent>',
+    },
+  });
+  await waiting;
+  expect(released).toBe(true);
   expect(mapper.pendingBackground).toBe(0);
-  expect(mapper.keepsProcess).toBe(true);
-  await mapper.waitBackground();
   const tasks = events.filter(([type]) => type === "task").map(([, data]) => data);
   expect(tasks[0]).toMatchObject({
     id: "sub",
@@ -495,13 +561,20 @@ test("opencode background subagent text receipt is a soft keep-alive task", asyn
     subagent: "general",
     prompt: "do it",
   });
+  expect(tasks).toContainEqual(
+    expect.objectContaining({
+      id: "sub",
+      status: "running",
+      background: true,
+      session: "ses_child1",
+    }),
+  );
   expect(tasks.at(-1)).toMatchObject({
     id: "sub",
-    status: "running",
+    status: "done",
     background: true,
     session: "ses_child1",
   });
-  expect(tasks.at(-1).untracked).toBeUndefined();
 });
 
 test("opencode background command is a task that its call does not end", () => {

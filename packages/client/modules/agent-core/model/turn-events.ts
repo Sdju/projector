@@ -28,6 +28,13 @@ export function settleAnswerTasks(turns: readonly AgentTurn[], at: number): void
       }
 }
 
+/** Tracked background work that still needs the live run (permissions / notify after `done`). */
+export function holdsAnswerRun(turn: AgentTurn): boolean {
+  return (turn.tasks ?? []).some(
+    (task) => task.status === "running" && task.background === true && task.untracked !== true,
+  );
+}
+
 /**
  * The stream of an answer is over: its calls cannot still run, and without a live run behind
  * the turn, the tasks left open are closed too (a stop or a broken stream sends no `done`).
@@ -61,6 +68,9 @@ function timesOf(assistant: AgentTurn): Map<string, ToolTimes> {
 /** Instructions already shown in each answer: a replayed event must not add its note twice. */
 const shownInputs = new WeakMap<AgentTurn, Set<string>>();
 
+/** `done` already arrived; `run` may still be kept for hard-held background work. */
+const answerEnded = new WeakSet<AgentTurn>();
+
 function inputsOf(assistant: AgentTurn): Set<string> {
   const known = shownInputs.get(assistant);
   if (known) return known;
@@ -74,6 +84,7 @@ export function resetAnswer(assistant: AgentTurn) {
   const times = timesOf(assistant);
   // The answer is replayed from scratch, so its notes have to be added again.
   shownInputs.delete(assistant);
+  answerEnded.delete(assistant);
   for (const tool of assistant.tools)
     if (tool.startedAt !== undefined || tool.endedAt !== undefined)
       times.set(tool.id, { startedAt: tool.startedAt, endedAt: tool.endedAt });
@@ -295,6 +306,10 @@ export function applyAgentEvent(
         task.startedAt ??= at;
         task.endedAt = undefined;
       } else if (task.startedAt !== undefined && task.endedAt === undefined) task.endedAt = at;
+      // Answer text may already be done while ACP still holds for children; drop `run` only when
+      // nothing left needs the same stream for permissions or completion.
+      if (assistant.run && answerEnded.has(assistant) && !holdsAnswerRun(assistant))
+        assistant.run = undefined;
       return false;
     }
     case "project":
@@ -306,12 +321,14 @@ export function applyAgentEvent(
       assistant.run = undefined;
       return false;
     case "done":
-      assistant.run = undefined;
       assistant.stopped = event.data.stopped;
+      answerEnded.add(assistant);
       // A foreground task cannot outlive the answer; a background one may and reports later,
       // unless the agent never reports (then its state is unknown once the answer is over).
       // Settle every turn: an earlier interrupted answer leaves rows this one must close.
       settleAnswerTasks([assistant, ...state.turns], at);
+      // Keep `run` while hard-held background work still needs this stream (permissions / notify).
+      if (!holdsAnswerRun(assistant)) assistant.run = undefined;
       return false;
     default:
       return false;

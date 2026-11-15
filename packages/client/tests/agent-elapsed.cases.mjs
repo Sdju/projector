@@ -90,3 +90,36 @@ test("an interrupted answer does not leave its untracked tasks running forever",
   // A tracked background subagent still reports its own end: it is not touched.
   expect(earlier.tasks[1]).toMatchObject({ status: "running" });
 });
+
+test("done keeps the run while a hard-held background task still needs the stream", () => {
+  const state = { permissions: [], questions: [], secrets: [], turns: [] };
+  const assistant = {
+    id: "a",
+    role: "assistant",
+    text: "",
+    tools: [],
+    tasks: [],
+    parts: [],
+    run: "run-1",
+  };
+  const event = (name, data, at) =>
+    applyAgentEvent(state, assistant, { event: name, data }, () => {}, at);
+
+  event(
+    "task",
+    {
+      id: "sub",
+      kind: "agent",
+      title: "Fix",
+      status: "running",
+      background: true,
+    },
+    1_000,
+  );
+  event("done", { text: "ok" }, 2_000);
+  expect(assistant.run).toBe("run-1");
+  event("permission-request", { id: "p1", tool: "bash", title: "run", input: {} }, 2_500);
+  expect(state.permissions).toHaveLength(1);
+  event("task", { id: "sub", status: "done", background: true }, 3_000);
+  expect(assistant.run).toBeUndefined();
+});

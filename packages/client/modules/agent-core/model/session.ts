@@ -192,6 +192,8 @@ export function useAgent(
     } finally {
       const stopped = signal.aborted;
       state.abort?.abort();
+      // Stream ended (including after ACP hard-hold wait): the process may keep-alive, the run id does not.
+      assistant.run = undefined;
       closeAnswer(state, assistant, Date.now());
       state.busy = false;
       state.phase = "";
