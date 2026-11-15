@@ -88,8 +88,9 @@ test("project roles API creates, trusts, updates and deletes a role", async () =
       `/api/agent/project-roles/${role.id}?projectId=p1`,
       "DELETE",
     );
-    expect(deleted.status).toBe(200);
-    expect((await deleted.json()).roles).toEqual([]);
+    const deletedBody = await deleted.text();
+    expect(deleted.status, deletedBody).toBe(200);
+    expect(JSON.parse(deletedBody).roles).toEqual([]);
 
     const badAgent = await request(origin, "/api/agent/project-roles", "POST", {
       projectId: "p1",
