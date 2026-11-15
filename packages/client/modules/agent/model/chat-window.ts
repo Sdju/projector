@@ -74,11 +74,22 @@ export function useChatWindow(
     while (element && hidden.value && element.clientHeight && near())
       if (!(await loadEarlier())) return;
   }
+  /** Mount the requested turn even when it is outside the current window. */
+  async function reveal(id: string) {
+    const index = turns.value.findIndex((turn) => turn.id === id && turn.role === "user");
+    if (index < 0 || waiting.value) return false;
+    visible.value = Math.max(
+      visible.value,
+      turns.value.slice(index).filter((turn) => turn.role === "user").length,
+    );
+    await nextTick();
+    return true;
+  }
   // The conversation appears when loading ends: a short window is filled then.
   watch(waiting, async (now) => {
     if (now) return;
     await nextTick();
     void topUp(true);
   });
-  return { PRELOAD_PX, firstShown, shown, hidden, loadEarlier, topUp };
+  return { PRELOAD_PX, firstShown, shown, hidden, loadEarlier, topUp, reveal };
 }

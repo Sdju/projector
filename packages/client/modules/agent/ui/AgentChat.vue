@@ -2,6 +2,7 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, provide, ref } from "vue";
 import { widgetReplyKey } from "../../widget-runtime/index.ts";
 import { useIdeCommands } from "../../ide/index.ts";
+import { commandArgs, useCommandScope } from "../../../common/utilities/commands.ts";
 import { workspaceRequest } from "../../workspace-api/index.ts";
 import { AgentFeaturesIsland } from "../../agent-features/index.ts";
 import { AgentJudgeIsland } from "../modules/settings/index.ts";
@@ -53,6 +54,7 @@ import UiBadge from "../../../common/ui/UiBadge.vue";
 import UiButton from "../../../common/ui/UiButton.vue";
 import UiLoader from "../../../common/ui/UiLoader.vue";
 import AgentWelcome from "./AgentWelcome.vue";
+import AgentChatTimeline from "./AgentChatTimeline.vue";
 import { AgentComposer, AgentControls } from "../modules/composer/index.ts";
 import AgentContextMeter from "./AgentContextMeter.vue";
 import AgentChipPreview from "./AgentChipPreview.vue";
@@ -261,7 +263,7 @@ const chatDrop = chatDropHandlers(() => composer.value);
 const panel = ref<InstanceType<typeof UiPanel>>();
 const root = computed(() => panel.value?.element);
 let rememberScroll = () => {};
-const { PRELOAD_PX, firstShown, shown, hidden, loadEarlier, topUp } = useChatWindow(
+const { PRELOAD_PX, firstShown, shown, hidden, loadEarlier, topUp, reveal } = useChatWindow(
   turns,
   log,
   () => rememberScroll(),
@@ -296,6 +298,48 @@ const {
   },
 });
 rememberScroll = rememberChatScroll;
+const navigation = useCommandScope(`chat-navigation:${chatKey}`, () => ({
+  surface: "agent-chat",
+  project: props.projectId,
+  chat: chatKey,
+}));
+const showTimeline = computed(
+  () =>
+    !loading.value &&
+    !viewed.value &&
+    turns.value.filter((turn) => turn.role === "assistant").length >= 3,
+);
+async function goToRequest(id: string) {
+  const wasAway = away.value;
+  away.value = true;
+  if (!(await reveal(id))) {
+    away.value = wasAway;
+    throw new Error("Запрос не найден");
+  }
+  const element = log.value?.querySelector<HTMLElement>(`[data-request-id="${CSS.escape(id)}"]`);
+  if (!element || !log.value) return;
+  log.value.scrollTo({
+    top:
+      log.value.scrollTop +
+      element.getBoundingClientRect().top -
+      log.value.getBoundingClientRect().top -
+      12,
+    behavior: "instant",
+  });
+  rememberChatScroll();
+}
+navigation.scope.registerCommand({
+  id: "ide.agent.chat.request.go",
+  title: "Перейти к запросу в чате",
+  description:
+    "Прокручивает открытый чат к указанному сообщению пользователя, подгружая раннюю историю при необходимости.",
+  arguments: { turnId: "Идентификатор запроса из ide.agent.turns.list" },
+  run: (value) => {
+    const { turnId } = commandArgs(value);
+    if (typeof turnId !== "string") throw new Error("Укажите turnId запроса");
+    return goToRequest(turnId);
+  },
+});
 const zenMode = useChatZenFocus({
   projectId: props.projectId,
   chatKey,
@@ -540,64 +584,72 @@ onBeforeUnmount(() => release());
       :disabled="loading"
       @update:override="setJudgeOverride"
     />
-    <div v-show="!viewed" ref="log" class="chat-log" @scroll.passive="trackScroll">
-      <div v-if="loading" class="chat-loading">
-        <UiLoader label="Загружаю чат…" align="center" />
-      </div>
-      <AgentWelcome
-        v-else-if="!turns.length"
-        :plain="plain"
-        :agent-name="agentName"
-        :role-name="roleSnapshot?.name"
-        :project-id="projectId"
-        @suggest="suggest"
-        @open="openAgent"
-        @form="openPresetForm"
-      />
-      <div
-        v-else
-        class="conversation"
-        role="log"
-        aria-label="Сообщения"
-        aria-live="polite"
-        aria-relevant="additions text"
-      >
-        <button v-if="hidden" type="button" class="earlier" @click="loadEarlier">
-          Показать ранние запросы · скрыто {{ hidden }}
-        </button>
-        <AgentTurn
-          v-for="(turn, offset) in shown"
-          :key="turn.id"
-          :turn="turn"
-          :chat-usage="chatUsage.get(turn.id)"
-          :root="projectRoot"
-          :promoted-form="answerFormFor(turn).promotedForm"
-          :lens="turn.role === 'assistant' && turn.id === turns.at(-1)?.id ? lens : undefined"
-          :doctor="answerDoctorReport(turn)"
-          :doctor-live="doctorProgress.get(turn.id)"
-          :flags="{
-            busy,
-            last: firstShown + offset === turns.length - 1,
-            copied: copied === turn.id,
-            faded: editFrom >= 0 && firstShown + offset >= editFrom,
-            canRevert: canRevert(turn.id),
-            formAnswered: answerFormFor(turn).formAnswered,
-            phase: turn.role === 'assistant' && turn.id === turns.at(-1)?.id ? phase : undefined,
-          }"
-          @copy="copyMessage"
-          @open="openChip"
-          @edit="editMessage"
-          @form-submit="submitTurnForm"
-          @rewind="askRewind"
-          @retry="retryMessage"
-          @fork="forkMessage"
-          @continue="continueTurn"
-          @version="showVersion"
-          @open-file="(path) => openChip({ type: 'file', path })"
-          @revert="(id) => askRewind(precedingUser(id), 'files')"
-          @doctor-retry="retryDoctor"
+    <div class="chat-area" v-show="!viewed">
+      <div ref="log" class="chat-log" @scroll.passive="trackScroll">
+        <div v-if="loading" class="chat-loading">
+          <UiLoader label="Загружаю чат…" align="center" />
+        </div>
+        <AgentWelcome
+          v-else-if="!turns.length"
+          :plain="plain"
+          :agent-name="agentName"
+          :role-name="roleSnapshot?.name"
+          :project-id="projectId"
+          @suggest="suggest"
+          @open="openAgent"
+          @form="openPresetForm"
         />
+        <div
+          v-else
+          class="conversation"
+          role="log"
+          aria-label="Сообщения"
+          aria-live="polite"
+          aria-relevant="additions text"
+        >
+          <button v-if="hidden" type="button" class="earlier" @click="loadEarlier">
+            Показать ранние запросы · скрыто {{ hidden }}
+          </button>
+          <AgentTurn
+            v-for="(turn, offset) in shown"
+            :key="turn.id"
+            :data-request-id="turn.role === 'user' ? turn.id : undefined"
+            :turn="turn"
+            :chat-usage="chatUsage.get(turn.id)"
+            :root="projectRoot"
+            :promoted-form="answerFormFor(turn).promotedForm"
+            :lens="turn.role === 'assistant' && turn.id === turns.at(-1)?.id ? lens : undefined"
+            :doctor="answerDoctorReport(turn)"
+            :doctor-live="doctorProgress.get(turn.id)"
+            :flags="{
+              busy,
+              last: firstShown + offset === turns.length - 1,
+              copied: copied === turn.id,
+              faded: editFrom >= 0 && firstShown + offset >= editFrom,
+              canRevert: canRevert(turn.id),
+              formAnswered: answerFormFor(turn).formAnswered,
+              phase: turn.role === 'assistant' && turn.id === turns.at(-1)?.id ? phase : undefined,
+            }"
+            @copy="copyMessage"
+            @open="openChip"
+            @edit="editMessage"
+            @form-submit="submitTurnForm"
+            @rewind="askRewind"
+            @retry="retryMessage"
+            @fork="forkMessage"
+            @continue="continueTurn"
+            @version="showVersion"
+            @open-file="(path) => openChip({ type: 'file', path })"
+            @revert="(id) => askRewind(precedingUser(id), 'files')"
+            @doctor-retry="retryDoctor"
+          />
+        </div>
       </div>
+      <AgentChatTimeline
+        v-if="showTimeline"
+        :turns="turns"
+        @select="(id) => navigation.run('ide.agent.chat.request.go', { turnId: id })"
+      />
     </div>
     <AgentTaskView
       v-if="viewed"
@@ -754,6 +806,12 @@ onBeforeUnmount(() => release());
   max-width: calc(var(--chat-width) + 56px);
   margin: 0 auto;
   padding: var(--sp-2) var(--sp-5) 0;
+}
+.chat-area {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
 }
 .chat-log {
   flex: 1;
