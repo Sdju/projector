@@ -24,7 +24,6 @@ import {
 import IconBell from "~icons/lucide/bell";
 import IconBellOff from "~icons/lucide/bell-off";
 import IconExternalLink from "~icons/lucide/external-link";
-import IconServer from "~icons/lucide/server";
 
 const router = useRouter();
 const { items, hub, error, loading, refresh, href, markRead, isAttention, isUnread } =
@@ -72,10 +71,17 @@ const activeItems = (device: HubDevice) =>
   deviceItems(device)
     .filter((item) => item.category === "working" || isAttention(item) || isUnread(item))
     .slice(0, 3);
-const stateText = (device: HubDevice) => (device.online ? "в сети" : "не в сети");
-const activityText = (device: HubDevice) => hubActivityText(hub.value.activity[device.id]);
 const itemState = (item: (typeof items.value)[number]) => hubItemState(item);
-const countsText = (device: HubDevice) => hubCountsText(hubDeviceCounts(deviceItems(device)));
+/** One muted line: «это устройство · в сети · активность · счётчики». */
+const metaText = (device: HubDevice) =>
+  [
+    isSelf(device) ? "это устройство" : "",
+    device.online ? "в сети" : "не в сети",
+    hubActivityText(hub.value.activity[device.id]),
+    hubCountsText(hubDeviceCounts(deviceItems(device))),
+  ]
+    .filter(Boolean)
+    .join(" · ");
 
 async function reload(): Promise<void> {
   if (userRefreshing.value) return;
@@ -202,7 +208,7 @@ commands.scope.registerCommand({
   >
     <header class="head">
       <UiInline justify="between" align="center">
-        <strong class="title">Hub</strong>
+        <h3 class="title">Hub</h3>
         <UiSectionRefresh />
       </UiInline>
       <p class="status">
@@ -230,59 +236,31 @@ commands.scope.registerCommand({
         class="device"
         :class="{ offline: !device.online, self: isSelf(device) }"
       >
-        <header class="device-head">
-          <UiStatusDot :tone="device.online ? 'success' : 'muted'" />
-          <div class="device-name">
-            <strong>{{ device.name }}</strong>
+        <button
+          type="button"
+          class="main"
+          :disabled="isSelf(device) || !device.online"
+          :title="
+            isSelf(device)
+              ? 'Это устройство уже открыто'
+              : device.online
+                ? `Открыть ${device.name}`
+                : 'Устройство не в сети'
+          "
+          data-command="ide.hub.device.open"
+          @click="openDevice(device)"
+        >
+          <span class="device-head">
+            <UiStatusDot :tone="device.online ? 'success' : 'muted'" />
+            <strong class="device-name">{{ device.name }}</strong>
             <span v-if="device.name !== device.id" class="device-id">{{ device.id }}</span>
-          </div>
-          <span v-if="isSelf(device)" class="badge">это устройство</span>
-        </header>
-        <p class="meta">
-          <span>{{ stateText(device) }}</span>
-          <span v-if="activityText(device)"> · {{ activityText(device) }}</span>
-        </p>
-        <p v-if="countsText(device)" class="counts">{{ countsText(device) }}</p>
-
-        <ul v-if="activeItems(device).length" class="work">
-          <li v-for="item in activeItems(device)" :key="item.key">
-            <button
-              type="button"
-              class="work-item"
-              :title="`${item.projectName} · ${item.topic}`"
-              @click="openItem(item)"
-            >
-              <span class="work-head">
-                <UiStatusDot
-                  :tone="
-                    isAttention(item) ? 'warning' : item.status === 'error' ? 'danger' : 'success'
-                  "
-                />
-                <span class="work-project">{{ item.projectName }}</span>
-                <span class="work-state">{{ itemState(item) }}</span>
-              </span>
-              <span class="work-topic">{{ item.topic }}</span>
-            </button>
-          </li>
-        </ul>
-        <p v-else-if="!isSelf(device) && device.online && !isHubPage" class="remote-hint">
-          Работы и переход в проект — в Hub.
-        </p>
-
-        <UiInline v-if="!isSelf(device)" class="actions" :gap="1" wrap>
+          </span>
+          <span class="meta">{{ metaText(device) }}</span>
+        </button>
+        <div v-if="isHubPage && !isSelf(device)" class="actions">
           <UiButton
-            size="sm"
-            :disabled="!device.online"
-            data-command="ide.hub.device.open"
-            @click="openDevice(device)"
-          >
-            <IconServer aria-hidden="true" />Открыть
-          </UiButton>
-          <UiButton
-            v-if="isHubPage"
             shape="icon"
             size="sm"
-            appearance="quiet"
             :title="
               hubNotifyEnabled(device.id)
                 ? `Выключить уведомления с ${device.name}`
@@ -298,7 +276,31 @@ commands.scope.registerCommand({
             <IconBell v-if="hubNotifyEnabled(device.id)" aria-hidden="true" />
             <IconBellOff v-else aria-hidden="true" />
           </UiButton>
-        </UiInline>
+        </div>
+
+        <ul v-if="activeItems(device).length" class="work">
+          <li v-for="item in activeItems(device)" :key="item.key">
+            <button
+              type="button"
+              class="work-item"
+              :title="`${item.projectName} · ${item.topic}`"
+              @click="openItem(item)"
+            >
+              <span class="work-head">
+                <UiStatusDot
+                  :tone="
+                    isAttention(item) ? 'warning' : item.status === 'error' ? 'danger' : 'success'
+                  "
+                />
+                <span class="work-topic">{{ item.topic }}</span>
+              </span>
+              <span class="work-meta">{{ item.projectName }} · {{ itemState(item) }}</span>
+            </button>
+          </li>
+        </ul>
+        <p v-else-if="!isSelf(device) && device.online && !isHubPage" class="remote-hint">
+          Работы и переход в проект — в Hub.
+        </p>
       </article>
     </div>
 
@@ -316,17 +318,16 @@ commands.scope.registerCommand({
       <UiHint v-else-if="permission === 'denied'" class="permission">
         Уведомления запрещены в настройках браузера.
       </UiHint>
-      <UiButton
+      <button
         v-if="isHubPage || hubUrl"
-        size="sm"
-        appearance="quiet"
+        type="button"
+        class="link"
         data-command="ide.hub.open"
         @click="openHub"
       >
-        <IconExternalLink aria-hidden="true" />{{
-          isHubPage ? "К списку устройств" : "Открыть Hub"
-        }}
-      </UiButton>
+        <IconExternalLink aria-hidden="true" />
+        {{ isHubPage ? "К списку устройств" : "Открыть Hub" }}
+      </button>
     </footer>
   </div>
 </template>
@@ -335,9 +336,8 @@ commands.scope.registerCommand({
 .hub-panel {
   display: grid;
   align-content: start;
-  gap: var(--sp-3);
   min-width: 0;
-  padding: var(--sp-3) var(--sp-2);
+  padding: var(--sp-3) 0;
   color: var(--text);
   font-size: var(--fs-xs);
 }
@@ -345,8 +345,10 @@ commands.scope.registerCommand({
   display: grid;
   gap: 2px;
   min-width: 0;
+  padding: 0 var(--sp-3) var(--sp-2);
 }
 .title {
+  margin: 0;
   font-size: var(--fs-sm);
   font-weight: 600;
 }
@@ -364,134 +366,152 @@ commands.scope.registerCommand({
   color: var(--faint);
   font-size: var(--fs-2xs);
 }
-.message {
+.message,
+.setup,
+.permission {
+  margin: var(--sp-2) var(--sp-3) 0;
+}
+.permission {
+  font-size: var(--fs-2xs);
+}
+.empty {
   margin: 0;
+  padding: var(--sp-2) var(--sp-3);
+  color: var(--faint);
+  line-height: 1.45;
 }
 .devices {
   display: grid;
-  gap: var(--sp-2);
+  min-width: 0;
+  margin-top: var(--sp-2);
 }
 .device {
+  --indent: calc(7px + var(--sp-2));
   display: grid;
-  gap: var(--sp-1);
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
   min-width: 0;
-  padding: var(--sp-2);
-  border: 1px solid var(--line);
-  border-radius: var(--r-md);
-  background: var(--bg-2);
+  border-top: 1px solid var(--line);
 }
-.device.self {
-  border-color: var(--line-2, var(--line));
-  background: var(--bg-3);
-}
-.device.offline {
+.device.offline .main {
   opacity: 0.62;
 }
-.device-head {
+.main,
+.work-item {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  background: none;
+  color: var(--text-2);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.main {
+  padding: var(--sp-2) var(--sp-3);
+}
+.main:hover:not(:disabled),
+.work-item:hover {
+  background: var(--hover);
+}
+.main:disabled {
+  cursor: default;
+}
+.device-head,
+.work-head {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--sp-2);
   min-width: 0;
 }
 .device-name {
-  display: flex;
-  align-items: baseline;
-  gap: 4px;
   min-width: 0;
-}
-.device-name strong {
   overflow: hidden;
+  color: var(--text);
+  font-size: var(--fs-xs);
+  font-weight: 500;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: var(--fs-xs);
 }
 .device-id {
+  min-width: 0;
   overflow: hidden;
   color: var(--faint);
   font: var(--fs-2xs) var(--mono);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.badge {
-  flex-shrink: 0;
-  margin-left: auto;
-  padding: 0 5px;
-  border: 1px solid var(--line);
-  border-radius: var(--r-full);
-  color: var(--muted);
-  font-size: 10px;
-  line-height: 16px;
-}
 .meta,
-.counts,
+.work-meta,
 .remote-hint {
-  margin: 0;
+  padding-left: var(--indent);
+  overflow: hidden;
   color: var(--muted);
   font-size: var(--fs-2xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
-.counts {
-  color: var(--text-2);
+.actions {
+  display: flex;
+  gap: 2px;
+  padding: var(--sp-1) var(--sp-2) 0 0;
+}
+.work,
+.remote-hint {
+  grid-column: 1 / -1;
 }
 .work {
   display: grid;
-  gap: 2px;
   margin: 0;
   padding: 0;
   list-style: none;
 }
 .work-item {
-  display: grid;
-  gap: 2px;
-  width: 100%;
+  padding: var(--sp-1) var(--sp-3);
+}
+.work-topic {
   min-width: 0;
-  padding: 4px;
+  overflow: hidden;
+  color: var(--text);
+  font-size: var(--fs-2xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.work-item:last-child {
+  padding-bottom: var(--sp-2);
+}
+.remote-hint {
+  margin: 0;
+  padding: 0 var(--sp-3) var(--sp-2) calc(var(--sp-3) + var(--indent));
+  color: var(--faint);
+}
+.foot {
+  display: grid;
+  min-width: 0;
+}
+.link {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+  padding: var(--sp-2) var(--sp-3);
   border: 0;
-  border-radius: var(--r-sm);
+  border-top: 1px solid var(--line);
   background: none;
-  color: var(--text-2);
+  color: var(--muted);
   font: inherit;
   font-size: var(--fs-2xs);
   text-align: left;
   cursor: pointer;
 }
-.work-item:hover {
+.link:hover {
   background: var(--hover);
   color: var(--text);
 }
-.work-head {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  min-width: 0;
-}
-.work-project,
-.work-topic {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.work-project {
-  color: var(--muted);
-}
-.work-state {
-  flex-shrink: 0;
-  margin-left: auto;
-  color: var(--muted);
-}
-.actions :deep(svg),
-.foot :deep(svg) {
+.hub-panel :deep(svg) {
   width: 13px;
   height: 13px;
-}
-.foot {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--sp-2);
-}
-.permission {
-  flex: 1;
 }
 </style>
