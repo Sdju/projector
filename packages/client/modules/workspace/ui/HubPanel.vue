@@ -24,6 +24,7 @@ import {
 import IconBell from "~icons/lucide/bell";
 import IconBellOff from "~icons/lucide/bell-off";
 import IconExternalLink from "~icons/lucide/external-link";
+import IconMonitor from "~icons/lucide/monitor";
 
 const router = useRouter();
 const { items, hub, error, loading, refresh, href, markRead, isAttention, isUnread } =
@@ -72,11 +73,18 @@ const activeItems = (device: HubDevice) =>
     .filter((item) => item.category === "working" || isAttention(item) || isUnread(item))
     .slice(0, 3);
 const itemState = (item: (typeof items.value)[number]) => hubItemState(item);
-/** One muted line: «это устройство · в сети · активность · счётчики». */
+/** Work is nested under a machine: only live or failing rows get a bright dot. */
+const itemTone = (item: (typeof items.value)[number]) =>
+  item.status === "error"
+    ? "danger"
+    : isAttention(item)
+      ? "warning"
+      : item.category === "working"
+        ? "success"
+        : "faint";
+/** The muted tail of a machine line: activity and counts, never its own presence. */
 const metaText = (device: HubDevice) =>
   [
-    isSelf(device) ? "это устройство" : "",
-    device.online ? "в сети" : "не в сети",
     hubActivityText(hub.value.activity[device.id]),
     hubCountsText(hubDeviceCounts(deviceItems(device))),
   ]
@@ -250,12 +258,22 @@ commands.scope.registerCommand({
           data-command="ide.hub.device.open"
           @click="openDevice(device)"
         >
-          <span class="device-head">
-            <UiStatusDot :tone="device.online ? 'success' : 'muted'" />
-            <strong class="device-name">{{ device.name }}</strong>
-            <span v-if="device.name !== device.id" class="device-id">{{ device.id }}</span>
+          <span class="device-icon" aria-hidden="true"><IconMonitor /></span>
+          <span class="device-text">
+            <span class="device-line">
+              <strong class="device-name">{{ device.name }}</strong>
+              <span v-if="device.name !== device.id" class="device-id">{{ device.id }}</span>
+              <span v-if="isSelf(device)" class="self-badge">это устройство</span>
+            </span>
+            <span class="meta">
+              <UiStatusDot :size="6" :tone="device.online ? 'success' : 'muted'" />
+              <span>{{ device.online ? "в сети" : "не в сети" }}</span>
+              <template v-if="metaText(device)">
+                <span aria-hidden="true">·</span>
+                <span class="meta-tail">{{ metaText(device) }}</span>
+              </template>
+            </span>
           </span>
-          <span class="meta">{{ metaText(device) }}</span>
         </button>
         <div v-if="isHubPage && !isSelf(device)" class="actions">
           <UiButton
@@ -278,7 +296,7 @@ commands.scope.registerCommand({
           </UiButton>
         </div>
 
-        <ul v-if="activeItems(device).length" class="work">
+        <ul v-if="activeItems(device).length" class="work" :aria-label="`Работы ${device.name}`">
           <li v-for="item in activeItems(device)" :key="item.key">
             <button
               type="button"
@@ -287,11 +305,7 @@ commands.scope.registerCommand({
               @click="openItem(item)"
             >
               <span class="work-head">
-                <UiStatusDot
-                  :tone="
-                    isAttention(item) ? 'warning' : item.status === 'error' ? 'danger' : 'success'
-                  "
-                />
+                <UiStatusDot :size="6" :tone="itemTone(item)" />
                 <span class="work-topic">{{ item.topic }}</span>
               </span>
               <span class="work-meta">{{ item.projectName }} · {{ itemState(item) }}</span>
@@ -386,15 +400,11 @@ commands.scope.registerCommand({
   margin-top: var(--sp-2);
 }
 .device {
-  --indent: calc(7px + var(--sp-2));
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: start;
   min-width: 0;
   border-top: 1px solid var(--line);
-}
-.device.offline .main {
-  opacity: 0.62;
 }
 .main,
 .work-item {
@@ -411,6 +421,9 @@ commands.scope.registerCommand({
   cursor: pointer;
 }
 .main {
+  flex-direction: row;
+  align-items: flex-start;
+  gap: var(--sp-2);
   padding: var(--sp-2) var(--sp-3);
 }
 .main:hover:not(:disabled),
@@ -420,7 +433,34 @@ commands.scope.registerCommand({
 .main:disabled {
   cursor: default;
 }
-.device-head,
+.device-icon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: var(--sp-5);
+  height: var(--sp-5);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  background: var(--bg-3);
+  color: var(--muted);
+}
+.device.offline .device-icon {
+  background: none;
+  color: var(--faint);
+}
+.device.offline .device-name {
+  color: var(--text-2);
+}
+.device.offline .meta {
+  color: var(--faint);
+}
+.device-text {
+  display: grid;
+  flex: 1;
+  gap: 3px;
+  min-width: 0;
+}
+.device-line,
 .work-head {
   display: flex;
   align-items: center;
@@ -431,8 +471,8 @@ commands.scope.registerCommand({
   min-width: 0;
   overflow: hidden;
   color: var(--text);
-  font-size: var(--fs-xs);
-  font-weight: 500;
+  font-size: var(--fs-sm);
+  font-weight: 600;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -444,15 +484,28 @@ commands.scope.registerCommand({
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.meta,
-.work-meta,
-.remote-hint {
-  padding-left: var(--indent);
-  overflow: hidden;
+.self-badge {
+  flex: none;
+  padding: 0 var(--sp-1);
+  border: 1px solid var(--line);
+  border-radius: var(--r-full);
+  color: var(--faint);
+  font-size: var(--fs-2xs);
+  line-height: 1.5;
+}
+.meta {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+  min-width: 0;
   color: var(--muted);
   font-size: var(--fs-2xs);
-  text-overflow: ellipsis;
   white-space: nowrap;
+}
+.meta-tail {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .actions {
   display: flex;
@@ -465,28 +518,39 @@ commands.scope.registerCommand({
 }
 .work {
   display: grid;
-  margin: 0;
-  padding: 0;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 1px;
+  margin: 0 0 var(--sp-1) calc(var(--sp-3) + 11px);
+  padding: var(--sp-1) 0 var(--sp-1) var(--sp-2);
+  border-left: 1px solid var(--line);
   list-style: none;
 }
 .work-item {
-  padding: var(--sp-1) var(--sp-3);
+  padding: var(--sp-1) var(--sp-2) var(--sp-1) 0;
+  border-radius: 0 var(--r-sm) var(--r-sm) 0;
 }
 .work-topic {
   min-width: 0;
   overflow: hidden;
-  color: var(--text);
+  color: var(--text-2);
   font-size: var(--fs-2xs);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.work-item:last-child {
-  padding-bottom: var(--sp-2);
+.work-meta {
+  padding-left: calc(6px + var(--sp-2));
+  overflow: hidden;
+  color: var(--faint);
+  font-size: var(--fs-2xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .remote-hint {
   margin: 0;
-  padding: 0 var(--sp-3) var(--sp-2) calc(var(--sp-3) + var(--indent));
+  padding: 0 var(--sp-3) var(--sp-2) calc(var(--sp-3) + var(--sp-2) + var(--sp-5));
   color: var(--faint);
+  font-size: var(--fs-2xs);
+  line-height: 1.45;
 }
 .foot {
   display: grid;
@@ -513,5 +577,9 @@ commands.scope.registerCommand({
 .hub-panel :deep(svg) {
   width: 13px;
   height: 13px;
+}
+.hub-panel .device-icon svg {
+  width: 15px;
+  height: 15px;
 }
 </style>
