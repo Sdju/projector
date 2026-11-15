@@ -1,12 +1,9 @@
 import { proxyUrl } from "@ai-projector/core/modules/browser/index.ts";
+import { pageShim, type PageContext } from "./page-shim.ts";
 
 /** Страница, ответ которой переписывается: её адрес и окончание хоста прокси. */
-export interface RewriteContext {
-  /** Настоящий адрес документа. */
-  page: URL;
-  /** `<nonce>.proxy.localhost:<порт>` */
-  suffix: string;
-}
+export type RewriteContext = PageContext;
+export { pageShim };
 
 const ABSOLUTE = /^(?:https?:)?\/\//i;
 
@@ -24,6 +21,7 @@ function remap(value: string, context: RewriteContext): string | undefined {
   }
 }
 
+/** Переписывает абсолютные `url()` и `@import`; экранирование и скобки внутри `url()` не разбираются. */
 export function rewriteCss(css: string, context: RewriteContext): string {
   return css
     .replace(/url\(\s*(["']?)([^"')]*?)\1\s*\)/gi, (whole, quote: string, value: string) => {
@@ -56,29 +54,17 @@ function quoted(
 }
 
 /**
- * Скрипт страницы: направляет в прокси абсолютные адреса из JavaScript (fetch, XHR, sendBeacon,
- * window.open) и сообщает родителю настоящий адрес и заголовок для адресной строки.
+ * Переписывает абсолютные ссылки HTML на origin прокси и добавляет скрипт страницы.
+ *
+ * Разметка разбирается регулярными выражениями, а не парсером, поэтому есть осознанные
+ * ограничения. Переписываются только значения в кавычках (двойных или одинарных): атрибуты без
+ * кавычек (`src=https://…`) остаются как есть. Нестандартная разметка — тот же предел: ссылка,
+ * собранная в `<script>` или в JSON-LD, не видна, а `srcset` делится по запятым, поэтому `data:`
+ * с запятой внутри разбивается на части. В CSS не разбираются экранирование и скобки внутри
+ * `url()`: `url("a(1).png")` не распознаётся. Адрес, собранный в JavaScript по частям
+ * (`origin + "/api"`), тоже не переписывается — прокси видит только готовое значение. Тег,
+ * попавший в комментарий или строку скрипта, будет переписан как разметка.
  */
-export function pageShim(context: RewriteContext): string {
-  const origin = JSON.stringify(context.page.origin);
-  const suffix = JSON.stringify(context.suffix);
-  const source = `(function(){
-var T=${origin},S=${suffix},A=/^(?:https?:)?\\/\\//i;
-function map(u){try{var s=typeof u==="string"?u:u instanceof URL?u.href:"";if(!A.test(s))return u;
-var x=new URL(s,location.href);if(x.hostname.indexOf(":")>=0||x.host.slice(-S.length)===S)return u;
-return"http://"+x.hostname+"."+(x.protocol==="https:"?"s":"h")+x.port+"."+S+x.pathname+x.search+x.hash}catch(e){return u}}
-var f=window.fetch;if(f)window.fetch=function(i,n){try{if(typeof i==="string"||i instanceof URL)i=map(i);else if(i&&i.url){var m=map(i.url);if(m!==i.url)i=new Request(m,i)}}catch(e){}return f.call(this,i,n)};
-var o=XMLHttpRequest.prototype.open;XMLHttpRequest.prototype.open=function(m,u){arguments[1]=map(u);return o.apply(this,arguments)};
-if(navigator.sendBeacon){var b=navigator.sendBeacon;navigator.sendBeacon=function(u,d){return b.call(this,map(u),d)}}
-var w=window.open;window.open=function(u){arguments[0]=map(u);return w.apply(this,arguments)};
-var last="";function report(){var u=T+location.pathname+location.search+location.hash,t=document.title,k=u+"\\n"+t;
-if(k===last)return;last=k;try{parent.postMessage({projectorBrowser:true,url:u,title:t},"*")}catch(e){}}
-addEventListener("load",report);addEventListener("popstate",report);addEventListener("hashchange",report);setInterval(report,500);report();
-})();`;
-  return `<script>${source.replace(/<\/script/gi, "<\\/script")}</script>`;
-}
-
-/** Переписывает абсолютные ссылки HTML на origin прокси и добавляет скрипт страницы. */
 export function rewriteHtml(html: string, context: RewriteContext): string {
   const rewritten = html
     .replace(META_BLOCKED, "")
