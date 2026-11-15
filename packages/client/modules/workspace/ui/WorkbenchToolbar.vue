@@ -17,6 +17,7 @@ import ContextMenu from "../../../common/ui/ContextMenu.vue";
 import { useIslandMenu } from "../../../common/utilities/island-menu.ts";
 import { useCommandScope } from "../../../common/utilities/commands.ts";
 import { useHiddenActions } from "../lib/hidden-actions.ts";
+import { useActionOrder } from "../lib/action-order.ts";
 
 const props = defineProps<{
   projectId: string;
@@ -57,9 +58,80 @@ const actions = computed(() => [
   { id: "settings", title: "Настройки Projector" },
   ...(!props.mobile ? [{ id: "layout", title: "Раскладка" }] : []),
 ]);
+const ordering = useActionOrder("toolbar");
+const visibleActions = computed(() =>
+  ordering.sort(
+    actions.value.filter((item) => !isHidden(item.id)),
+    (item) => item.id,
+  ),
+);
+const dragging = ref("");
+const dropTarget = ref<{ id: string; after: boolean }>();
+function endDrag() {
+  dragging.value = "";
+  dropTarget.value = undefined;
+}
+function dragLeave(event: DragEvent) {
+  if (
+    !(event.relatedTarget instanceof Node) ||
+    !(event.currentTarget as HTMLElement).contains(event.relatedTarget)
+  )
+    dropTarget.value = undefined;
+}
+function dragOver(event: DragEvent, id: string) {
+  if (!dragging.value || dragging.value === id) {
+    dropTarget.value = undefined;
+    return;
+  }
+  event.preventDefault();
+  if (event.dataTransfer) event.dataTransfer.dropEffect = "move";
+  const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
+  dropTarget.value = { id, after: event.clientX > rect.left + rect.width / 2 };
+}
+
+function dragStart(event: DragEvent, id: string) {
+  dragging.value = id;
+  event.dataTransfer?.setData("text/plain", id);
+  if (event.dataTransfer) event.dataTransfer.effectAllowed = "move";
+}
+function drop(event: DragEvent, id: string) {
+  event.preventDefault();
+  const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
+  void commands.scope.executeCommand("ide.workbench.action.move", {
+    from: dragging.value,
+    to: id,
+    after: event.clientX > rect.left + rect.width / 2,
+  });
+  endDrag();
+}
 const isHidden = (id: string) => visibility.hidden.value.includes(`toolbar:${id}`);
 const hiddenActions = computed(() => actions.value.filter((item) => isHidden(item.id)));
 const commands = useCommandScope("workbench-hidden-actions", () => ({ surface: "workbench" }));
+commands.scope.registerCommand({
+  id: "ide.workbench.action.move",
+  title: "Переместить кнопку шапки",
+  description: "Меняет порядок кнопок шапки и сохраняет его.",
+  arguments: {
+    from: "string: перемещаемая кнопка",
+    to: "string: соседняя кнопка",
+    after: "boolean: разместить после",
+  },
+  run: async (args) => {
+    const value = args as { from?: unknown; to?: unknown; after?: unknown };
+    if (
+      typeof value?.from !== "string" ||
+      typeof value.to !== "string" ||
+      typeof value.after !== "boolean"
+    )
+      throw new Error("Укажите from, to и after");
+    await ordering.move(
+      visibleActions.value.map((item) => item.id),
+      value.from,
+      value.to,
+      value.after,
+    );
+  },
+});
 commands.scope.registerCommand({
   id: "ide.workbench.actions.hidden.toggle",
   title: "Открыть скрытые действия",
@@ -107,72 +179,73 @@ function openContext(event: MouseEvent, id: string) {
     </p>
     <div class="toolbar-spacer" />
     <span
-      v-if="capabilities.terminals && !mobile && !isHidden('session')"
-      @contextmenu="openContext($event, 'session')"
-      ><NewSessionMenu
+      v-for="item in visibleActions"
+      :key="item.id"
+      class="sortable-action"
+      draggable="true"
+      :class="{
+        dragging: dragging === item.id,
+        'drop-before': dropTarget?.id === item.id && !dropTarget.after,
+        'drop-after': dropTarget?.id === item.id && dropTarget.after,
+      }"
+      @dragstart="dragStart($event, item.id)"
+      @dragend="endDrag"
+      @dragover="dragOver($event, item.id)"
+      @dragleave="dragLeave"
+      @drop.stop="drop($event, item.id)"
+      @contextmenu="openContext($event, item.id)"
+    >
+      <NewSessionMenu
+        v-if="item.id === 'session'"
         variant="split"
         :busy="terminalsBusy"
         :agent="capabilities.agent"
         :project-id="projectId"
         @command="(id, args) => emit('command', id, args)"
-    /></span>
-    <span
-      v-if="$slots['project-run'] && !isHidden('project-run')"
-      @contextmenu="openContext($event, 'project-run')"
-      ><slot name="project-run"
-    /></span>
-    <span
-      v-if="$slots['project-repository'] && !isHidden('project-repository')"
-      @contextmenu="openContext($event, 'project-repository')"
-      ><slot name="project-repository"
-    /></span>
-    <span v-if="inbox && !isHidden('inbox')" @contextmenu="openContext($event, 'inbox')"
-      ><AgentInboxBell @open="emit('command', 'ide.workbench.inbox.open')"
-    /></span>
-    <UiButton
-      v-if="!isHidden('media')"
-      shape="icon"
-      size="sm"
-      title="Генерация медиа"
-      aria-label="Генерация медиа"
-      data-command="ide.media.open"
-      @click="emit('command', 'ide.media.open')"
-      @contextmenu="openContext($event, 'media')"
-    >
-      <IconMedia aria-hidden="true" />
-    </UiButton>
-    <UiButton
-      v-if="!isHidden('analytics')"
-      shape="icon"
-      size="sm"
-      title="Аналитика расхода"
-      aria-label="Аналитика расхода"
-      data-command="ide.workbench.analytics.open"
-      @click="emit('command', 'ide.workbench.analytics.open')"
-      @contextmenu="openContext($event, 'analytics')"
-    >
-      <IconAnalytics aria-hidden="true" />
-    </UiButton>
-    <UiButton
-      v-if="!isHidden('settings')"
-      shape="icon"
-      size="sm"
-      title="Настройки Projector"
-      aria-label="Настройки Projector"
-      data-command="ide.workbench.settings.open"
-      @click="emit('command', 'ide.workbench.settings.open')"
-      @contextmenu="openContext($event, 'settings')"
-    >
-      <IconSettings aria-hidden="true" />
-    </UiButton>
-    <span v-if="!mobile && !isHidden('layout')" @contextmenu="openContext($event, 'layout')"
-      ><LayoutMenu
+      />
+      <slot v-else-if="item.id === 'project-run'" name="project-run" />
+      <slot v-else-if="item.id === 'project-repository'" name="project-repository" />
+      <AgentInboxBell
+        v-else-if="item.id === 'inbox'"
+        @open="emit('command', 'ide.workbench.inbox.open')"
+      />
+      <LayoutMenu
+        v-else-if="item.id === 'layout'"
         :groups="layoutGroups"
         :preset="preset"
         :presets-available="presetsAvailable"
         :sidebar-hidden="sidebarHidden"
         @command="(id, args) => emit('command', id, args)"
-    /></span>
+      />
+      <UiButton
+        v-else
+        shape="icon"
+        size="sm"
+        :title="item.title"
+        :aria-label="item.title"
+        :data-command="
+          item.id === 'media'
+            ? 'ide.media.open'
+            : item.id === 'analytics'
+              ? 'ide.workbench.analytics.open'
+              : 'ide.workbench.settings.open'
+        "
+        @click="
+          emit(
+            'command',
+            item.id === 'media'
+              ? 'ide.media.open'
+              : item.id === 'analytics'
+                ? 'ide.workbench.analytics.open'
+                : 'ide.workbench.settings.open',
+          )
+        "
+      >
+        <IconMedia v-if="item.id === 'media'" aria-hidden="true" />
+        <IconAnalytics v-else-if="item.id === 'analytics'" aria-hidden="true" />
+        <IconSettings v-else aria-hidden="true" />
+      </UiButton>
+    </span>
     <span :ref="menu.trigger"
       ><UiButton
         shape="icon"
@@ -253,6 +326,34 @@ function openContext(event: MouseEvent, id: string) {
 </template>
 
 <style scoped>
+.sortable-action {
+  position: relative;
+}
+.sortable-action.drop-before::before,
+.sortable-action.drop-after::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  bottom: 2px;
+  width: 2px;
+  background: var(--focus);
+  border-radius: 2px;
+  pointer-events: none;
+  z-index: 1;
+}
+.sortable-action.drop-before::before {
+  left: -5px;
+}
+.sortable-action.drop-after::after {
+  right: -5px;
+}
+
+.sortable-action {
+  display: flex;
+}
+.sortable-action.dragging {
+  opacity: 0.4;
+}
 .hidden-action {
   display: flex;
   align-items: center;

@@ -16,6 +16,7 @@ import IconMenu from "~icons/lucide/menu";
 import IconEyeOff from "~icons/lucide/eye-off";
 import IconEye from "~icons/lucide/eye";
 import { useHiddenActions } from "../lib/hidden-actions.ts";
+import { useActionOrder } from "../lib/action-order.ts";
 import { groupSidebar } from "../../workspace-api/index.ts";
 
 export interface SidebarItem {
@@ -62,6 +63,48 @@ const picker = useIslandMenu({
 });
 const overflow = useIslandMenu({ anchor: "left", initialFocus: ".section-item" });
 const visibility = useHiddenActions();
+const ordering = useActionOrder("sidebar");
+const dragging = ref("");
+const dropTarget = ref<{ id: string; after: boolean }>();
+function endDrag() {
+  dragging.value = "";
+  dropTarget.value = undefined;
+}
+function dragLeave(event: DragEvent) {
+  if (
+    !(event.relatedTarget instanceof Node) ||
+    !(event.currentTarget as HTMLElement).contains(event.relatedTarget)
+  )
+    dropTarget.value = undefined;
+}
+function dragOver(event: DragEvent, id: string) {
+  const from = groups.value.find((group) => group[0]?.id === dragging.value);
+  const to = groups.value.find((group) => group[0]?.id === id);
+  if (!from || !to || dragging.value === id || !!from[0]?.utility !== !!to[0]?.utility) {
+    dropTarget.value = undefined;
+    return;
+  }
+  event.preventDefault();
+  if (event.dataTransfer) event.dataTransfer.dropEffect = "move";
+  const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
+  dropTarget.value = { id, after: event.clientY > rect.top + rect.height / 2 };
+}
+
+function dragStart(event: DragEvent, id: string) {
+  dragging.value = id;
+  event.dataTransfer?.setData("text/plain", id);
+  if (event.dataTransfer) event.dataTransfer.effectAllowed = "move";
+}
+function drop(event: DragEvent, id: string) {
+  event.preventDefault();
+  const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
+  void commands.scope.executeCommand("ide.workbench.section.move", {
+    from: dragging.value,
+    to: id,
+    after: event.clientY > rect.top + rect.height / 2,
+  });
+  endDrag();
+}
 const keyFor = (id: string) => `sidebar:${id}`;
 const settingsItem: SidebarItem = {
   id: "project-settings",
@@ -83,8 +126,14 @@ const groups = computed(() => {
     ),
   );
   return [
-    ...all.filter((group) => !group[0]?.utility),
-    ...all.filter((group) => group[0]?.utility),
+    ...ordering.sort(
+      all.filter((group) => !group[0]?.utility),
+      (group) => group[0]!.id,
+    ),
+    ...ordering.sort(
+      all.filter((group) => group[0]?.utility),
+      (group) => group[0]!.id,
+    ),
   ];
 });
 const firstUtility = computed(() => groups.value.find((group) => group[0]?.utility));
@@ -96,6 +145,34 @@ const otherBadges = computed(() =>
 const commands = useCommandScope(props.scopeId ?? "sidebar-sections", () => ({
   surface: "workbench",
 }));
+commands.scope.registerCommand({
+  id: "ide.workbench.section.move",
+  title: "Переместить раздел боковой панели",
+  description: "Меняет порядок групп разделов боковой панели и сохраняет его.",
+  arguments: {
+    from: "string: перемещаемый раздел",
+    to: "string: соседний раздел",
+    after: "boolean: разместить после",
+  },
+  run: async (args) => {
+    const value = args as { from?: unknown; to?: unknown; after?: unknown };
+    if (
+      typeof value?.from !== "string" ||
+      typeof value.to !== "string" ||
+      typeof value.after !== "boolean"
+    )
+      throw new Error("Укажите from, to и after");
+    const from = groups.value.find((group) => group[0]?.id === value.from);
+    const to = groups.value.find((group) => group[0]?.id === value.to);
+    if (!from || !to || !!from[0]?.utility !== !!to[0]?.utility) return;
+    await ordering.move(
+      groups.value.map((group) => group[0]!.id),
+      value.from,
+      value.to,
+      value.after,
+    );
+  },
+});
 commands.scope.registerCommand({
   id: "ide.workbench.section.picker.toggle",
   title: "Открыть или закрыть выбор раздела",
@@ -238,7 +315,21 @@ function choose(item: SidebarItem) {
   <nav v-else class="side-tabs vertical" :aria-label="label ?? 'Разделы проекта'">
     <template v-for="group in groups" :key="group[0]?.id">
       <i v-if="group === firstUtility" class="rail-divider" aria-hidden="true" />
-      <div class="side-group" :class="{ grouped: group.length > 1 }">
+      <div
+        class="side-group"
+        :class="{
+          grouped: group.length > 1,
+          dragging: dragging === group[0]?.id,
+          'drop-before': dropTarget?.id === group[0]?.id && !dropTarget.after,
+          'drop-after': dropTarget?.id === group[0]?.id && dropTarget.after,
+        }"
+        draggable="true"
+        @dragstart="dragStart($event, group[0]!.id)"
+        @dragend="endDrag"
+        @dragover="dragOver($event, group[0]!.id)"
+        @dragleave="dragLeave"
+        @drop.stop="drop($event, group[0]!.id)"
+      >
         <template v-for="(item, index) in group" :key="item.id">
           <i v-if="index" class="side-separator" aria-hidden="true" />
           <button
@@ -321,6 +412,31 @@ function choose(item: SidebarItem) {
 </template>
 
 <style scoped>
+.side-tabs.vertical .side-group {
+  position: relative;
+}
+.side-group.drop-before::before,
+.side-group.drop-after::after {
+  content: "";
+  position: absolute;
+  left: 2px;
+  right: 2px;
+  height: 2px;
+  background: var(--focus);
+  border-radius: 2px;
+  pointer-events: none;
+  z-index: 1;
+}
+.side-group.drop-before::before {
+  top: -3px;
+}
+.side-group.drop-after::after {
+  bottom: -3px;
+}
+
+.side-group.dragging {
+  opacity: 0.4;
+}
 .overflow-trigger {
   display: flex;
 }
