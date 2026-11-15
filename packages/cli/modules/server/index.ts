@@ -95,9 +95,14 @@ export function createServerControl({
     return response.json().catch(() => ({}));
   }
 
+  /**
+   * A second launch joins the one already starting the server instead of failing: a cold start
+   * rebuilds Vite dependencies for 10–20 s, which is longer than a double click.
+   */
   async function acquireLock(): Promise<() => Promise<void>> {
     mkdirSync(dataDir, { recursive: true });
-    for (let i = 0; i < 80; i += 1) {
+    const deadline = Date.now() + 120_000;
+    while (Date.now() < deadline) {
       try {
         const handle = await open(lockPath, "wx");
         await handle.writeFile(String(process.pid));
@@ -113,10 +118,10 @@ export function createServerControl({
           continue;
         }
         if (await health()) return async () => undefined;
-        await sleep(100);
+        await sleep(200);
       }
     }
-    throw new Error("Запуск уже выполняется");
+    throw new Error(`Запуск уже выполняется больше двух минут. См. ${serverLogPath()}`);
   }
 
   async function waitUntilReady(timeoutMs = 90000, daemonPid?: number): Promise<void> {
