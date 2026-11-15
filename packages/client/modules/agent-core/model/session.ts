@@ -175,7 +175,9 @@ export function useAgent(
         }
         try {
           await start(onEvent, signal, attach);
-          if (signal.aborted || !assistant.run) break;
+          // Clean end (including Kimi soft keep-alive after end_turn): do not rejoin. Rejoin only
+          // when the stream breaks while the answer is still open (restart / dropped socket).
+          break;
         } catch (err) {
           if (err instanceof AgentRunGone || signal.aborted || !assistant.run) throw err;
           if (attempt >= REJOIN_ATTEMPTS) throw err;

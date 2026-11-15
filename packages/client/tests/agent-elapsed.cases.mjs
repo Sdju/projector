@@ -123,3 +123,33 @@ test("done keeps the run while a hard-held background task still needs the strea
   event("task", { id: "sub", status: "done", background: true }, 3_000);
   expect(assistant.run).toBeUndefined();
 });
+
+test("soft keep-alive background (hold: false) clears run on done", () => {
+  const state = { turns: [], permissions: [], questions: [], secrets: [], error: "", phase: "" };
+  const assistant = {
+    id: "a",
+    role: "assistant",
+    text: "",
+    tools: [],
+    tasks: [],
+    parts: [],
+    run: "run-soft",
+  };
+  const event = (name, data, at) =>
+    applyAgentEvent(state, assistant, { event: name, data }, () => {}, at);
+
+  event(
+    "task",
+    {
+      id: "sub",
+      kind: "agent",
+      title: "Fix",
+      status: "running",
+      background: true,
+      hold: false,
+    },
+    1_000,
+  );
+  event("done", { text: "ok" }, 2_000);
+  expect(assistant.run).toBeUndefined();
+});

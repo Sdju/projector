@@ -31,7 +31,12 @@ export function settleAnswerTasks(turns: readonly AgentTurn[], at: number): void
 /** Tracked background work that still needs the live run (permissions / notify after `done`). */
 export function holdsAnswerRun(turn: AgentTurn): boolean {
   return (turn.tasks ?? []).some(
-    (task) => task.status === "running" && task.background === true && task.untracked !== true,
+    (task) =>
+      task.status === "running" &&
+      task.background === true &&
+      task.untracked !== true &&
+      // Soft keep-alive (`hold: false`) does not need the answer stream after end_turn.
+      task.hold !== false,
   );
 }
 

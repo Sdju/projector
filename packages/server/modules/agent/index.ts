@@ -113,6 +113,12 @@ export {
 } from "./secret-show.ts";
 export { readAttachment, saveAttachment } from "./attachments.ts";
 export { readAgentHistory, writeAgentHistory } from "./history.ts";
+export {
+  isHarnessOnly,
+  lostBackgroundAgents,
+  sanitizeHarnessTurns,
+  withoutHarness,
+} from "./harness-turns.ts";
 export { readAgentUsage, type AgentUsageRecord } from "./usage-history.ts";
 export {
   chatMetaOf,

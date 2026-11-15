@@ -166,13 +166,21 @@ function historyState<Turns>(id: string, turns: Turns) {
   };
 }
 
-/** OpenCode may leave background tasks `running` in history; settle from its DB on read. */
+/** Settle stale background rows and drop harness-only user turns before the chat paints them. */
 async function loadHistoryForClient(id: string) {
   const turns = await readAgentHistory(id);
-  if (!id.startsWith("opencode:")) return turns;
-  const { settleOpenCodeHistoryTasks } = await import("../../modules/agents/opencode/index.ts");
-  if (!settleOpenCodeHistoryTasks(turns)) return turns;
-  return writeAgentHistory(id, turns);
+  let changed = false;
+  if (id.startsWith("kimi:")) {
+    const { hydrateKimiHistoryTasks } = await import("../../modules/agents/kimi/index.ts");
+    if (hydrateKimiHistoryTasks(turns)) changed = true;
+  }
+  const { sanitizeHarnessTurns } = await import("../../modules/agent/index.ts");
+  if (sanitizeHarnessTurns(turns)) changed = true;
+  if (id.startsWith("opencode:")) {
+    const { settleOpenCodeHistoryTasks } = await import("../../modules/agents/opencode/index.ts");
+    if (settleOpenCodeHistoryTasks(turns)) changed = true;
+  }
+  return changed ? writeAgentHistory(id, turns) : turns;
 }
 
 export const routes: RouteDefinition[] = [

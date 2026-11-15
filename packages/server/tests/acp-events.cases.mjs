@@ -285,6 +285,7 @@ test("kimi background Agent is a soft keep-alive task, not a connection hold", a
       title: "Fix trust",
       status: "running",
       background: true,
+      hold: false,
       subagent: "coder",
       prompt: "do it",
       tool: "a1",
@@ -307,6 +308,7 @@ test("kimi background Agent is a soft keep-alive task, not a connection hold", a
     id: "a1",
     status: "running",
     background: true,
+    hold: false,
     session: "agent-0",
     subagent: "coder",
   });
