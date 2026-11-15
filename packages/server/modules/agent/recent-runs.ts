@@ -1,7 +1,7 @@
-import { randomBytes } from "node:crypto";
-import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
+import { mkdir, readFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { dataDir } from "@ai-projector/core/modules/app-paths/index.ts";
+import { writeFileAtomic, withFileLock } from "../atomic-files/index.ts";
 import type { AgentBackendId } from "./backend.ts";
 import { runsChanged } from "./change-events.ts";
 
@@ -29,23 +29,8 @@ const host = globalThis as typeof globalThis & {
   projectorRecentRuns?: Map<string, RecentRun[]>;
 };
 const stores = (host.projectorRecentRuns ??= new Map<string, RecentRun[]>());
-const locks = new Map<string, Promise<void>>();
 
 const recentRunsPath = () => join(dataDir(), "agent", "recent-runs.json");
-
-function serialized<T>(path: string, task: () => Promise<T>): Promise<T> {
-  const previous = locks.get(path) ?? Promise.resolve();
-  const next = previous.then(task, task);
-  const tail = next.then(
-    () => undefined,
-    () => undefined,
-  );
-  locks.set(path, tail);
-  void tail.then(() => {
-    if (locks.get(path) === tail) locks.delete(path);
-  });
-  return next;
-}
 
 async function loadFromDisk(path: string): Promise<RecentRun[]> {
   const cached = stores.get(path);
@@ -72,10 +57,9 @@ async function loadFromDisk(path: string): Promise<RecentRun[]> {
 
 async function saveToDisk(path: string, list: RecentRun[]): Promise<void> {
   stores.set(path, list);
+  // Каталог недавних запусков закрыт от остальных пользователей, как и сам файл.
   await mkdir(dirname(path), { recursive: true, mode: 0o700 });
-  const temp = `${path}.${randomBytes(3).toString("hex")}.tmp`;
-  await writeFile(temp, JSON.stringify(list), { mode: 0o600 });
-  await rename(temp, path);
+  await writeFileAtomic(path, JSON.stringify(list));
 }
 
 function prune(list: RecentRun[], now = Date.now()): RecentRun[] {
@@ -111,7 +95,7 @@ export function hasAnswerForm(text: string): boolean {
 /** Records a finished chat run so the notification center and bell surface completions. */
 export async function recordRecentRun(entry: RecentRun): Promise<void> {
   const path = recentRunsPath();
-  await serialized(path, async () => {
+  await withFileLock(path, async () => {
     const list = await loadFromDisk(path);
     const filtered = list.filter(
       (item) => item.id !== entry.id && (!entry.chat || item.chat !== entry.chat),
@@ -126,7 +110,7 @@ export async function recordRecentRun(entry: RecentRun): Promise<void> {
 export async function clearRecentRunForChat(chat: string): Promise<void> {
   if (!chat) return;
   const path = recentRunsPath();
-  await serialized(path, async () => {
+  await withFileLock(path, async () => {
     const list = await loadFromDisk(path);
     const filtered = list.filter((item) => item.chat !== chat);
     if (filtered.length === list.length) return;

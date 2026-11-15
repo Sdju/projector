@@ -50,4 +50,3 @@ export {
 export type { ThinkingStyle } from "./thinking.ts";
 export { createQwenOpenAI, normalizeOpenAiBaseUrl } from "./openai-client.ts";
 export { quietChatModel } from "./quiet-model.ts";
-export { writeFileAtomic } from "./atomic-file.ts";

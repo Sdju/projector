@@ -1,8 +1,8 @@
 import { AsyncLocalStorage } from "node:async_hooks";
-import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import { join } from "node:path";
-import { randomUUID } from "node:crypto";
 import { dataDir } from "@ai-projector/core/modules/app-paths/index.ts";
+import { writeFileAtomic, withFileLock } from "../atomic-files/index.ts";
 import {
   activeExcludePatterns,
   defaultFilesExclude,
@@ -13,7 +13,6 @@ import {
 
 const settingsPath = () => join(dataDir(), "files-exclude.json");
 const override = new AsyncLocalStorage<FilesExcludeMap>();
-let pending: Promise<unknown> = Promise.resolve();
 let cache: { path: string; value: FilesExcludeMap; patterns?: string[] } | undefined;
 
 /** Run workspace code against an in-memory exclude map (parallel-safe in tests). */
@@ -47,21 +46,12 @@ export async function writeFilesExclude(input: unknown): Promise<FilesExcludeMap
     Object.assign(local, exclude);
     return { ...local };
   }
-  const task = pending.then(async () => {
-    await mkdir(dataDir(), { recursive: true });
+  return withFileLock(settingsPath(), async () => {
     const path = settingsPath();
-    const temporary = `${path}.${randomUUID()}.tmp`;
-    try {
-      await writeFile(temporary, JSON.stringify({ exclude }, null, 2) + "\n", { mode: 0o600 });
-      await rename(temporary, path);
-    } finally {
-      await rm(temporary, { force: true });
-    }
+    await writeFileAtomic(path, JSON.stringify({ exclude }, null, 2) + "\n");
     cache = { path, value: exclude };
     return { ...exclude };
   });
-  pending = task.catch(() => undefined);
-  return task;
 }
 
 export async function excludePatterns(): Promise<string[]> {

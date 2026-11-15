@@ -1,6 +1,6 @@
 import { randomBytes } from "node:crypto";
-import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
-import { dirname, join } from "node:path";
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
 import { dataDir } from "@ai-projector/core/modules/app-paths/index.ts";
 import {
   BUILTIN_SERVICE_ROLES,
@@ -14,6 +14,7 @@ import {
   type AgentRoleView,
   type ServiceRoleId,
 } from "@ai-projector/core/modules/agent-role/index.ts";
+import { setAsideBroken, writeFileAtomic, withFileLock } from "../atomic-files/index.ts";
 import { projectRoleState } from "./project.ts";
 
 /** The user's choices for the built-in service roles: `$XDG_DATA_HOME/projector/agent/roles.json`. */
@@ -62,25 +63,14 @@ async function readState(): Promise<StoredRoles> {
     return stateOf(await readFile(rolesFile(), "utf8"));
   } catch (error) {
     // A broken file is kept next to the settings instead of being silently overwritten.
-    if ((error as NodeJS.ErrnoException).code !== "ENOENT")
-      await rename(rolesFile(), `${rolesFile()}.broken-${Date.now()}`).catch(() => undefined);
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT") await setAsideBroken(rolesFile());
     return empty();
   }
 }
 
-/** One write at a time: two settings requests must not lose each other's change. */
-let queue: Promise<unknown> = Promise.resolve();
-
 /** Writes through a temporary file, with the owner-only mode secrets-adjacent settings use. */
 async function writeState(state: StoredRoles): Promise<void> {
-  const path = rolesFile();
-  await mkdir(dirname(path), { recursive: true });
-  const temporary = `${path}.${process.pid}.tmp`;
-  await writeFile(temporary, `${JSON.stringify(state, null, 2)}\n`, {
-    encoding: "utf8",
-    mode: 0o600,
-  });
-  await rename(temporary, path);
+  await writeFileAtomic(rolesFile(), `${JSON.stringify(state, null, 2)}\n`);
 }
 
 function serviceRoleView(role: AgentRole, selection: AgentRoleSelection): AgentRoleView {
@@ -133,28 +123,24 @@ export async function readAgentRole(
 export async function saveServiceRole(id: string, value: unknown): Promise<AgentRoleSettings> {
   if (!isServiceRoleId(id)) throw new Error(`Неизвестная служебная роль: ${id}`);
   const selection = normalizeRoleSelection(value);
-  const task = queue.then(async () => {
+  return withFileLock(rolesFile(), async () => {
     const state = await readState();
     if (Object.keys(selection).length) state.builtins[id] = { selection };
     else delete state.builtins[id];
     await writeState(state);
     return roleSettings();
   });
-  queue = task.catch(() => undefined);
-  return task;
 }
 
 /** Removes the service role's own model: it follows the chat again. */
 export async function resetServiceRole(id: string): Promise<AgentRoleSettings> {
   if (!isServiceRoleId(id)) throw new Error(`Неизвестная служебная роль: ${id}`);
-  const task = queue.then(async () => {
+  return withFileLock(rolesFile(), async () => {
     const state = await readState();
     delete state.builtins[id];
     await writeState(state);
     return roleSettings();
   });
-  queue = task.catch(() => undefined);
-  return task;
 }
 
 /** Generates a stable id for a role created in the settings. */
@@ -168,7 +154,7 @@ function newRoleId(existing: readonly AgentRole[]): string {
 /** Creates a chat role; service roles are never user-created. */
 export async function createChatRole(value: unknown): Promise<AgentRoleSettings> {
   const input = value && typeof value === "object" && !Array.isArray(value) ? value : {};
-  const task = queue.then(async () => {
+  return withFileLock(rolesFile(), async () => {
     const state = await readState();
     const id = newRoleId(state.roles);
     const role = normalizeAgentRole({ ...(input as object), id, kind: "chat" });
@@ -179,14 +165,12 @@ export async function createChatRole(value: unknown): Promise<AgentRoleSettings>
     const settings = await roleSettings();
     return { ...settings, created: chatRoleView(role) };
   });
-  queue = task.catch(() => undefined);
-  return task;
 }
 
 /** Replaces an existing chat role; the id is part of the address and cannot be changed here. */
 export async function saveChatRole(id: string, value: unknown): Promise<AgentRoleSettings> {
   if (isServiceRoleId(id)) throw new Error("Служебная роль настраивается отдельно");
-  const task = queue.then(async () => {
+  return withFileLock(rolesFile(), async () => {
     const state = await readState();
     const index = state.roles.findIndex((role) => role.id === id);
     if (index < 0) throw new Error(`Неизвестная роль: ${id}`);
@@ -197,22 +181,18 @@ export async function saveChatRole(id: string, value: unknown): Promise<AgentRol
     await writeState(state);
     return roleSettings();
   });
-  queue = task.catch(() => undefined);
-  return task;
 }
 
 /** Deletes a chat role; chats that already started keep their saved snapshot. */
 export async function deleteChatRole(id: string): Promise<AgentRoleSettings> {
   if (isServiceRoleId(id)) throw new Error("Служебную роль нельзя удалить");
-  const task = queue.then(async () => {
+  return withFileLock(rolesFile(), async () => {
     const state = await readState();
     if (!state.roles.some((role) => role.id === id)) throw new Error(`Неизвестная роль: ${id}`);
     state.roles = state.roles.filter((role) => role.id !== id);
     await writeState(state);
     return roleSettings();
   });
-  queue = task.catch(() => undefined);
-  return task;
 }
 
 /** The model the service call should use: the role's own provider over the chat's fallback. */

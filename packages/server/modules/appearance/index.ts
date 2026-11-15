@@ -1,6 +1,5 @@
-import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
+import { readFile, rm } from "node:fs/promises";
 import { join } from "node:path";
-import { randomUUID } from "node:crypto";
 import { dataDir } from "@ai-projector/core/modules/app-paths/index.ts";
 import {
   appearanceFile,
@@ -15,10 +14,10 @@ import {
   type AppearanceFonts,
   type AppearanceSettings,
 } from "@ai-projector/core/modules/appearance/index.ts";
+import { writeFileAtomic, withFileLock } from "../atomic-files/index.ts";
 
 const appearancePath = () => join(dataDir(), appearanceFile);
 const legacyTypographyPath = () => join(dataDir(), legacyTypographyFile);
-let pending: Promise<unknown> = Promise.resolve();
 
 async function readLegacyTypography(): Promise<AppearanceFonts | undefined> {
   try {
@@ -50,15 +49,7 @@ export async function readAppearanceChoice(): Promise<AppearanceChoice> {
 }
 
 async function writeSettings(settings: AppearanceSettings): Promise<AppearanceSettings> {
-  await mkdir(dataDir(), { recursive: true });
-  const file = appearancePath();
-  const temporary = `${file}.${randomUUID()}.tmp`;
-  try {
-    await writeFile(temporary, JSON.stringify(settings, null, 2) + "\n", { mode: 0o600 });
-    await rename(temporary, file);
-  } finally {
-    await rm(temporary, { force: true });
-  }
+  await writeFileAtomic(appearancePath(), JSON.stringify(settings, null, 2) + "\n");
   // The short-lived typography.json is absorbed into appearance.json.
   await rm(legacyTypographyPath(), { force: true });
   return settings;
@@ -72,7 +63,7 @@ export function writeAppearance(
   patch: { choice?: unknown; fonts?: unknown },
   availableThemeIds?: readonly string[],
 ): Promise<AppearanceSettings> {
-  const task = pending.then(async () => {
+  return withFileLock(appearancePath(), async () => {
     const current = await readAppearance();
     let choice = current.choice;
     if (patch.choice !== undefined) {
@@ -89,8 +80,6 @@ export function writeAppearance(
       patch.fonts !== undefined ? mergeAppearanceFonts(current.fonts, patch.fonts) : current.fonts;
     return writeSettings({ choice, fonts });
   });
-  pending = task.catch(() => undefined);
-  return task;
 }
 
 /** Colour-scheme-only write used by older callers; fonts on disk are preserved. */

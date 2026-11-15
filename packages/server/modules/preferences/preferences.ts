@@ -1,7 +1,8 @@
-import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { dataDir } from "@ai-projector/core/modules/app-paths/index.ts";
 import { shortcuts, type InterfaceMode } from "@ai-projector/core/modules/launcher/index.ts";
+import { writeFileAtomic, withFileLock } from "../atomic-files/index.ts";
 interface Usage {
   count: number;
   last: number;
@@ -40,7 +41,6 @@ export function configureAgentPreferences(value: AgentPreferencesCatalog): void 
 }
 
 const preferencesPath = () => join(dataDir(), "launcher.json");
-let saving: Promise<unknown> = Promise.resolve();
 export async function preferences(): Promise<Preferences> {
   try {
     const data = JSON.parse(await readFile(preferencesPath(), "utf8"));
@@ -100,16 +100,11 @@ export function interfaceMode(value: unknown): InterfaceMode {
   return value === "window" || value === "browser" ? value : "native";
 }
 export function updatePreferences(update: (value: Preferences) => void): Promise<void> {
-  const task = saving.then(async () => {
+  return withFileLock(preferencesPath(), async () => {
     const value = await preferences();
     update(value);
-    await mkdir(dataDir(), { recursive: true });
-    const file = preferencesPath();
-    await writeFile(`${file}.tmp`, JSON.stringify(value, null, 2) + "\n");
-    await rename(`${file}.tmp`, file);
+    await writeFileAtomic(preferencesPath(), JSON.stringify(value, null, 2) + "\n");
   });
-  saving = task.catch(() => undefined);
-  return task;
 }
 export function saveInterface(mode: InterfaceMode, shortcut?: string): Promise<void> {
   return updatePreferences((value) => {

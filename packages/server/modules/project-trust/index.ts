@@ -1,64 +1,30 @@
-import { readFile, realpath } from "node:fs/promises";
-import type { Project } from "@ai-projector/core/modules/project/index.ts";
-import { projectRoleState, projectRolesTrustFile } from "../agent-roles/index.ts";
-import { projectPresetState, projectPresetsTrustFile } from "../agent-presets/index.ts";
-import { devcontainerState, devcontainerTrustFile } from "../devcontainer/index.ts";
-import { projectAppearanceState, projectAppearanceTrustFile } from "../project-appearance/index.ts";
+import { realpath } from "node:fs/promises";
+import { projectRoleTrustDescriptor } from "../agent-roles/index.ts";
+import { projectPresetTrustDescriptor } from "../agent-presets/index.ts";
+import { devcontainerTrustDescriptor } from "../devcontainer/index.ts";
+import { projectAppearanceTrustDescriptor } from "../project-appearance/index.ts";
 import { loadProjects } from "../projects/index.ts";
-import { projectWidgetState, projectWidgetsTrustFile } from "../project-widgets/index.ts";
+import { projectWidgetTrustDescriptor } from "../project-widgets/index.ts";
+import type { ProjectTrustDescriptor } from "../trusted-project-file/index.ts";
 import {
   readTrustNotices,
   syncProjectTrustNotices,
   type RevokedProjectFile,
 } from "../trust-notices/index.ts";
 
-interface HashEntry {
-  hash: string;
-  decision?: string;
-}
-
-type ProjectState = { exists: boolean; trusted: boolean; hash?: string };
+/**
+ * Все виды доверия к файлам проекта. Новый вид достаточно описать своим дескриптором и добавить
+ * сюда: проверка одного проекта и полный обход каталога идут по этому же реестру.
+ */
+const sources: readonly ProjectTrustDescriptor[] = [
+  projectAppearanceTrustDescriptor,
+  projectRoleTrustDescriptor,
+  projectWidgetTrustDescriptor,
+  projectPresetTrustDescriptor,
+  devcontainerTrustDescriptor,
+];
 
 const queues = new Map<string, Promise<void>>();
-
-async function readEntries(file: string): Promise<Record<string, HashEntry>> {
-  try {
-    const value = JSON.parse(await readFile(file, "utf8")) as { projects?: unknown };
-    if (!value.projects || typeof value.projects !== "object" || Array.isArray(value.projects))
-      return {};
-    const entries: Record<string, HashEntry> = {};
-    for (const [root, item] of Object.entries(value.projects as Record<string, unknown>)) {
-      if (!item || typeof item !== "object" || Array.isArray(item)) continue;
-      const row = item as { hash?: unknown; decision?: unknown };
-      if (typeof row.hash !== "string") continue;
-      entries[root] =
-        typeof row.decision === "string"
-          ? { hash: row.hash, decision: row.decision }
-          : { hash: row.hash };
-    }
-    return entries;
-  } catch {
-    return {};
-  }
-}
-
-/** The stored confirmation describes different bytes than the file on disk. */
-function revoked(entry: HashEntry | undefined, state: ProjectState | undefined): boolean {
-  return !!entry && !!state?.exists && !state.trusted && !!state.hash && entry.hash !== state.hash;
-}
-
-async function revokedHash(
-  entry: HashEntry | undefined,
-  read: () => Promise<ProjectState>,
-): Promise<string | undefined> {
-  if (!entry) return undefined;
-  try {
-    const state = await read();
-    return revoked(entry, state) ? state.hash : undefined;
-  } catch {
-    return undefined;
-  }
-}
 
 async function audit(projectId: string): Promise<void> {
   const projects = await loadProjects();
@@ -67,35 +33,11 @@ async function audit(projectId: string): Promise<void> {
     await syncProjectTrustNotices({ id: projectId, name: projectId, path: "" }, []);
     return;
   }
-  const root = await realpath(project.path).catch(() => project.path);
-  const [appearance, roles, widgets, presets, devcontainer] = await Promise.all([
-    readEntries(projectAppearanceTrustFile()),
-    readEntries(projectRolesTrustFile()),
-    readEntries(projectWidgetsTrustFile()),
-    readEntries(projectPresetsTrustFile()),
-    readEntries(devcontainerTrustFile()),
-  ]);
   const found: RevokedProjectFile[] = [];
-  const appearanceHash = await revokedHash(appearance[root], () =>
-    projectAppearanceState(projectId),
-  );
-  if (appearanceHash) found.push({ kind: "appearance", hash: appearanceHash });
-  const rolesHash = await revokedHash(roles[root], () => projectRoleState(projectId));
-  if (rolesHash) found.push({ kind: "roles", hash: rolesHash });
-  const widgetsHash = await revokedHash(widgets[root], () => projectWidgetState(projectId));
-  if (widgetsHash) found.push({ kind: "widgets", hash: widgetsHash });
-  const presetsHash = await revokedHash(presets[root], () => projectPresetState(projectId));
-  if (presetsHash) found.push({ kind: "presets", hash: presetsHash });
-  // A declined or absent devcontainer decision has no trust to revoke.
-  const devEntry = devcontainer[root];
-  if (devEntry?.decision === "trusted") {
-    try {
-      const state = devcontainerState(project);
-      if (state.found && state.hash && devEntry.hash !== state.hash)
-        found.push({ kind: "devcontainer", hash: state.hash });
-    } catch {
-      // A broken config keeps its last notice until the project file is readable again.
-    }
+  for (const source of sources) {
+    // Один недоступный или повреждённый файл не должен скрывать остальные решения.
+    const state = await source.stateFor(projectId).catch(() => undefined);
+    if (state?.revoked && state.hash) found.push({ kind: source.kind, hash: state.hash });
   }
   await syncProjectTrustNotices({ id: project.id, name: project.name, path: project.path }, found);
 }
@@ -129,23 +71,16 @@ export async function auditAllProjectTrust(): Promise<void> {
   for (const notice of notices)
     if (notice.scope === "project" && notice.projectId) targets.add(notice.projectId);
   const roots = new Set<string>();
-  for (const file of [
-    projectAppearanceTrustFile(),
-    projectRolesTrustFile(),
-    projectWidgetsTrustFile(),
-    projectPresetsTrustFile(),
-    devcontainerTrustFile(),
-  ])
-    for (const root of Object.keys(await readEntries(file))) roots.add(root);
+  for (const source of sources) for (const root of await source.storedRoots()) roots.add(root);
   if (roots.size) {
-    const byRoot = new Map<string, Project>();
+    const byRoot = new Map<string, string>();
     for (const project of projects) {
       const root = await realpath(project.path).catch(() => project.path);
-      byRoot.set(root, project);
+      byRoot.set(root, project.id);
     }
     for (const root of roots) {
-      const project = byRoot.get(root);
-      if (project) targets.add(project.id);
+      const id = byRoot.get(root);
+      if (id) targets.add(id);
     }
   }
   for (const id of targets) await auditProjectTrust(id);

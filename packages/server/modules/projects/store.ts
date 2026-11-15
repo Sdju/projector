@@ -1,7 +1,8 @@
-import { mkdir, readFile, rename, stat, writeFile } from "node:fs/promises";
+import { readFile, stat } from "node:fs/promises";
 import { dataDir } from "@ai-projector/core/modules/app-paths/index.ts";
-import { dirname, join } from "node:path";
+import { join } from "node:path";
 import type { ProjectScenarios } from "@ai-projector/core/modules/project/index.ts";
+import { writeFileAtomic, withFileLock } from "../atomic-files/index.ts";
 import type { Project } from "./types.ts";
 import { readProjectScenarios, writeProjectScenarios } from "./scenarios.ts";
 
@@ -89,9 +90,6 @@ async function isDirectory(path: string): Promise<boolean> {
 
 /** `projects.json` keeps only the catalog now; scenario fields live in each project's folder. */
 export async function saveProjects(projects: Project[]): Promise<void> {
-  const file = storePath();
-  await mkdir(dirname(file), { recursive: true });
-  const tmp = `${file}.tmp`;
   const catalog = await Promise.all(
     projects.map(async ({ commands, defaultCommandId, ...item }) => {
       // A project whose folder is gone keeps its scenarios here until recovery can write them.
@@ -99,17 +97,16 @@ export async function saveProjects(projects: Project[]): Promise<void> {
       return { ...item, commands, defaultCommandId };
     }),
   );
-  await writeFile(tmp, `${JSON.stringify({ projects: catalog }, null, 2)}\n`, "utf8");
-  await rename(tmp, file);
+  await writeFileAtomic(storePath(), `${JSON.stringify({ projects: catalog }, null, 2)}\n`);
 }
 
 function scenariosChanged(before: ProjectScenarios, after: ProjectScenarios): boolean {
   return JSON.stringify(before) !== JSON.stringify(after);
 }
 
-let projectWrites = Promise.resolve();
+/** Каталог правится по очереди: два запроса не должны потерять проект друг друга. */
 export async function updateProjects(update: (projects: Project[]) => void): Promise<void> {
-  const operation = projectWrites.then(async () => {
+  await withFileLock(storePath(), async () => {
     const projects = await loadProjects();
     const before = new Map(
       projects.map((project) => [
@@ -134,8 +131,6 @@ export async function updateProjects(update: (projects: Project[]) => void): Pro
     }
     await saveProjects(projects);
   });
-  projectWrites = operation.catch(() => {});
-  await operation;
 }
 
 export async function findProject(id: string): Promise<Project | undefined> {

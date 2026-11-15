@@ -1,11 +1,11 @@
-import { randomUUID } from "node:crypto";
-import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { dataDir } from "@ai-projector/core/modules/app-paths/index.ts";
 import type {
   ProjectTrustKind,
   TrustNotice,
 } from "@ai-projector/core/modules/trust-notices/index.ts";
+import { writeFileAtomic, withFileLock } from "../atomic-files/index.ts";
 import { broadcastEvent } from "../events/index.ts";
 
 const MAX_NOTICES = 50;
@@ -45,9 +45,6 @@ export interface ProjectTrustTarget {
   path: string;
 }
 
-/** Writes are serialized: discovery, a project audit and an inbox request may overlap. */
-let pending: Promise<unknown> = Promise.resolve();
-
 function validNotice(value: unknown): value is TrustNotice {
   if (!value || typeof value !== "object" || Array.isArray(value)) return false;
   const notice = value as Record<string, unknown>;
@@ -75,15 +72,7 @@ export async function readTrustNotices(): Promise<TrustNotice[]> {
 }
 
 async function writeTrustNotices(notices: readonly TrustNotice[]): Promise<void> {
-  await mkdir(dataDir(), { recursive: true });
-  const file = trustNoticeFile();
-  const temporary = `${file}.${randomUUID()}.tmp`;
-  try {
-    await writeFile(temporary, `${JSON.stringify({ notices }, null, 2)}\n`, { mode: 0o600 });
-    await rename(temporary, file);
-  } finally {
-    await rm(temporary, { force: true });
-  }
+  await writeFileAtomic(trustNoticeFile(), `${JSON.stringify({ notices }, null, 2)}\n`);
 }
 
 function sameNotices(left: readonly TrustNotice[], right: readonly TrustNotice[]): boolean {
@@ -102,11 +91,14 @@ function ordered(notices: readonly TrustNotice[]): TrustNotice[] {
     .slice(0, MAX_NOTICES);
 }
 
-/** One pass that reads the previous list, replaces matching notices and broadcasts a real change. */
+/**
+ * One pass that reads the previous list, replaces matching notices and broadcasts a real change.
+ * Discovery, a project audit and an inbox request may overlap, so writes go one at a time.
+ */
 function updateNotices(
   compute: (previous: TrustNotice[]) => TrustNotice[],
 ): Promise<TrustNotice[]> {
-  const task = pending.then(async () => {
+  return withFileLock(trustNoticeFile(), async () => {
     const previous = await readTrustNotices();
     const next = ordered(compute(previous));
     if (sameNotices(previous, next)) return previous;
@@ -114,8 +106,6 @@ function updateNotices(
     broadcastEvent("trust-notices-changed", { at: Date.now() });
     return next;
   });
-  pending = task.catch(() => undefined);
-  return task;
 }
 
 function pluginNotice(revoked: RevokedPlugin, previous: TrustNotice | undefined): TrustNotice {

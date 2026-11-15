@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { providersPath } from "@ai-projector/core/modules/app-paths/index.ts";
-import { setAsideBroken, writeFileAtomic } from "./atomic-file.ts";
+import { setAsideBroken, writeFileAtomic, withFileLock } from "../atomic-files/index.ts";
 import { HttpError } from "../http/index.ts";
 import { vault as systemVault } from "../secrets/index.ts";
 import { inferProviderKind, isProviderKind } from "./kinds.ts";
@@ -28,7 +28,6 @@ import type {
   StoredProvidersConfig,
 } from "./types.ts";
 
-let writeChain: Promise<unknown> = Promise.resolve();
 let providerVault = systemVault;
 /** Test hook: replaces the secret vault. */
 export const useProviderVault = (next: typeof systemVault) => {
@@ -36,13 +35,9 @@ export const useProviderVault = (next: typeof systemVault) => {
 };
 const keyAccount = (id: string, balance = false) => `provider:${id}${balance ? ":balance" : ""}`;
 
+/** Записи providers.json идут по очереди: два сохранения не должны потерять друг друга. */
 function withWriteLock<T>(fn: () => Promise<T>): Promise<T> {
-  const next = writeChain.then(fn, fn);
-  writeChain = next.then(
-    () => undefined,
-    () => undefined,
-  );
-  return next;
+  return withFileLock(providersPath(), fn);
 }
 
 export async function loadStoredProviders(

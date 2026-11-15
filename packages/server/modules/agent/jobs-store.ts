@@ -1,7 +1,8 @@
 import { randomBytes } from "node:crypto";
-import { mkdir, readFile, readdir, rename, rm, writeFile } from "node:fs/promises";
+import { mkdir, readFile, readdir, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { dataDir } from "@ai-projector/core/modules/app-paths/index.ts";
+import { writeFileAtomic } from "../atomic-files/index.ts";
 import { jobsChanged } from "./change-events.ts";
 import type { AgentBackendId, AgentPermissionMode } from "./backend.ts";
 import type { AgentSelection } from "./controls.ts";
@@ -105,10 +106,8 @@ export function jobDirectory(id: string): string {
 
 export const newJobId = () => randomBytes(6).toString("hex");
 
-async function writeAtomic(file: string, data: unknown): Promise<void> {
-  const temporary = `${file}.${randomBytes(3).toString("hex")}.tmp`;
-  await writeFile(temporary, JSON.stringify(data), { mode: 0o600 });
-  await rename(temporary, file);
+function writeAtomic(file: string, data: unknown): Promise<void> {
+  return writeFileAtomic(file, JSON.stringify(data));
 }
 
 export async function saveJob(job: AgentJob): Promise<void> {

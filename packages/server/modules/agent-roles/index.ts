@@ -14,6 +14,7 @@ export {
   createProjectRole,
   deleteProjectRole,
   projectRoleState,
+  projectRoleTrustDescriptor,
   projectRolesRelativeFile,
   projectRolesTrustFile,
   readProjectAgentRole,

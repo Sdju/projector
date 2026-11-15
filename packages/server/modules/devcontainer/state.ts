@@ -6,8 +6,10 @@ import type {
 } from "@ai-projector/core/modules/devcontainer/index.ts";
 import type { Project } from "@ai-projector/core/modules/project/index.ts";
 import { HttpError } from "../http/index.ts";
+import { findProject } from "../projects/index.ts";
+import type { ProjectTrustDescriptor } from "../trusted-project-file/index.ts";
 import { findDevcontainer } from "./discovery.ts";
-import { saveTrust, trustEntry } from "./trust.ts";
+import { saveTrust, trustEntry, trustPath, trustRoots } from "./trust.ts";
 
 function resolved(project: Project) {
   const root = realpathSync(project.path);
@@ -77,3 +79,29 @@ export function trustedDevcontainer(project: Project) {
     return undefined;
   }
 }
+
+/**
+ * Вид доверия к devcontainer.json для реестра `project-trust`. Отказ пользователя — тоже
+ * сохранённое решение, но отозванным доверием считается только изменение согласованного файла.
+ */
+export const devcontainerTrustDescriptor: ProjectTrustDescriptor = {
+  kind: "devcontainer",
+  trustFile: trustPath,
+  storedRoots: trustRoots,
+  stateFor: async (projectId) => {
+    const project = await findProject(projectId);
+    if (!project) throw new Error("Проект не найден");
+    const root = realpathSync(project.path);
+    const state = devcontainerState(project);
+    const entry = trustEntry(root);
+    return {
+      root,
+      exists: state.found,
+      trusted: state.decision === "trusted",
+      hash: state.hash,
+      savedHash: entry?.hash,
+      revoked:
+        entry?.decision === "trusted" && state.found && !!state.hash && entry.hash !== state.hash,
+    };
+  },
+};

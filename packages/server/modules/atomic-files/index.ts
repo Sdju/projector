@@ -1,0 +1,65 @@
+import { randomUUID } from "node:crypto";
+import { mkdir, open, rename, rm } from "node:fs/promises";
+import { dirname, resolve } from "node:path";
+import { os } from "@ai-projector/core/modules/os/index.ts";
+
+export interface AtomicWriteOptions {
+  /** Permissions of the new file; the default keeps private settings readable by the owner only. */
+  mode?: number;
+  /** Flush the bytes to disk before the rename; only a throwaway cache may skip it. */
+  sync?: boolean;
+  /** Закрыть файл для остальных пользователей ОС: на POSIX это chmod, на Windows — ACL. */
+  ownerOnly?: boolean;
+}
+
+/** Written in full and flushed to disk before the rename replaces the previous file. */
+export async function writeFileAtomic(
+  file: string,
+  text: string,
+  options: AtomicWriteOptions = {},
+): Promise<void> {
+  await mkdir(dirname(file), { recursive: true });
+  const temporary = `${file}.${randomUUID()}.tmp`;
+  try {
+    const handle = await open(temporary, "w", options.mode ?? 0o600);
+    try {
+      await handle.writeFile(text, "utf8");
+      if (options.sync !== false) await handle.sync();
+    } finally {
+      await handle.close();
+    }
+    await rename(temporary, file);
+  } catch (error) {
+    await rm(temporary, { force: true });
+    throw error;
+  }
+  if (options.ownerOnly) await os.tools.restrictToOwner(file);
+}
+
+/** Moves a damaged file out of the way so that defaults written next never overwrite it. */
+export async function setAsideBroken(file: string): Promise<string> {
+  const backup = `${file}.broken-${Date.now()}`;
+  await rename(file, backup).catch(() => {});
+  return backup;
+}
+
+const chains = new Map<string, Promise<unknown>>();
+
+/**
+ * Runs tasks that touch one file strictly one after another. A failed task never blocks the next
+ * one, so a rejected write cannot wedge the file forever.
+ */
+export function withFileLock<T>(file: string, task: () => Promise<T>): Promise<T> {
+  const key = resolve(file);
+  const previous = chains.get(key) ?? Promise.resolve();
+  const run = previous.then(task);
+  const tail = run.then(
+    () => undefined,
+    () => undefined,
+  );
+  chains.set(key, tail);
+  void tail.finally(() => {
+    if (chains.get(key) === tail) chains.delete(key);
+  });
+  return run;
+}
