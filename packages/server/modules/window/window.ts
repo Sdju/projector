@@ -75,8 +75,15 @@ export async function openLauncher(
 ): Promise<InterfaceMode> {
   let selected = mode ?? (await preferences()).mode;
   if (selected === "native" && !hasNativePalette()) selected = "browser";
-  if (selected === "native") await desktopCommand(url, toggle ? "toggle" : "show");
-  else {
+  if (selected === "native") {
+    await desktopCommand(url, toggle ? "toggle" : "show");
+    // A cold resident can lose the first show while GTK maps the window; the second one is
+    // what the user sees. Showing an already visible palette is a no-op.
+    if (!toggle) {
+      await new Promise((done) => setTimeout(done, 400));
+      await desktopCommand(url, "show").catch((error) => console.warn("Палитра:", error.message));
+    }
+  } else {
     await startTray(url).catch((error) => console.warn("Трей недоступен:", error.message));
     if (selected === "window")
       await os.windows.openPalette(url, toggle, PALETTE_CLASS, `${chromeProfileDir()}-launcher`);

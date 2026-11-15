@@ -45,7 +45,11 @@ function listenAddress(address: string | { port: number } | null): string {
 
 function bindHooks(): void {
   if (runtime.projectorExitHook) process.off("exit", runtime.projectorExitHook);
-  runtime.projectorExitHook = clearInstance;
+  runtime.projectorExitHook = () => {
+    // A silent start that never reaches the UI is otherwise indistinguishable from a crash.
+    console.log(`Projector: процесс завершается (код ${process.exitCode ?? 0})`);
+    clearInstance();
+  };
   process.on("exit", runtime.projectorExitHook);
 }
 

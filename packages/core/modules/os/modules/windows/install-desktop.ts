@@ -1,6 +1,6 @@
 import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { desktopPaths } from "./directories.ts";
+import { dataHome, desktopPaths } from "./directories.ts";
 import { runPowerShellSync } from "./ps.ts";
 
 /** Quote a path for VBScript string literals: wrap in " and double inner quotes. */
@@ -97,11 +97,17 @@ export function installDesktop(root: string) {
     copyFileSync(svg, installedIcon);
   }
 
+  // Prefer the Vite+ toolchain shim: it honours `.node-version` and survives runtime upgrades.
+  const toolchainNode = join(dataHome(), "vite-plus", "bin", "node.exe");
+  const node = existsSync(toolchainNode) ? toolchainNode : process.execPath;
+
   const command = join(bin, "projector.cmd");
-  writeFileSync(command, `@echo off\r\n"${process.execPath}" "${launch}" %*\r\n`);
+  writeFileSync(command, `@echo off\r\n"${node}" "${launch}" %*\r\n`);
 
   // Start Menu must not flash a console: node.exe is a console-subsystem binary.
   // wscript + Run(..., 0) hides the window the way Linux .desktop uses Terminal=false.
+  // The launch log lives inside launch.ts: a cmd wrapper would put the detached server into
+  // its console job, and closing the wrapper would kill the server.
   const silent = join(bin, "projector.vbs");
   writeFileSync(
     silent,
@@ -111,7 +117,7 @@ export function installDesktop(root: string) {
       `sh.CurrentDirectory = ${vbsQuote(root)}`,
       // So launch.ts can show a MessageBox if the hidden process fails.
       'sh.Environment("Process")("PROJECTOR_FROM_SHORTCUT") = "1"',
-      `sh.Run ${vbsRunCommand([process.execPath, launch])}, 0, False`,
+      `sh.Run ${vbsRunCommand([node, launch])}, 0, False`,
       "",
     ].join("\r\n"),
   );

@@ -1,4 +1,4 @@
-import { existsSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -24,6 +24,29 @@ const APP_URL = (process.env.PROJECTOR_URL || "http://localhost:4177").replace(/
 const DATA_DIR = join(os.dataHome(), "projector");
 const api = createApi(APP_URL);
 
+/**
+ * The Start Menu hides the console: a launch that fails before the message box leaves no trace.
+ * Every hidden launch appends one line here, so the next failure is diagnosable.
+ */
+function note(line: string): void {
+  if (process.env.PROJECTOR_FROM_SHORTCUT !== "1") return;
+  try {
+    mkdirSync(DATA_DIR, { recursive: true });
+    appendFileSync(join(DATA_DIR, "launch.log"), `${new Date().toISOString()} ${line}\n`);
+  } catch {
+    /* diagnostics must never break the launch */
+  }
+}
+note(`launch ${process.argv.slice(2).join(" ") || "(default)"}`);
+process.on("uncaughtException", (error) => {
+  note(`uncaught ${error.stack ?? error.message}`);
+  process.exit(1);
+});
+process.on("unhandledRejection", (reason) => {
+  note(`unhandled ${reason instanceof Error ? (reason.stack ?? reason.message) : String(reason)}`);
+  process.exit(1);
+});
+
 function parsedArgs(): ParsedArgs {
   try {
     return parseArgs(process.argv.slice(2));
@@ -35,6 +58,7 @@ function parsedArgs(): ParsedArgs {
 
 const { command, target, options } = parsedArgs();
 const out: Output = (line = "") => {
+  note(line);
   if (!options.quiet || options.json) console.log(line);
 };
 const serverControl = createServerControl({
@@ -112,6 +136,9 @@ async function execute(): Promise<void> {
     return;
   }
 
+  // The Start Menu closes the hidden console when this process exits, and the detached server can
+  // go with it. A shortcut launch that started the server stays as its invisible supervisor.
+  const launchedServer = !(await serverControl.health());
   await serverControl.ensureServer();
   if (command === "open") await commandOpen(api, options, target, out);
   else if (command === "toggle") await commandToggle(api, options, out);
@@ -120,10 +147,26 @@ async function execute(): Promise<void> {
   else if (command === "run") await commandRun(api, options, target, out);
   else if (command === "stop") await commandStop(api, options, target, out);
   else throw new Error("Неизвестная команда");
+  if (launchedServer && process.env.PROJECTOR_FROM_SHORTCUT === "1") await supervise();
+}
+
+/** Keeps the hidden launch alive while its server runs; leaves when the server is gone. */
+async function supervise(): Promise<void> {
+  let misses = 0;
+  const sleep = (ms: number) => new Promise<void>((done) => setTimeout(done, ms));
+  for (;;) {
+    await sleep(2000);
+    if (await api.health()) {
+      misses = 0;
+      continue;
+    }
+    if (++misses >= 3) return;
+  }
 }
 
 execute().catch((error: unknown) => {
   const message = error instanceof Error ? error.message : String(error);
+  note(`failed ${message}`);
   serverControl.alertFailure(message);
   process.exit(1);
 });
