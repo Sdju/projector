@@ -35,8 +35,11 @@ export interface RecentRun {
 
 const host = globalThis as typeof globalThis & {
   projectorRecentRuns?: Map<string, RecentRun[]>;
+  projectorRecentWrites?: Map<string, Promise<unknown>>;
 };
 const stores = (host.projectorRecentRuns ??= new Map<string, RecentRun[]>());
+/** Последняя запись по пути: читатель ждёт её, иначе список отстаёт от только что завершённого хода. */
+const writes = (host.projectorRecentWrites ??= new Map<string, Promise<unknown>>());
 
 const recentRunsPath = () => join(dataDir(), "agent", "recent-runs.json");
 
@@ -105,10 +108,30 @@ export function hasAnswerForm(text: string): boolean {
   return false;
 }
 
+/**
+ * Запись списка с отметкой «идёт»: ответ агента завершается раньше, чем ложится на диск запись о
+ * нём, поэтому список, запрошенный сразу после ответа, дожидается уже начатой записи.
+ */
+function writeRecentRuns(path: string, task: () => Promise<void>): Promise<void> {
+  const write = withFileLock(path, task);
+  writes.set(path, write);
+  const forget = () => {
+    if (writes.get(path) === write) writes.delete(path);
+  };
+  void write.then(forget, forget);
+  return write;
+}
+
+/** Записи идут цепочкой по пути, поэтому последняя покрывает предыдущие. */
+async function settleWrites(path: string): Promise<void> {
+  const pending = writes.get(path);
+  if (pending) await pending.catch(() => {});
+}
+
 /** Records a finished chat run so the notification center and bell surface completions. */
 export async function recordRecentRun(entry: RecentRun): Promise<void> {
   const path = recentRunsPath();
-  await withFileLock(path, async () => {
+  await writeRecentRuns(path, async () => {
     const list = await loadFromDisk(path);
     const filtered = list.filter(
       (item) => item.id !== entry.id && (!entry.chat || item.chat !== entry.chat),
@@ -123,7 +146,7 @@ export async function recordRecentRun(entry: RecentRun): Promise<void> {
 export async function clearRecentRunForChat(chat: string): Promise<void> {
   if (!chat) return;
   const path = recentRunsPath();
-  await withFileLock(path, async () => {
+  await writeRecentRuns(path, async () => {
     const list = await loadFromDisk(path);
     const filtered = list.filter((item) => item.chat !== chat);
     if (filtered.length === list.length) return;
@@ -133,6 +156,7 @@ export async function clearRecentRunForChat(chat: string): Promise<void> {
 
 export async function listRecentRuns(now = Date.now()): Promise<RecentRun[]> {
   const path = recentRunsPath();
+  await settleWrites(path);
   const list = await loadFromDisk(path);
   return prune(list, now);
 }

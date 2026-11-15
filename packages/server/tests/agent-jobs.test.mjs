@@ -13,7 +13,8 @@ let store;
 let attached;
 let replayed;
 
-async function until(check, timeoutMs = 15000) {
+// Git worktrees and fs on Windows CI runners are an order of magnitude slower than on Linux/macOS.
+async function until(check, timeoutMs = process.platform === "win32" ? 45_000 : 15_000) {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     const value = await check();
