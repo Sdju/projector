@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, readFile, readdir, rm, stat, writeFile } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, readFile, readdir, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, expect, test } from "vite-plus/test";
@@ -46,6 +46,23 @@ test("a damaged file is moved aside instead of being overwritten", async () => {
   expect(backup.startsWith(`${file}.broken-`)).toBe(true);
   expect(await readFile(backup, "utf8")).toBe("{ broken");
   await expect(readFile(file, "utf8")).rejects.toMatchObject({ code: "ENOENT" });
+});
+
+test("a file that is already gone has nothing to preserve", async () => {
+  await expect(setAsideBroken(join(directory, "missing.json"))).resolves.toBeUndefined();
+});
+
+test("a copy that cannot be made is an error, not a phantom path", async () => {
+  if (process.platform === "win32" || process.getuid?.() === 0) return;
+  const file = join(directory, "state.json");
+  await writeFile(file, "{ broken", "utf8");
+  await chmod(directory, 0o500);
+  try {
+    await expect(setAsideBroken(file)).rejects.toThrow();
+    expect(await readFile(file, "utf8")).toBe("{ broken");
+  } finally {
+    await chmod(directory, 0o700);
+  }
 });
 
 test("tasks of one file run in order and a failure does not block the next", async () => {

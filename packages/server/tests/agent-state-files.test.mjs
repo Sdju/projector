@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { basename, dirname, join } from "node:path";
 import { afterAll, expect, test, vi } from "vite-plus/test";
@@ -12,6 +12,7 @@ const jobs = await import("../modules/agent/jobs-store.ts");
 const runs = await import("../modules/agent/agent-runs.ts");
 const records = await import("../modules/agent/run-record.ts");
 const recent = await import("../modules/agent/recent-runs.ts");
+const stateFiles = await import("../modules/agent/state-file.ts");
 
 afterAll(async () => {
   process.env.XDG_DATA_HOME = previous;
@@ -42,6 +43,29 @@ async function quiet(work) {
 const jobFile = (id) => join(jobs.jobDirectory(id), "job.json");
 const journalFile = (id) => join(jobs.jobDirectory(id), "journal.json");
 const runFile = (id) => join(runs.runDirectory(id), "run.json");
+
+const runRecord = (overrides = {}) => ({
+  backend: "kimi",
+  message: "m",
+  history: [],
+  ...overrides,
+});
+
+const jobRecord = (id, overrides = {}) => ({
+  id,
+  backend: "fake",
+  task: "t",
+  projectId: "p",
+  cwd: root,
+  unattended: false,
+  status: "running",
+  rev: 1,
+  createdAt: 1,
+  result: "",
+  files: [],
+  pending: [],
+  ...overrides,
+});
 
 test("отсутствие job.json — штатное отсутствие задания, без диагностики", async () => {
   const file = jobFile("aaaaaaaaaaaa");
@@ -206,6 +230,209 @@ test("процесс хода не стартует без годной запи
     backend: "kimi",
     message: "m",
   });
+});
+
+test("вложенные поля run.json проверяются, неверные откладываются", async () => {
+  const variants = [
+    ["часть сообщения null", { parts: [null] }],
+    ["часть сообщения неизвестного типа", { parts: [{ type: "mystery", text: "x" }] }],
+    [
+      "вызов инструмента без вывода",
+      { history: [{ role: "user", content: "hi", tools: [{ id: "t", name: "read" }] }] },
+    ],
+    ["выбор модели не строкой", { selection: { model: 7 } }],
+    ["настройки Judge неверные", { judge: { maxRisk: 9 } }],
+    [
+      "снимок роли с неверным выбором",
+      { role: { roleId: "chat", name: "Роль", selection: { model: 7 } } },
+    ],
+  ];
+  for (const [index, [label, overrides]] of variants.entries()) {
+    const id = (0x333000000000 + index).toString(16);
+    const file = runFile(id);
+    await mkdir(dirname(file), { recursive: true });
+    await writeFile(file, JSON.stringify(runRecord(overrides)));
+    const read = await quiet(() => runs.readRun(id));
+    expect(read.value, label).toBeNull();
+    expect(read.messages, label).toContain("Файл хода");
+    expect(await shelved(file), label).toHaveLength(1);
+    expect(await exists(file), label).toBe(false);
+  }
+});
+
+test("годные вложенные поля run.json не считаются повреждением", async () => {
+  const id = (0x333000000010).toString(16);
+  const file = runFile(id);
+  await mkdir(dirname(file), { recursive: true });
+  await writeFile(
+    file,
+    JSON.stringify(
+      runRecord({
+        parts: [
+          { type: "text", text: "посмотри" },
+          { type: "file", path: "src/a.ts", range: { from: 1, to: 2 } },
+          { type: "image", id: "i1", name: "a.png", mime: "image/png" },
+          { type: "command", name: "test" },
+        ],
+        history: [
+          {
+            role: "assistant",
+            content: "готово",
+            thoughts: "проверяю",
+            tools: [{ id: "t1", name: "read", input: "{}", output: "ok", failed: false }],
+          },
+        ],
+        features: ["skills"],
+        judge: { show: true, auto: false, maxRisk: 2, confidence: "high-medium" },
+        role: {
+          roleId: "chat",
+          name: "Роль",
+          selection: { model: "m" },
+          permissionMode: "auto",
+          skills: ["s"],
+          mcp: [],
+        },
+        selection: { model: "m" },
+        approvals: true,
+      }),
+    ),
+  );
+  const read = await quiet(() => runs.readRun(id));
+  expect(read.messages).toBe("");
+  expect(read.value).toMatchObject({
+    backend: "kimi",
+    message: "m",
+    features: ["skills"],
+    approvals: true,
+  });
+  expect(await shelved(file)).toHaveLength(0);
+});
+
+test("вложенные поля job.json проверяются, неверные откладываются", async () => {
+  const variants = [
+    ["карточка ожидания null", { pending: [null] }],
+    [
+      "вариант ответа не объект",
+      {
+        pending: [
+          {
+            id: "q1",
+            kind: "question",
+            title: "?",
+            questions: [{ id: "one", question: "?", options: [null], multiple: false }],
+          },
+        ],
+      },
+    ],
+    [
+      "вопрос без признака множественности",
+      {
+        pending: [
+          {
+            id: "q2",
+            kind: "question",
+            title: "?",
+            questions: [{ id: "one", question: "?", options: [] }],
+          },
+        ],
+      },
+    ],
+    ["выбор модели не строкой", { selection: { model: 7 } }],
+    [
+      "снимок роли с неверным выбором",
+      { role: { roleId: "chat", name: "Р", selection: { model: 7 } } },
+    ],
+    ["worktree без ветки", { worktree: { id: "w1" } }],
+    ["режим разрешений не строкой", { permissionMode: 3 }],
+  ];
+  for (const [index, [label, overrides]] of variants.entries()) {
+    const id = (0x444000000000 + index).toString(16);
+    const file = jobFile(id);
+    await mkdir(dirname(file), { recursive: true });
+    await writeFile(file, JSON.stringify(jobRecord(id, overrides)));
+    const read = await quiet(() => jobs.loadJob(id));
+    expect(read.value, label).toBeNull();
+    expect(read.messages, label).toContain("Файл задания");
+    expect(await shelved(file), label).toHaveLength(1);
+    expect(await exists(file), label).toBe(false);
+  }
+});
+
+test("годные вложенные поля job.json не считаются повреждением", async () => {
+  const id = (0x444000000010).toString(16);
+  const file = jobFile(id);
+  await mkdir(dirname(file), { recursive: true });
+  await writeFile(
+    file,
+    JSON.stringify(
+      jobRecord(id, {
+        pending: [
+          {
+            id: "p1",
+            kind: "permission",
+            title: "Разрешение",
+            tool: "shell",
+            detail: "ls",
+            persistent: true,
+            judge: { score: 2, label: "низкий", reason: "ok", confidence: "high" },
+          },
+          {
+            id: "q1",
+            kind: "question",
+            title: "Вопрос",
+            questions: [
+              {
+                id: "one",
+                question: "Что?",
+                header: "H",
+                options: [{ id: "a", label: "A", description: "d" }],
+                multiple: false,
+                custom: true,
+                optional: true,
+              },
+            ],
+            custom: true,
+          },
+        ],
+        selection: { model: "m" },
+        role: {
+          roleId: "chat",
+          name: "Роль",
+          selection: { model: "m" },
+          permissionMode: "auto",
+          prompt: "p",
+          template: true,
+          skills: ["s"],
+          mcp: [],
+        },
+        worktree: { id: "w1", branch: "b" },
+        history: [{ role: "user", content: "hi", tools: [{ id: "t", name: "read", output: "x" }] }],
+        permissionMode: "auto",
+        worktreeCleared: true,
+      }),
+    ),
+  );
+  const read = await quiet(() => jobs.loadJob(id));
+  expect(read.messages).toBe("");
+  expect(read.value).toMatchObject({ id, status: "running", permissionMode: "auto" });
+  expect(read.value.pending).toHaveLength(2);
+  expect(await shelved(file)).toHaveLength(0);
+});
+
+test("если повреждённый файл нельзя увести, чтение падает, а не врёт о копии", async () => {
+  if (process.platform === "win32" || process.getuid?.() === 0) return;
+  const directory = join(root, "read-only");
+  await mkdir(directory, { recursive: true });
+  const file = join(directory, "state.json");
+  await writeFile(file, "{ broken");
+  await chmod(directory, 0o500);
+  try {
+    await expect(stateFiles.readStateFile(file, "Тест", () => undefined)).rejects.toThrow();
+    expect(await readFile(file, "utf8")).toBe("{ broken");
+    expect(await shelved(file)).toHaveLength(0);
+  } finally {
+    await chmod(directory, 0o700);
+  }
 });
 
 test("список недавних запусков переживает испорченный файл с диагностикой", async () => {

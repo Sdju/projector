@@ -39,10 +39,19 @@ export async function writeFileAtomic(
 /**
  * Moves a damaged file out of the way so that defaults written next never overwrite it. Два
  * повреждения подряд не должны попасть в одну копию, поэтому к времени добавлен суффикс.
+ *
+ * A copy that cannot be made is a real error: the caller must not report the file as saved and
+ * then let the next write replace it. `undefined` means the file was already gone, so there was
+ * nothing to preserve and nothing left to overwrite.
  */
-export async function setAsideBroken(file: string): Promise<string> {
+export async function setAsideBroken(file: string): Promise<string | undefined> {
   const backup = `${file}.broken-${Date.now()}-${randomUUID().slice(0, 8)}`;
-  await rename(file, backup).catch(() => {});
+  try {
+    await rename(file, backup);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return undefined;
+    throw error;
+  }
   return backup;
 }
 

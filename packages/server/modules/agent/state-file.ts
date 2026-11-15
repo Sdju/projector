@@ -11,12 +11,22 @@ export interface ParsedState<T> {
 export type StateFileRead<T> =
   | { status: "ok"; value: T }
   | { status: "missing" }
-  | { status: "broken"; backup: string; problem: string };
+  | { status: "broken"; backup?: string; problem: string };
 
 export const isRecord = (value: unknown): value is Record<string, unknown> =>
   !!value && typeof value === "object" && !Array.isArray(value);
 
 export const isText = (value: unknown): value is string => typeof value === "string";
+
+export const isBoolean = (value: unknown): value is boolean => typeof value === "boolean";
+
+/** A list of strings; an empty list is valid, so a required field still needs its own check. */
+export const isTextList = (value: unknown): value is string[] =>
+  Array.isArray(value) && value.every(isText);
+
+/** A selection of control values: every entry is a string the agent can be sent. */
+export const isStringMap = (value: unknown): value is Record<string, string> =>
+  isRecord(value) && Object.values(value).every(isText);
 
 /** Число из JSON: `1e999` разбирается в бесконечность, поэтому конечность тоже проверяется. */
 export const isCount = (value: unknown): value is number =>
@@ -35,8 +45,9 @@ export const optionalField = (
  * ENOENT — штатное отсутствие записи: это не ошибка, вызывающий получает `missing` без
  * диагностики. Повреждённый JSON и данные неверной формы не подменяются пустым значением молча:
  * файл откладывается рядом (`*.broken-*`), чтобы следующая запись не затёрла испорченные данные,
- * а в лог уходит сообщение с причиной. Прочие ошибки чтения (права, диск) пробрасываются: это не
- * признак испорченного файла и не повод начать с чистого листа.
+ * а в лог уходит сообщение с причиной. Если увести файл не удалось, чтение падает: мнимой копии
+ * не обещаем. Прочие ошибки чтения (права, диск) пробрасываются: это не признак испорченного
+ * файла и не повод начать с чистого листа.
  */
 export async function readStateFile<T>(
   file: string,
@@ -77,10 +88,12 @@ async function shelve(
   file: string,
   verdict: string,
   problem: string,
-): Promise<string> {
+): Promise<string | undefined> {
   const backup = await setAsideBroken(file);
   console.error(
-    `${label}: ${file} ${verdict} и сохранён как ${backup}${problem ? `: ${problem}` : ""}`,
+    backup
+      ? `${label}: ${file} ${verdict} и сохранён как ${backup}${problem ? `: ${problem}` : ""}`
+      : `${label}: ${file} ${verdict}; файл уже удалён, сохранять нечего${problem ? `: ${problem}` : ""}`,
   );
   return backup;
 }

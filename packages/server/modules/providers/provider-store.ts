@@ -54,7 +54,12 @@ export async function loadStoredProviders(
     } catch (error) {
       if (!(error instanceof SyntaxError)) throw error;
       const backup = await setAsideBroken(file);
-      console.error(`providers.json повреждён и сохранён как ${backup}:`, error.message);
+      console.error(
+        backup
+          ? `providers.json повреждён и сохранён как ${backup}:`
+          : "providers.json повреждён и уже удалён, сохранять нечего:",
+        error.message,
+      );
       return seededConfig(fallback);
     }
     const providers = Array.isArray(parsed.providers)
