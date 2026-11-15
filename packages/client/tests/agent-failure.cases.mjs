@@ -77,3 +77,25 @@ test("an empty answer without a failure is still shown as interrupted", async ()
 
   expect(state.turns[1].text).toBe(INTERRUPTED);
 });
+
+test("a saved run is not settled: the page will rejoin it", async () => {
+  vi.stubGlobal("fetch", async () => ({
+    ok: true,
+    json: async () => ({
+      turns: [
+        turn("u1", "user", "почини"),
+        turn("a1", "assistant", "частично", {
+          run: "run-live",
+          tools: [{ id: "t1", name: "shell", status: "running", detail: "git merge" }],
+        }),
+      ],
+    }),
+  }));
+  const state = createState();
+
+  await loadHistory("/h", state);
+
+  expect(state.turns[1].text).toBe("частично");
+  expect(state.turns[1].run).toBe("run-live");
+  expect(state.turns[1].tools[0].status).toBe("running");
+});

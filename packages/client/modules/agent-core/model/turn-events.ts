@@ -41,6 +41,23 @@ export function holdsAnswerRun(turn: AgentTurn): boolean {
 }
 
 /**
+ * The saved answer looks like it was cut off, so a live host for this chat should be rejoined
+ * even if `run` was dropped (a remount or reload aborted the stream and used to clear it).
+ * A finished answer with only soft-held background tasks is left alone: attaching would wipe it.
+ */
+export function answerLooksOpen(turn: AgentTurn): boolean {
+  if (turn.failure) return false;
+  if (turn.tools.some((tool) => tool.status === "running")) return true;
+  if (
+    (turn.tasks ?? []).some(
+      (task) => task.status === "running" && task.background !== true && task.untracked !== true,
+    )
+  )
+    return true;
+  return !turn.text.trim();
+}
+
+/**
  * The stream of an answer is over: its calls cannot still run, and without a live run behind
  * the turn, the tasks left open are closed too (a stop or a broken stream sends no `done`).
  */
@@ -82,6 +99,30 @@ function inputsOf(assistant: AgentTurn): Set<string> {
   const ids = new Set<string>();
   shownInputs.set(assistant, ids);
   return ids;
+}
+
+/** A copy of the visible answer: a failed rejoin puts this back instead of saving an empty turn. */
+export type AnswerSnapshot = {
+  text: string;
+  tools: AgentTurn["tools"];
+  parts?: AgentPart[];
+  tasks?: AgentTurn["tasks"];
+};
+
+export function snapshotAnswer(assistant: AgentTurn): AnswerSnapshot {
+  return {
+    text: assistant.text,
+    tools: assistant.tools.map((tool) => ({ ...tool })),
+    ...(assistant.parts ? { parts: assistant.parts.map((part) => ({ ...part })) } : {}),
+    ...(assistant.tasks ? { tasks: assistant.tasks.map((task) => ({ ...task })) } : {}),
+  };
+}
+
+export function restoreAnswer(assistant: AgentTurn, snapshot: AnswerSnapshot): void {
+  assistant.text = snapshot.text;
+  assistant.tools.splice(0, assistant.tools.length, ...snapshot.tools);
+  assistant.parts = snapshot.parts;
+  if (snapshot.tasks) assistant.tasks = snapshot.tasks;
 }
 
 /** Keeps the times of the calls already seen, then empties the answer for its replay. */

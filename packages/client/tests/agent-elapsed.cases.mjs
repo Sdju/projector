@@ -1,5 +1,13 @@
 import { expect, test } from "vite-plus/test";
-import { applyAgentEvent, resetAnswer } from "../modules/agent-core/model/turn-events.ts";
+import { AgentRunGone } from "../modules/agent-core/api/client.ts";
+import { streamAnswer } from "../modules/agent-core/model/run-turn.ts";
+import {
+  answerLooksOpen,
+  applyAgentEvent,
+  resetAnswer,
+  restoreAnswer,
+  snapshotAnswer,
+} from "../modules/agent-core/model/turn-events.ts";
 
 test("the chat times a tool call from the event and keeps it across a replay", () => {
   const state = { permissions: [], questions: [], secrets: [], turns: [] };
@@ -152,4 +160,90 @@ test("soft keep-alive background (hold: false) clears run on done", () => {
   );
   event("done", { text: "ok" }, 2_000);
   expect(assistant.run).toBeUndefined();
+});
+
+test("a failed rejoin can put the previous answer back instead of saving an empty turn", () => {
+  const assistant = {
+    id: "a",
+    role: "assistant",
+    text: "Вливаю ветку",
+    tools: [{ id: "t1", name: "shell", status: "done", detail: "ok" }],
+    parts: [{ type: "text", text: "Вливаю ветку" }],
+    tasks: [{ id: "x", kind: "agent", title: "gate", status: "running", background: true }],
+  };
+  const snapshot = snapshotAnswer(assistant);
+  resetAnswer(assistant);
+  expect(assistant.text).toBe("");
+  expect(assistant.tools).toHaveLength(0);
+  restoreAnswer(assistant, snapshot);
+  expect(assistant).toMatchObject({
+    text: "Вливаю ветку",
+    tools: [{ id: "t1", name: "shell", status: "done" }],
+    tasks: [{ id: "x", title: "gate", status: "running" }],
+  });
+  expect(assistant.parts).toEqual([{ type: "text", text: "Вливаю ветку" }]);
+});
+
+test("an emptied answer still looks open so a reload can rejoin the live host", () => {
+  expect(
+    answerLooksOpen({
+      id: "a",
+      role: "assistant",
+      text: "",
+      tools: [
+        { id: "t1", name: "shell", status: "done", detail: "ok" },
+        { id: "t2", name: "read", status: "done", detail: "ok" },
+      ],
+    }),
+  ).toBe(true);
+  expect(
+    answerLooksOpen({
+      id: "a",
+      role: "assistant",
+      text: "Готово",
+      tools: [{ id: "t1", name: "shell", status: "running", detail: "git merge" }],
+    }),
+  ).toBe(true);
+  expect(
+    answerLooksOpen({
+      id: "a",
+      role: "assistant",
+      text: "Готово",
+      tools: [{ id: "t1", name: "shell", status: "done", detail: "ok" }],
+      tasks: [{ id: "bg", kind: "agent", title: "Fix", status: "running", background: true }],
+    }),
+  ).toBe(false);
+  expect(
+    answerLooksOpen({
+      id: "a",
+      role: "assistant",
+      text: "",
+      tools: [],
+      failure: "overloaded",
+    }),
+  ).toBe(false);
+});
+
+test("an attach that dies before events puts the previous answer back", async () => {
+  const assistant = {
+    id: "a",
+    role: "assistant",
+    text: "Вливаю ветку",
+    tools: [{ id: "t1", name: "shell", status: "done", detail: "ok" }],
+    parts: [{ type: "text", text: "Вливаю ветку" }],
+    run: "run-1",
+  };
+  await expect(
+    streamAnswer(
+      assistant,
+      async () => {
+        throw new AgentRunGone("gone");
+      },
+      () => {},
+      new AbortController().signal,
+      "run-1",
+    ),
+  ).rejects.toBeInstanceOf(AgentRunGone);
+  expect(assistant.text).toBe("Вливаю ветку");
+  expect(assistant.tools).toEqual([{ id: "t1", name: "shell", status: "done", detail: "ok" }]);
 });
