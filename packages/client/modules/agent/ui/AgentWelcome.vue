@@ -24,7 +24,7 @@ const props = withDefaults(
 const emit = defineEmits<{
   suggest: [text: string];
   open: [program: string];
-  form: [preset: AgentPresetView, text: string, data: unknown, summary?: string];
+  form: [preset: AgentPresetView];
 }>();
 const { isEnabled } = useAgentModes();
 const coders = computed(() => guiAgents().filter((agent) => isEnabled(agent.program)));
@@ -45,8 +45,8 @@ watch(
   () => props.projectId,
   () => void loadPresets(),
 );
-function startPresetForm(preset: AgentPresetView, text: string, data: unknown, summary?: string) {
-  emit("form", preset, text, data, summary);
+function startPresetForm(preset: AgentPresetView) {
+  emit("form", preset);
 }
 const suggestions = [
   {
@@ -72,7 +72,6 @@ const suggestions = [
     <p v-if="presetError" class="preset-error">{{ presetError }}</p>
     <AgentPresetsStart
       :presets="presets"
-      :project-id="projectId"
       @suggest="emit('suggest', $event)"
       @form="startPresetForm"
     />

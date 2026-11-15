@@ -48,6 +48,7 @@ import {
 } from "../modules/panels/index.ts";
 import { useAutoCompact } from "../model/use-auto-compact.ts";
 import { useChatInputActions, useChatRetry } from "../model/use-chat-input-actions.ts";
+import { useStartPreset } from "../model/start-preset.ts";
 import { useAnswerForm } from "../model/answer-form.ts";
 import { useAnswerDoctor } from "../model/answer-doctor.ts";
 import UiPanel from "../../../common/ui/UiPanel.vue";
@@ -72,7 +73,6 @@ import { useChatZenFocus } from "../model/chat-zen.ts";
 import { useChatCopy } from "../model/use-chat-copy.ts";
 import { useAgentChatTabTitle } from "../model/chat-titles.ts";
 import { chatUsageByTurn } from "../model/chat-usage.ts";
-import type { AgentPresetView } from "@ai-projector/core/modules/agent-preset/index.ts";
 import type { AgentRoleSnapshot } from "@ai-projector/core/modules/agent-role/index.ts";
 import IconArrowDown from "~icons/lucide/arrow-down";
 import IconSquarePen from "~icons/lucide/square-pen";
@@ -224,17 +224,6 @@ function openAgent(program: string) {
     error.value = message;
   });
 }
-/** A starter preset with a form: its values go to the agent as the usual form answer. */
-function startPresetForm(preset: AgentPresetView, text: string, data: unknown, summary?: string) {
-  const source = preset.form;
-  if (!source) return;
-  const prompt = preset.prompt.trim();
-  const message = prompt ? `${prompt}\n\n${text}` : text;
-  void toBottom();
-  void send(message, undefined, {
-    form: { source, values: data, ...(summary ? { summary } : {}) },
-  });
-}
 attach();
 const {
   tasks,
@@ -343,6 +332,20 @@ const { pendingForm, answerFormFor, submitComposerForm, submitTurnForm } = useAn
   edit,
   projectId: props.projectId,
 });
+/** The form the composer shows: a starter preset wins over the last answer's form. */
+const {
+  form: composerForm,
+  open: openPresetForm,
+  close: closePresetForm,
+  submit: submitComposerPreset,
+} = useStartPreset({
+  turns,
+  chat: () => chatKey,
+  pendingForm,
+  send,
+  submitAnswerForm: submitComposerForm,
+  toBottom,
+});
 const {
   progress: doctorProgress,
   reportFor: answerDoctorReport,
@@ -424,7 +427,7 @@ const controller: ChatController = {
   send: (text) => send(text),
   attach: async (chips) => composer.value?.attach(chips),
   appendText: async (text) => composer.value?.appendText(text),
-  pendingForm: () => pendingForm.value,
+  pendingForm: () => composerForm.value,
   showForm: () => composer.value?.showForm(),
   hideForm: () => composer.value?.hideForm(),
   inject: async (text) => {
@@ -486,6 +489,7 @@ const { submit, continueTurn, suggest, newChat } = useChatInputActions({
     away.value = false;
   },
   focus: () => composer.value?.focus(),
+  closeForm: closePresetForm,
 });
 onBeforeUnmount(() => release());
 </script>
@@ -590,7 +594,7 @@ onBeforeUnmount(() => release());
         :project-id="projectId"
         @suggest="suggest"
         @open="openAgent"
-        @form="startPresetForm"
+        @form="openPresetForm"
       />
       <div
         v-else
@@ -735,12 +739,12 @@ onBeforeUnmount(() => release());
       :started-at="turns.findLast((turn) => turn.role === 'assistant')?.at"
       :error="error || copyError"
       :copied="!!copied"
-      :form="pendingForm"
+      :form="composerForm"
       :editing="!!editing"
       :retryable="retryableError"
       :dropping="chatDrop.over.value"
       @submit="submit"
-      @form-submit="submitComposerForm"
+      @form-submit="submitComposerPreset"
       @open="openChip"
       @fail="(message) => (error = message)"
       @dismiss="dismissError"
