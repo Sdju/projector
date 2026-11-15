@@ -1,3 +1,4 @@
+import { resolve } from "node:path";
 import {
   SESSION_LIST_LIMIT,
   type AgentCommand,
@@ -148,11 +149,27 @@ interface RawSession {
   sessionId?: string;
   title?: string | null;
   updatedAt?: string | null;
+  /** Working directory of the session; required by ACP, ignored by some agents. */
+  cwd?: unknown;
   /** Parent session: agents that expose subagent branches use their own field name. */
   parentId?: unknown;
   parentSessionId?: unknown;
   agent?: unknown;
   _meta?: Record<string, unknown> | null;
+}
+
+/** The folder a listed session belongs to, when the agent names it. */
+function cwdOf(session: RawSession): string | undefined {
+  for (const value of [session.cwd, session._meta?.cwd])
+    if (typeof value === "string" && value.trim()) return value;
+  return undefined;
+}
+
+/** Same folder as the chat, after `resolve`; Windows paths compare without case. */
+function sameCwd(left: string, right: string): boolean {
+  const a = resolve(left);
+  const b = resolve(right);
+  return process.platform === "win32" ? a.toLowerCase() === b.toLowerCase() : a === b;
 }
 
 /** The session a raw one was started from, as far as the agent tells it. */
@@ -221,6 +238,10 @@ export function acpSessions(
       const title = session.title?.trim();
       // A session that never received a prompt has no title (or a placeholder like OpenCode's).
       if (!session.sessionId || !title || EMPTY_TITLE.test(title)) return [];
+      // Cursor stores every ACP session in one home directory and may list them all; keep this
+      // project's folder only. Agents that omit `cwd` (older OpenCode/Codex) stay as they are.
+      const folder = cwdOf(session);
+      if (folder && !sameCwd(folder, cwd)) return [];
       const parent = parentOf(session);
       // Only a branch is named by its agent: the same field on a chat is the mode it runs in.
       const agent = parent ? agentOf(session) : undefined;

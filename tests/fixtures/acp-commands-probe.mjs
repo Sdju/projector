@@ -64,7 +64,8 @@ rl.on("line", (line) => {
     } else send({ jsonrpc: "2.0", id: message.id, result: { sessionId: "s1" } });
   } else if (message.method === "session/delete" || message.method === "session/close")
     send({ jsonrpc: "2.0", id: message.id, result: {} });
-  else if (message.method === "session/list")
+  else if (message.method === "session/list") {
+    const cwd = typeof message.params?.cwd === "string" ? message.params.cwd : "";
     send({
       jsonrpc: "2.0",
       id: message.id,
@@ -75,6 +76,24 @@ rl.on("line", (line) => {
           { sessionId: "ses_new", title: "new session" },
           { sessionId: "ses_blank", title: "   " },
           {
+            sessionId: "ses_other",
+            title: "PONG",
+            cwd: "/tmp/other-project",
+            updatedAt: "2026-11-12T08:00:00.000Z",
+          },
+          {
+            sessionId: "ses_here",
+            title: "This folder",
+            cwd,
+            updatedAt: "2026-11-12T07:00:00.000Z",
+          },
+          {
+            sessionId: "ses_slash",
+            title: "Same folder slash",
+            cwd: cwd ? `${cwd.replace(/\/$/, "")}/` : "/tmp/slash/",
+            updatedAt: "2026-11-12T06:30:00.000Z",
+          },
+          {
             sessionId: "ses_real",
             title: "Fix the parser",
             updatedAt: "2026-11-12T06:00:00.000Z",
@@ -82,7 +101,7 @@ rl.on("line", (line) => {
         ],
       },
     });
-  else
+  } else
     send({
       jsonrpc: "2.0",
       id: message.id,

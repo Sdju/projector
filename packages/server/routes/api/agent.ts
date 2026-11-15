@@ -111,11 +111,12 @@ async function withoutInjectedTitles(
 ): Promise<AgentSessionInfo[]> {
   const suspicious = (title: string) =>
     title.includes(FEATURE_PROMPT_END) || title.startsWith("[Projector]");
-  if (!sessions.some((session) => suspicious(session.title))) return sessions;
   const chats = projectId ? readRecentChats(projectId, backend) : [];
   const chatOf = new Map(
     chats.flatMap((chat) => (chat.session ? [[chat.session, chat] as const] : [])),
   );
+  if (!sessions.some((session) => suspicious(session.title) || chatOf.has(session.id)))
+    return sessions;
   const prompts = new Map<string, string>();
   const legacyOf = async (chat?: string) => {
     const key = chat ?? "";
@@ -129,11 +130,13 @@ async function withoutInjectedTitles(
   };
   return Promise.all(
     sessions.map(async (session) => {
-      if (!suspicious(session.title)) return session;
       const chat = chatOf.get(session.id);
+      // Cursor auto-names from the injected abilities ("Projector Widgets Guide"): the chat
+      // already stores the user's words, even when the native title has no marker.
+      if (chat?.title) return { ...session, title: chat.title };
+      if (!suspicious(session.title)) return session;
       const title = sessionTitleWithoutInjected(session.title, await legacyOf(chat?.chat));
-      if (title !== session.title) return { ...session, title };
-      return chat?.title ? { ...session, title: chat.title } : session;
+      return title !== session.title ? { ...session, title } : session;
     }),
   );
 }

@@ -60,6 +60,8 @@ const history = computed<HistoryEntry[]>(() => {
   }));
   const bySession = new Map(entries.map((entry) => [entry.id, entry]));
   const seen = new Set<string>();
+  /** Auto-names of sessions that a chat already continues: leftover natives with that title go. */
+  const boundNativeTitles = new Set<string>();
   for (const chat of props.recent.items) {
     if (chat.session) {
       const known = bySession.get(chat.session);
@@ -67,6 +69,10 @@ const history = computed<HistoryEntry[]>(() => {
       if (known) {
         // Two tabs continued one session: the newest one stands for both.
         if (known.chat) continue;
+        // Cursor names the session after the injected abilities ("Projector Widgets Guide");
+        // the chat already has the user's words.
+        boundNativeTitles.add(known.title);
+        known.title = chat.title;
         known.chat = chat.chat;
         if (chat.updatedAt > (known.updatedAt ?? "")) known.updatedAt = chat.updatedAt;
         continue;
@@ -89,9 +95,10 @@ const history = computed<HistoryEntry[]>(() => {
   return entries
     .filter((entry) => {
       // An unbound native row with the same title as a chat-bound session is the leftover of a
-      // resumed conversation, not a second chat.
+      // resumed conversation, not a second chat. Cursor's auto-name is remembered separately
+      // because the bound row already shows the chat's title.
       if (!entry.native || entry.chat || entry.parent) return true;
-      return !boundTitles.has(entry.title);
+      return !boundTitles.has(entry.title) && !boundNativeTitles.has(entry.title);
     })
     .sort(
       (a, b) =>
