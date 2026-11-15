@@ -1,5 +1,5 @@
 import { ref, type Ref } from "vue";
-import type { Pipeline, PipelineList } from "@ai-projector/core/modules/workspace/index.ts";
+import type { Pipeline } from "@ai-projector/core/modules/workspace/index.ts";
 import { workspaceRequest } from "../../../../workspace-api/index.ts";
 
 export type PipelineFilter = "all" | "running" | "success" | "failed" | "canceled";
@@ -21,7 +21,7 @@ export function usePipelines(projectId: () => string) {
   const error = ref("");
   let generation = 0;
   const page = (cursor: number) =>
-    workspaceRequest<PipelineList>(projectId(), "pipelines", {
+    workspaceRequest(projectId(), "pipelines", {
       status: status.value,
       page: String(cursor),
     });

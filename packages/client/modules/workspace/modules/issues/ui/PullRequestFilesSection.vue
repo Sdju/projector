@@ -25,7 +25,7 @@ const {
   reload,
 } = useAsyncData<PullRequestChanges>({
   load: () =>
-    workspaceRequest<PullRequestChanges>(props.projectId, "pull-files", {
+    workspaceRequest(props.projectId, "pull-files", {
       number: String(props.number),
     }),
   keys: () => [props.projectId, props.number, props.head, props.snapshot],

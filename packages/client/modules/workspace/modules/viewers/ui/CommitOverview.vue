@@ -125,7 +125,7 @@ async function load() {
   detail.value = undefined;
   reset();
   try {
-    const data = await workspaceRequest<GitCommitDetail>(props.projectId, "commit", {
+    const data = await workspaceRequest(props.projectId, "commit", {
       hash: props.hash,
     });
     if (current !== generation) return;

@@ -49,11 +49,7 @@ export function useGitHistory(projectId: () => string) {
     error.value = "";
     try {
       const limit = Math.min(200, Math.max(PAGE, commits.value.length));
-      const data = await workspaceRequest<GitLog>(
-        projectId(),
-        "log",
-        params({ limit: String(limit) }),
-      );
+      const data = await workspaceRequest(projectId(), "log", params({ limit: String(limit) }));
       if (current !== generation) return;
       log.value = data;
       commits.value = data.commits;
@@ -68,7 +64,7 @@ export function useGitHistory(projectId: () => string) {
     const current = generation;
     loadingMore.value = true;
     try {
-      const data = await workspaceRequest<GitLog>(
+      const data = await workspaceRequest(
         projectId(),
         "log",
         params({ skip: String(log.value.next), limit: String(PAGE) }),
@@ -96,7 +92,7 @@ export function useGitHistory(projectId: () => string) {
     const project = projectId();
     details.value[hash] = { loading: true, error: "" };
     try {
-      const data = await workspaceRequest<GitCommitDetail>(project, "commit", { hash });
+      const data = await workspaceRequest(project, "commit", { hash });
       if (project === projectId())
         details.value[hash] = { loading: false, error: "", detail: data };
     } catch (err) {

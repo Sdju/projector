@@ -18,7 +18,7 @@ export function useGitOverview(projectId: () => string) {
     loading.value = true;
     error.value = "";
     try {
-      const data = await workspaceRequest<GitOverview>(projectId(), "git");
+      const data = await workspaceRequest(projectId(), "git");
       if (current === generation) git.value = data;
     } catch (err) {
       if (current === generation) error.value = err instanceof Error ? err.message : "Ошибка Git";

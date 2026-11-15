@@ -245,7 +245,7 @@ export function useOpenFiles(ctx: OpenFilesContext) {
         paths.push(`${result.project.path.replace(/\/+$/, "")}/${entry.path}`);
       }
       if (paths.length) {
-        const { root } = await workspaceRequest<{ root: string }>(projectId, "root");
+        const { root } = await workspaceRequest(projectId, "root");
         for (const path of paths) {
           if (!current()) return;
           const relative = projectRelativePath(root, path);

@@ -23,7 +23,7 @@ export async function readFileConfirmed(
   scope?: FileScope,
 ): Promise<(FileContent & { image?: boolean }) | undefined> {
   const read = (announce: boolean) =>
-    workspaceRequest<FileContent & { image?: boolean }>(projectId, external ? "external" : "file", {
+    workspaceRequest(projectId, external ? "external" : "file", {
       path,
       ...(announce ? { ask: "1" } : {}),
       ...(scope ? fileScopeQuery(scope) : {}),
@@ -48,7 +48,7 @@ export async function readOpenData(
   },
 ): Promise<(FileContent & { image?: boolean }) | FileComparison | FileSides | undefined> {
   if (options.scope?.kind === "compare")
-    return workspaceScopeRequest<FileSides>(projectId, options.scope, "compare-file", {
+    return workspaceScopeRequest(projectId, options.scope, "compare-file", {
       path,
       ...(options.originalPath ? { originalPath: options.originalPath } : {}),
     });
@@ -56,7 +56,7 @@ export async function readOpenData(
     return readFileConfirmed(projectId, path, false, options.ask, options.wanted, options.scope);
   if (options.staged === undefined)
     return readFileConfirmed(projectId, path, options.external, options.ask, options.wanted);
-  return workspaceRequest<FileComparison>(projectId, "diff", {
+  return workspaceRequest(projectId, "diff", {
     path,
     staged: String(options.staged),
   });

@@ -1,14 +1,44 @@
-import { ref, shallowRef, watch } from "vue";
+import { ref, shallowRef, watch, type Ref, type ShallowRef } from "vue";
+import type {
+  DiscussionDetail,
+  IssueDetail,
+  PullRequestDetail,
+} from "@ai-projector/core/modules/workspace/index.ts";
 import { workspaceRequest } from "../../../../workspace-api/index.ts";
 
+export interface TrackerDetailState<T> {
+  detail: ShallowRef<T | undefined>;
+  loading: Ref<boolean>;
+  error: Ref<string>;
+  reload(): void;
+}
+
 /** Загрузка деталей tracker; смена вкладки и unmount отменяют применение старого ответа. */
-export function useTrackerDetail<T>(
+export function useTrackerDetail(
+  projectId: () => string,
+  number: () => number,
+  action: "issue",
+  failure: string,
+): TrackerDetailState<IssueDetail>;
+export function useTrackerDetail(
+  projectId: () => string,
+  number: () => number,
+  action: "pull",
+  failure: string,
+): TrackerDetailState<PullRequestDetail>;
+export function useTrackerDetail(
+  projectId: () => string,
+  number: () => number,
+  action: "discussion",
+  failure: string,
+): TrackerDetailState<DiscussionDetail>;
+export function useTrackerDetail(
   projectId: () => string,
   number: () => number,
   action: "issue" | "pull" | "discussion",
   failure: string,
-) {
-  const detail = shallowRef<T>();
+): TrackerDetailState<IssueDetail | PullRequestDetail | DiscussionDetail> {
+  const detail = shallowRef<IssueDetail | PullRequestDetail | DiscussionDetail>();
   const loading = ref(false);
   const error = ref("");
   const revision = ref(0);
@@ -25,7 +55,7 @@ export function useTrackerDetail<T>(
       error.value = "";
       detail.value = undefined;
       try {
-        const data = await workspaceRequest<T>(
+        const data = await workspaceRequest(
           projectId,
           action,
           { number: String(number) },

@@ -5,7 +5,6 @@ import {
   workspaceRequest,
   workspaceWatchable,
 } from "../../workspace-api/index.ts";
-import type { FileContent } from "@ai-projector/core/modules/workspace/index.ts";
 import { isLiveFile, type OpenFile } from "../open-file.ts";
 
 export interface FileSyncContext {
@@ -43,7 +42,7 @@ export function useFileSync(ctx: FileSyncContext) {
     const projectId = ctx.projectId();
     let disk: string;
     try {
-      disk = (await workspaceRequest<FileContent>(projectId, "file", { path: file.path })).content;
+      disk = (await workspaceRequest(projectId, "file", { path: file.path })).content;
     } catch (error) {
       if (projectId !== ctx.projectId() || !ctx.tabs.value.includes(file)) return;
       file.conflict = { error: error instanceof Error ? error.message : "Файл недоступен" };

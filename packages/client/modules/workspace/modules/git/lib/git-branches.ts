@@ -25,7 +25,7 @@ export function useGitBranches(projectId: () => string) {
     loading.value = true;
     error.value = "";
     try {
-      const data = await workspaceRequest<GitBranches>(projectId(), "branches");
+      const data = await workspaceRequest(projectId(), "branches");
       if (current === generation) state.value = data;
     } catch (err) {
       if (current === generation) error.value = err instanceof Error ? err.message : "Ошибка Git";

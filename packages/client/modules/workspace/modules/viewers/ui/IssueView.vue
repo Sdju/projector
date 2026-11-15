@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import UiHint from "../../../../../common/ui/UiHint.vue";
 import { computed } from "vue";
-import type { IssueDetail } from "@ai-projector/core/modules/workspace/index.ts";
 import { readoutLines, useTabReadout } from "../../../../../common/utilities/tab-readout.ts";
 import { useTrackerDetail } from "../lib/tracker-detail.ts";
 import TrackerComments from "./TrackerComments.vue";
@@ -12,7 +11,7 @@ const props = withDefaults(defineProps<{ projectId: string; number: number; host
   host: "GitHub",
 });
 const emit = defineEmits<{ open: [path: string] }>();
-const { detail, loading, error } = useTrackerDetail<IssueDetail>(
+const { detail, loading, error } = useTrackerDetail(
   () => props.projectId,
   () => props.number,
   "issue",
