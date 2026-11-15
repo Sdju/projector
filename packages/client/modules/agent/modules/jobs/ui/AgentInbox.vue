@@ -21,6 +21,8 @@ import { projectRoute } from "../../../../project/index.ts";
 import { currentDeviceId, useAgentInbox, type InboxGroup, type InboxItem } from "../model/inbox.ts";
 import AgentInboxNotice from "./AgentInboxNotice.vue";
 import AgentInboxRow from "./AgentInboxRow.vue";
+import IconCheckCheck from "~icons/lucide/check-check";
+import IconChevron from "~icons/lucide/chevron-right";
 import IconRefresh from "~icons/lucide/rotate-cw";
 
 const props = withDefaults(defineProps<{ scopeId?: string }>(), {
@@ -72,6 +74,32 @@ const updated = computed(() =>
       })
     : "",
 );
+
+/** Non-empty counters of the header; zero values would only add noise. */
+const summary = computed(() =>
+  [
+    { key: "attention", text: `${attention.value} ждут вас`, count: attention.value, alert: true },
+    { key: "working", text: `${working.value} работают`, count: working.value },
+    {
+      key: "trust",
+      text: `${noticeUnread.value} по доверию`,
+      count: noticeUnread.value,
+      alert: true,
+    },
+    unread.value
+      ? { key: "unread", text: `${unread.value} завершили`, count: unread.value }
+      : { key: "finished", text: `${finished.value} завершились`, count: finished.value },
+  ].filter((part) => part.count > 0),
+);
+const footnote = computed(() => {
+  const parts: string[] = [];
+  if (updated.value) parts.push(`обновлено в ${updated.value}`);
+  if (hubDevices.value) {
+    const total = hubDevices.value + 1;
+    parts.push(`Hub: ${total} ${total === 1 ? "устройство" : "устройства"}`);
+  }
+  return parts.join(" · ");
+});
 
 const commands = useCommandScope(props.scopeId, () => ({
   surface: "inbox",
@@ -267,15 +295,18 @@ const groupBadge = (group: InboxGroup) =>
   <div class="inbox">
     <header class="head">
       <UiInline justify="between" align="center">
-        <strong class="title">Работы</strong>
+        <h3 class="title">Работы</h3>
         <UiInline :gap="1" align="center">
           <UiButton
             v-if="hasAcknowledgeable"
+            shape="icon"
             size="sm"
+            title="Прочитать всё"
+            aria-label="Прочитать всё"
             data-command="ide.inbox.read.all"
             @click="commands.run('ide.inbox.read.all')"
           >
-            Прочитать всё
+            <IconCheckCheck aria-hidden="true" />
           </UiButton>
           <UiSectionRefresh />
           <UiButton
@@ -292,18 +323,13 @@ const groupBadge = (group: InboxGroup) =>
           </UiButton>
         </UiInline>
       </UiInline>
-      <p class="counts">
-        <span :class="{ alive: attention }">{{ attention }} ждут вас</span>
-        <span>·</span>
-        <span>{{ working }} работают</span>
-        <span v-if="noticeUnread" class="alive">· {{ noticeUnread }} по доверию</span>
-        <span v-if="unread">· <span class="done-alive">{{ unread }} завершили</span></span>
-        <span v-else-if="finished">· {{ finished }} завершились</span>
+      <p v-if="summary.length" class="counts">
+        <template v-for="(part, index) in summary" :key="part.key">
+          <span v-if="index">·</span>
+          <span :class="{ alert: part.alert }">{{ part.text }}</span>
+        </template>
       </p>
-      <p v-if="hubDevices" class="hub">
-        Hub: {{ hubDevices + 1 }} {{ hubDevices + 1 === 1 ? "устройство" : "устройства" }}
-      </p>
-      <p class="updated">{{ updated ? `обновлено в ${updated}` : "" }}</p>
+      <p v-if="footnote" class="footnote">{{ footnote }}</p>
     </header>
 
     <UiLoader
@@ -372,7 +398,11 @@ const groupBadge = (group: InboxGroup) =>
         @answered="refresh"
       />
       <details v-if="completed(group).length" class="done">
-        <summary>Прочитанные за сутки · {{ completed(group).length }}</summary>
+        <summary>
+          <IconChevron class="chevron" aria-hidden="true" />
+          Прочитанные за сутки
+          <span class="count">{{ completed(group).length }}</span>
+        </summary>
         <AgentInboxRow
           v-for="item in completed(group)"
           :key="item.key"
@@ -391,9 +421,8 @@ const groupBadge = (group: InboxGroup) =>
 .inbox {
   display: grid;
   align-content: start;
-  gap: var(--sp-3);
   min-width: 0;
-  padding: var(--sp-3) var(--sp-2);
+  padding: var(--sp-3) 0;
   color: var(--text);
   font-size: var(--fs-xs);
 }
@@ -401,8 +430,10 @@ const groupBadge = (group: InboxGroup) =>
   display: grid;
   gap: 2px;
   min-width: 0;
+  padding: 0 var(--sp-3) var(--sp-2);
 }
 .title {
+  margin: 0;
   font-size: var(--fs-sm);
   font-weight: 600;
 }
@@ -414,77 +445,82 @@ const groupBadge = (group: InboxGroup) =>
   color: var(--muted);
   font-size: var(--fs-2xs);
 }
-.alive {
+.counts .alert {
   color: var(--warn);
 }
-.done-alive {
-  color: var(--info);
-}
-.hub,
-.updated {
+.footnote {
   margin: 0;
   color: var(--faint);
   font-size: var(--fs-2xs);
 }
-.message {
-  margin: 0;
+.message,
+.permission {
+  margin: var(--sp-2) var(--sp-3) 0;
 }
 .permission {
-  margin: 0;
   font-size: var(--fs-2xs);
 }
 .empty {
   margin: 0;
-  padding: var(--sp-2);
+  padding: var(--sp-2) var(--sp-3);
   color: var(--faint);
   line-height: 1.45;
 }
 .group {
   display: grid;
-  gap: var(--sp-2);
   min-width: 0;
+  margin-top: var(--sp-2);
 }
 .group-head {
   display: flex;
-  align-items: center;
+  align-items: baseline;
   gap: var(--sp-2);
   min-width: 0;
-  padding-bottom: 2px;
-  border-bottom: 1px solid var(--line);
+  padding: var(--sp-2) var(--sp-3);
+  color: var(--muted);
+  font-size: var(--fs-xs);
+  font-weight: 500;
 }
 .project {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-weight: 600;
 }
 .source {
   margin-left: auto;
   color: var(--faint);
   font-size: var(--fs-2xs);
+  font-weight: 400;
 }
-.group-alert {
-  min-width: 18px;
-  padding: 0 5px;
-  border-radius: var(--r-full);
-  background: var(--warn);
-  color: var(--bg);
-  font-size: var(--fs-2xs);
-  font-variant-numeric: tabular-nums;
-  text-align: center;
-}
-.done {
-  display: grid;
-  gap: var(--sp-2);
+.group-alert,
+.count {
+  color: var(--faint);
+  font: var(--fs-2xs) var(--mono);
 }
 .done summary {
-  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+  padding: var(--sp-2) var(--sp-3);
+  border-top: 1px solid var(--line);
   color: var(--muted);
   font-size: var(--fs-2xs);
+  cursor: pointer;
+  list-style: none;
 }
-.done[open] summary {
-  margin-bottom: var(--sp-2);
+.done summary::-webkit-details-marker {
+  display: none;
+}
+.done summary:hover {
+  color: var(--text);
+}
+.chevron {
+  flex-shrink: 0;
+  transition: transform var(--t-fast);
+}
+.done[open] .chevron {
+  transform: rotate(90deg);
 }
 .inbox :deep(svg) {
   width: 13px;

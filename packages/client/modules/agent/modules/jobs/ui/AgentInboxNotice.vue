@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import type { TrustNotice } from "@ai-projector/core/modules/trust-notices/index.ts";
-import UiBadge from "../../../../../common/ui/UiBadge.vue";
 import UiButton from "../../../../../common/ui/UiButton.vue";
-import UiInline from "../../../../../common/ui/UiInline.vue";
+import UiStatusDot from "../../../../../common/ui/UiStatusDot.vue";
+import IconCheck from "~icons/lucide/check";
+import IconShieldCheck from "~icons/lucide/shield-check";
 
 const props = defineProps<{ notice: TrustNotice; unread?: boolean; busy?: boolean }>();
 const emit = defineEmits<{ open: []; read: []; trust: [] }>();
@@ -32,83 +33,110 @@ const when = computed(() =>
 </script>
 
 <template>
-  <article class="item" :class="{ unread }">
-    <UiInline class="meta" :gap="1.5" wrap>
-      <UiBadge tone="warning">{{ kind }}</UiBadge>
-      <span class="agent">{{ notice.name }}</span>
-      <span class="when">{{ when }}</span>
-    </UiInline>
-    <p class="topic">{{ notice.title }}</p>
-    <p class="preview">{{ notice.body }}</p>
-    <UiInline class="actions" :gap="1.5" wrap>
-      <UiButton size="sm" @click="emit('open')">{{ action }}</UiButton>
-      <UiButton size="sm" :busy="busy" :disabled="busy" @click="emit('trust')">
-        Вернуть доверие
+  <article class="item" :class="{ read: !unread }">
+    <button type="button" class="main" :title="action" @click="emit('open')">
+      <span class="head">
+        <UiStatusDot tone="warning" />
+        <span class="topic">{{ notice.title }}</span>
+      </span>
+      <span class="meta">{{ notice.name }} · {{ kind }} · {{ when }}</span>
+      <span class="preview">{{ notice.body }}</span>
+    </button>
+    <div class="actions">
+      <UiButton
+        shape="icon"
+        size="sm"
+        title="Вернуть доверие"
+        aria-label="Вернуть доверие"
+        :busy="busy"
+        :disabled="busy"
+        @click="emit('trust')"
+      >
+        <IconShieldCheck aria-hidden="true" />
       </UiButton>
       <UiButton
         v-if="unread"
+        shape="icon"
         size="sm"
-        title="Отметить уведомление прочитанным"
+        title="Отметить прочитанным"
+        aria-label="Отметить прочитанным"
         @click="emit('read')"
       >
-        Прочитано
+        <IconCheck aria-hidden="true" />
       </UiButton>
-    </UiInline>
+    </div>
   </article>
 </template>
 
 <style scoped>
 .item {
   display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  min-width: 0;
+  border-top: 1px solid var(--line);
+}
+.item:hover {
+  background: var(--hover);
+}
+.main {
+  --indent: calc(7px + var(--sp-2));
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+  min-width: 0;
+  padding: var(--sp-2) var(--sp-3);
+  color: var(--text-2);
+  text-align: left;
+}
+.head {
+  display: flex;
+  align-items: baseline;
   gap: var(--sp-2);
   min-width: 0;
-  padding: var(--sp-2);
-  border: 1px solid var(--line);
-  border-radius: var(--r-md);
-  background: var(--bg);
 }
-.item.unread {
-  border-color: color-mix(in srgb, var(--warn) 45%, var(--line));
-}
-.meta {
-  min-width: 0;
-}
-.agent {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: var(--fs-xs);
-  color: var(--muted);
-}
-.when {
-  margin-left: auto;
-  color: var(--faint);
-  font-size: var(--fs-2xs);
-  font-variant-numeric: tabular-nums;
+.head :deep(.ui-status-dot) {
+  align-self: center;
 }
 .topic {
-  margin: 0;
+  min-width: 0;
   overflow: hidden;
   display: -webkit-box;
   -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
   overflow-wrap: anywhere;
+  color: var(--text);
   font-size: var(--fs-xs);
-  line-height: 1.4;
+  font-weight: 500;
+  line-height: 1.35;
+}
+.item.read .topic {
+  color: var(--text-2);
+  font-weight: 400;
+}
+.meta {
+  padding-left: var(--indent);
+  overflow: hidden;
+  color: var(--muted);
+  font-size: var(--fs-2xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
 }
 .preview {
-  margin: 0;
-  overflow: hidden;
+  padding-left: var(--indent);
   display: -webkit-box;
   -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
+  overflow: hidden;
   overflow-wrap: anywhere;
   color: var(--muted);
   font-size: var(--fs-2xs);
   line-height: 1.4;
 }
 .actions {
-  min-width: 0;
+  display: flex;
+  gap: 2px;
+  padding: var(--sp-1) var(--sp-2) 0 0;
 }
 </style>
