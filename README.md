@@ -112,7 +112,7 @@ Claude Code, Codex, OpenCode, Cursor и Kimi Code открываются не т
 
 ## Установка
 
-Projector можно установить из npm (готовые пакеты) или из исходников. Проверенное окружение — KDE Plasma с X11; Windows и macOS поддерживаются через адаптеры ОС и проверяются в CI.
+Projector можно установить из npm (готовые пакеты) или из исходников. Проверенное окружение — KDE Plasma на X11 и Wayland; Windows и macOS поддерживаются через адаптеры ОС и проверяются в CI.
 
 ### Из npm
 
@@ -157,7 +157,7 @@ projector-install-desktop
 - GTK4 и GObject Introspection, включая typelib GioUnix. На macOS: Xcode Command Line Tools (Swift-помощник меню и хоткея) и `brew install gtk4 gobject-introspection pkg-config` (его пробует выполнить `vp run desktop`); без GTK4 нативная палитра недоступна. На Windows GTK4 входит в поставку `node-gtk`.
 - Python 3, `make` и компилятор C++ для сборки зависимостей; Python 3 также читает архивы.
 - `git`, `rg` (ripgrep) и GNU `mv` для работы с проектами.
-- Linux: `xdg-open` для открытия браузера; для режима отдельного веб-окна — Chromium, `xdotool` и `xprop` (X11).
+- Linux: `xdg-open` для открытия браузера; для режима отдельного веб-окна — Chromium, а управление окном использует `xdotool` и `xprop`.
 
 Скачайте выпуск и установите зависимости:
 
