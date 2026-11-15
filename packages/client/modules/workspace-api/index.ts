@@ -73,7 +73,7 @@ export {
 } from "./pipeline-stages.ts";
 export {
   createSidebarRegistry,
-  workspaceAside,
+  workspaceUtility,
   type SidebarRegistry,
   type SidebarType,
 } from "./sidebar.ts";
@@ -83,6 +83,7 @@ export {
   createTabRegistry,
   defineTab,
   idTab,
+  inboxTab,
   numberedTab,
   singletonTab,
   tabRecordId,

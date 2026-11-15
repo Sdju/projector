@@ -12,25 +12,48 @@ import { computed, useId, ref, watch } from "vue";
 import UiButton from "../../../common/ui/UiButton.vue";
 import {
   AgentUsageIndicators,
-  agentUsageSummary,
   providerBalanceSummary,
 } from "../../agents-integration/status-bar/index.ts";
 import { useCompactViewport } from "../../../common/utilities/compact-viewport.ts";
 import IconPlus from "~icons/lucide/plus";
+import IconChevron from "~icons/lucide/chevron-down";
 import IconMessage from "~icons/lucide/message-square";
 import IconTerminal from "~icons/lucide/terminal";
 import IconSettings from "~icons/lucide/settings-2";
-import { builtinAgent, guiAgents, guiCommand, hasGui, useAgentModes } from "../../agent/index.ts";
 import { loadChatRoles } from "../../agent-roles/index.ts";
 import { clientAgentByBackend } from "../../agents-integration/catalog/index.ts";
+import { useSessionLaunchers } from "../lib/session-launchers.ts";
 
 /**
- * «+» с островом создания сессии: при открытии рамка охватывает кнопку, как у переключателя
- * проекта. Остров рисуется поверх дока (Teleport), поэтому кнопка дублируется в его шапке.
+ * Запуск сессии: остров со списком Shell, агентов и ролей. Кнопка бывает двух видов:
+ * «+» (в полосе вкладок группы терминалов) и split-кнопка (в шапке): основная часть
+ * повторяет последний выбор, стрелка открывает остров. Остров рисуется поверх дока (Teleport),
+ * поэтому кнопка дублируется в его шапке.
  */
-const props = defineProps<{ busy: boolean; agent?: boolean; projectId: string }>();
+const props = defineProps<{
+  busy: boolean;
+  agent?: boolean;
+  projectId: string;
+  variant?: "plus" | "split";
+}>();
 const emit = defineEmits<{ command: [id: string, args?: unknown] }>();
-const { modeOf, setMode, isEnabled } = useAgentModes();
+const split = computed(() => props.variant === "split");
+const launchers = useSessionLaunchers({
+  agent: () => props.agent,
+  busy: () => props.busy,
+  command: (id, args) => emit("command", id, args),
+});
+const {
+  rows,
+  builtin,
+  primary,
+  modeOf,
+  isEnabled,
+  canOpenChat,
+  commandOf,
+  launchPrimary,
+  toggleMode,
+} = launchers;
 const chatRoles = ref<Awaited<ReturnType<typeof loadChatRoles>>>([]);
 const roleRows = computed(() =>
   chatRoles.value.flatMap((role) => {
@@ -48,23 +71,8 @@ async function loadRoles() {
     chatRoles.value = [];
   }
 }
-const programs = computed(() => [
-  {
-    program: "shell",
-    title: "Shell",
-    caption: "Пустой терминал в папке проекта",
-    icon: IconTerminal,
-  },
-  ...guiAgents().map((agent) => ({
-    program: agent.program,
-    title: agent.title,
-    caption: agent.caption,
-    icon: agent.icon,
-  })),
-]);
-const builtin = builtinAgent();
 const menu = useIslandMenu({
-  anchor: "left",
+  anchor: split.value ? "right" : "left",
   initialFocus: ".row:not(:disabled)",
   items: ".row",
   closeOnTab: true,
@@ -74,24 +82,13 @@ watch(open, (value) => {
   if (value) void loadRoles();
 });
 const listId = useId();
-const rows = computed(() =>
-  programs.value
-    .filter((entry) => entry.program === "shell" || isEnabled(entry.program))
-    .map((entry) => {
-      const usage = agentUsageSummary[entry.program];
-      return { ...entry, usage: usage?.remaining == null ? undefined : usage };
-    }),
-);
 
 /** The status bar is hidden on mobile, so the limits shown below are polled only while this menu is open. */
 const compact = useCompactViewport();
 
-/** The chat view needs the agent feature; without it the terminal is the only option. */
-const canOpenChat = (program: string) => props.agent && hasGui(program);
-const toggleMode = (program: string) => setMode(program, modeOf(program) === "gui" ? "tui" : "gui");
 function openChat() {
   close();
-  emit("command", "ide.workbench.agent.open");
+  launchers.openBuiltin();
 }
 function pickRole(role: string) {
   if (props.busy) return;
@@ -105,8 +102,7 @@ function editRole(role: string) {
 function pick(program: string) {
   if (props.busy) return;
   close();
-  if (canOpenChat(program) && modeOf(program) === "gui") emit("command", guiCommand(program));
-  else emit("command", "ide.workbench.terminal.new", { program });
+  launchers.launch(program);
 }
 function hintTone(tone: "spare" | "normal" | "hot" | "over" | null | undefined) {
   return tone === "spare"
@@ -121,7 +117,33 @@ function hintTone(tone: "spare" | "normal" | "hot" | "over" | null | undefined) 
 
 <template>
   <span v-if="compact && open" hidden><AgentUsageIndicators :enabled="isEnabled" /></span>
-  <span :ref="menu.trigger" class="new-session">
+  <span v-if="split" :ref="menu.trigger" class="split-session" :class="{ open }">
+    <UiButton
+      class="split-main"
+      size="sm"
+      :disabled="busy"
+      :title="`Запустить: ${primary.title}`"
+      :aria-label="`Запустить: ${primary.title}`"
+      :data-command="primary.command"
+      @click="launchPrimary"
+    >
+      <component :is="primary.icon" class="split-icon" aria-hidden="true" />
+      <span class="split-label">{{ primary.title }}</span>
+    </UiButton>
+    <UiButton
+      class="split-more"
+      size="sm"
+      title="Новая сессия: выбрать Shell или агента"
+      aria-label="Новая сессия: выбрать Shell или агента"
+      aria-haspopup="dialog"
+      :aria-expanded="open"
+      :aria-controls="open ? menu.id : undefined"
+      @click="toggle()"
+    >
+      <IconChevron class="split-icon" aria-hidden="true" />
+    </UiButton>
+  </span>
+  <span v-else :ref="menu.trigger" class="new-session">
     <UiButton
       shape="icon"
       size="sm"
@@ -136,7 +158,12 @@ function hintTone(tone: "spare" | "normal" | "hot" | "over" | null | undefined) 
     </UiButton>
   </span>
   <UiIsland :menu="menu" label="Новая сессия">
-    <UiIslandHeader anchor="start" class="island-head" aria-label="Закрыть" @click="toggle(false)">
+    <UiIslandHeader
+      :anchor="split ? 'end' : 'start'"
+      class="island-head"
+      aria-label="Закрыть"
+      @click="toggle(false)"
+    >
       <IconPlus aria-hidden="true" /><span>Новая сессия</span>
     </UiIslandHeader>
     <template v-if="roleRows.length">
@@ -176,11 +203,7 @@ function hintTone(tone: "spare" | "normal" | "hot" | "over" | null | undefined) 
           role="menuitem"
           :disabled="busy"
           :tabindex="roleRows.length + index === active ? 0 : -1"
-          :data-command="
-            canOpenChat(row.program) && modeOf(row.program) === 'gui'
-              ? guiCommand(row.program)
-              : 'ide.workbench.terminal.new'
-          "
+          :data-command="commandOf(row.program)"
           @mousemove="active = roleRows.length + index"
           @click="pick(row.program)"
         >
@@ -248,6 +271,38 @@ function hintTone(tone: "spare" | "normal" | "hot" | "over" | null | undefined) 
   align-self: center;
   flex-shrink: 0;
   margin-inline: var(--sp-2) 0;
+}
+/* Split-кнопка шапки: две половины одной подложки, стрелка отделена тонкой чертой */
+.split-session {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+.split-main {
+  gap: var(--sp-1);
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+.split-more {
+  width: 24px;
+  padding-inline: 0;
+  border-left-width: 0;
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+}
+.split-session.open .split-more {
+  background: var(--active);
+}
+.split-icon {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+}
+/* Название программы уступает место иконке, когда шапке тесно */
+@media (max-width: 1100px) {
+  .split-label {
+    display: none;
+  }
 }
 .entry {
   display: flex;

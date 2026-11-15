@@ -25,7 +25,7 @@ import {
 import { PipelinesPanel } from "../modules/pipelines/index.ts";
 import { ReleasesPanel } from "../modules/releases/index.ts";
 import { DockerSidebar } from "../../docker/index.ts";
-import { AgentInbox, inboxBadge, inboxRemoteAttention } from "../../agent/index.ts";
+import { inboxRemoteAttention } from "../../agent/index.ts";
 import HubPanel from "../ui/HubPanel.vue";
 import SearchPanel from "../ui/SearchPanel.vue";
 import FilesSection from "../ui/FilesSection.vue";
@@ -39,7 +39,6 @@ import IconFiles from "~icons/lucide/files";
 import IconSearch from "~icons/lucide/search";
 import IconGit from "~icons/devicon/git";
 import IconDocker from "~icons/lucide/container";
-import IconBell from "~icons/lucide/bell";
 import IconHub from "~icons/lucide/network";
 import IconIssues from "~icons/lucide/circle-dot";
 import IconPulls from "~icons/lucide/git-pull-request";
@@ -56,21 +55,16 @@ export const baseSidebarTypes: SidebarType[] = [
   { id: "git", title: "Git", requires: "git" },
 ];
 
+/**
+ * Sections of the left rail: the project ones first, the service ones (`profile.utility`: Hub,
+ * trash) last. Utility sections are marked so the rail draws them in its bottom group.
+ */
 export const sidebarSections = (profile: WorkspaceProfile, capabilities: WorkspaceCapabilities) =>
   createSidebarRegistry(
     (capability) => capabilities[capability as keyof WorkspaceCapabilities],
     baseSidebarTypes,
     profile.sidebar,
-  );
-
-/**
- * Sections of the right rail. The base workspace has none: the owner adds them through
- * `profile.aside` and supplies their views with `asideViews`.
- */
-export const asideSections = (profile: WorkspaceProfile, capabilities: WorkspaceCapabilities) =>
-  createSidebarRegistry(
-    (capability) => capabilities[capability as keyof WorkspaceCapabilities],
-    profile.aside,
+    profile.utility?.map((type) => ({ ...type, utility: true })),
   );
 
 /** What a section may ask of the workspace that shows it. */
@@ -126,14 +120,6 @@ export interface SidebarView {
 export type SidebarViews = Record<string, SidebarView>;
 
 export const baseSidebarViews: SidebarViews = {
-  inbox: {
-    icon: IconBell,
-    component: AgentInbox,
-    props: () => ({}),
-    badge: () => inboxBadge(),
-    refreshGutter: true,
-    refresh: (_, panel) => panel?.refresh?.(),
-  },
   hub: {
     icon: IconHub,
     component: HubPanel,
@@ -216,7 +202,7 @@ export const baseSidebarViews: SidebarViews = {
     refreshGutter: true,
     refresh: (_, panel) => panel?.refresh?.(),
   },
-  // Right-rail section from `workspaceAside`: .projector-trash is not a left-sidebar section.
+  // Service section from `workspaceUtility`: it is drawn in the bottom group of the rail.
   trash: {
     icon: IconTrash,
     component: TrashPanel,

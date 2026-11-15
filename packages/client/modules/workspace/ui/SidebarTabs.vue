@@ -26,6 +26,8 @@ export interface SidebarItem {
   kind?: string;
   /** Временный раздел можно закрыть. */
   closable?: boolean;
+  /** Служебный раздел (Hub, корзина): живёт в нижней группе вертикальной полосы. */
+  utility?: boolean;
 }
 const props = defineProps<{
   section: string;
@@ -54,7 +56,15 @@ const picker = useIslandMenu({
   initialFocus: [".section-item.selected", ".section-item"],
   items: ".section-item",
 });
-const groups = computed(() => groupSidebar(props.items));
+/** Служебные разделы идут после проектных; на полосе они образуют нижнюю группу. */
+const groups = computed(() => {
+  const all = groupSidebar(props.items);
+  return [
+    ...all.filter((group) => !group[0]?.utility),
+    ...all.filter((group) => group[0]?.utility),
+  ];
+});
+const firstUtility = computed(() => groups.value.find((group) => group[0]?.utility));
 const ordered = computed(() => groups.value.flat());
 const current = computed(() => ordered.value.find((item) => item.id === props.section));
 const otherBadges = computed(() =>
@@ -169,32 +179,30 @@ function choose(item: SidebarItem) {
     </button>
   </UiIsland>
   <nav v-else class="side-tabs vertical" :aria-label="label ?? 'Разделы проекта'">
-    <div
-      v-for="group in groups"
-      :key="group[0]?.id"
-      class="side-group"
-      :class="{ grouped: group.length > 1 }"
-    >
-      <template v-for="(item, index) in group" :key="item.id">
-        <i v-if="index" class="side-separator" aria-hidden="true" />
-        <button
-          :class="{ selected: section === item.id && !collapsed }"
-          :aria-pressed="section === item.id && !collapsed"
-          :title="item.closable ? `${item.title} · ПКМ: закрыть` : item.title"
-          :aria-label="item.badge ? `${item.title}: ${item.badge}` : item.title"
-          :aria-haspopup="item.closable ? 'menu' : undefined"
-          @click="item.command ? emit('command', item.command) : emit('update:section', item.id)"
-          @contextmenu="openSectionMenu($event, item)"
-        >
-          <component
-            :is="item.icon"
-            :class="{ 'git-logo': item.id === 'git' }"
-            aria-hidden="true"
-          />
-          <span v-if="item.badge" aria-hidden="true">{{ item.badge }}</span>
-        </button>
-      </template>
-    </div>
+    <template v-for="group in groups" :key="group[0]?.id">
+      <i v-if="group === firstUtility" class="rail-divider" aria-hidden="true" />
+      <div class="side-group" :class="{ grouped: group.length > 1 }">
+        <template v-for="(item, index) in group" :key="item.id">
+          <i v-if="index" class="side-separator" aria-hidden="true" />
+          <button
+            :class="{ selected: section === item.id && !collapsed }"
+            :aria-pressed="section === item.id && !collapsed"
+            :title="item.closable ? `${item.title} · ПКМ: закрыть` : item.title"
+            :aria-label="item.badge ? `${item.title}: ${item.badge}` : item.title"
+            :aria-haspopup="item.closable ? 'menu' : undefined"
+            @click="item.command ? emit('command', item.command) : emit('update:section', item.id)"
+            @contextmenu="openSectionMenu($event, item)"
+          >
+            <component
+              :is="item.icon"
+              :class="{ 'git-logo': item.id === 'git' }"
+              aria-hidden="true"
+            />
+            <span v-if="item.badge" aria-hidden="true">{{ item.badge }}</span>
+          </button>
+        </template>
+      </div>
+    </template>
     <div v-if="projectSettings" class="side-actions">
       <UiButton
         shape="icon"
@@ -280,6 +288,17 @@ function choose(item: SidebarItem) {
 /* Дочерние разделы делят подложку с родителем: это одна «стопка», а не отдельные кнопки */
 .side-tabs.vertical .side-group.grouped {
   background: var(--bg-2);
+}
+/* Нижняя группа служебных разделов: тонкая черта прижата к низу, настройки проекта идут следом */
+.side-tabs.vertical .rail-divider {
+  width: 16px;
+  height: 1px;
+  flex-shrink: 0;
+  margin-top: auto;
+  background: var(--line-strong);
+}
+.side-tabs.vertical .rail-divider ~ .side-actions {
+  margin-top: 0;
 }
 .side-tabs.vertical .side-separator {
   width: 16px;

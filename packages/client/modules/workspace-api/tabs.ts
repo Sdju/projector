@@ -112,6 +112,23 @@ export const singletonTab = (
   extra: Pick<TabType, "subtitle" | "command"> = {},
 ) => defineTab({ id, key: () => key, path: () => path, title: () => title, ...extra });
 
+/** The work inbox of all agents and devices; the bell of the header opens it. */
+export const inboxTab = singletonTab(
+  "inbox",
+  "inbox:works",
+  "Работы",
+  "Работы и уведомления агентов",
+  {
+    subtitle: "фоновые задания и запросы",
+    command: {
+      id: "ide.workbench.inbox.open",
+      title: "Открыть работы и уведомления во вкладке",
+      description:
+        "Открывает вкладку «Работы»: фоновые задания, живые ходы, завершения и запросы агентов всех проектов и устройств Hub. Повторный вызов фокусирует вкладку.",
+    },
+  },
+);
+
 export interface TabRegistry {
   has(id: string): boolean;
   get(id: string): TabType | undefined;

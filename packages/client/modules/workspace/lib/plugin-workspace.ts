@@ -20,19 +20,20 @@ function sectionOf(item: (typeof runtimePanels.value)[number]): SidebarType {
     title: item.declaration.title,
     kind: pluginPanelKind(item.packageName, item.declaration.id),
     command: pluginPanelCommandId(item.packageName, item.declaration.id),
+    // The manifest placement `aside` is the service group of the rail (it used to be a right rail).
+    utility: item.declaration.placement === "aside",
   };
 }
 
-/** Plugin panels become ordinary sidebar/aside sections; their views mount borrowed DOM. */
-export function usePluginWorkspaceViews(
-  baseSidebarViews: SidebarViews | undefined,
-  baseAsideViews: SidebarViews | undefined,
-) {
+/** Plugin panels become ordinary sidebar sections; their views mount borrowed DOM. */
+export function usePluginWorkspaceViews(baseSidebarViews: SidebarViews | undefined) {
   const pluginSidebarSections = computed<SidebarType[]>(() =>
-    runtimePanels.value.filter((item) => item.declaration.placement === "sidebar").map(sectionOf),
-  );
-  const pluginAsideSections = computed<SidebarType[]>(() =>
-    runtimePanels.value.filter((item) => item.declaration.placement === "aside").map(sectionOf),
+    runtimePanels.value
+      .filter(
+        (item) =>
+          item.declaration.placement === "sidebar" || item.declaration.placement === "aside",
+      )
+      .map(sectionOf),
   );
   const pluginPanelViews = computed<SidebarViews>(() =>
     Object.fromEntries(
@@ -65,16 +66,7 @@ export function usePluginWorkspaceViews(
     ...baseSidebarViews,
     ...pluginPanelViews.value,
   }));
-  const mergedAsideViews = computed<SidebarViews>(() => ({
-    ...baseAsideViews,
-    ...pluginPanelViews.value,
-  }));
-  return {
-    pluginSidebarSections,
-    pluginAsideSections,
-    mergedSidebarViews,
-    mergedAsideViews,
-  };
+  return { pluginSidebarSections, mergedSidebarViews };
 }
 
 export interface PluginWorkspaceCommands {
@@ -90,8 +82,6 @@ export interface PluginWorkspaceCommands {
   openTab(id: string, params?: Record<string, unknown>): void;
   section: Ref<string>;
   showSidebar(): void;
-  asideSection: Ref<string>;
-  asideHidden: Ref<boolean>;
 }
 
 /** Adds plugin tab kinds, their open commands and plugin IDE commands for this workspace. */
@@ -181,18 +171,12 @@ export function registerPluginWorkspaceCommands(host: PluginWorkspaceCommands): 
         );
         wantedPanels.add(commandId);
         if (commandDisposers.has(commandId)) continue;
-        const placement = contribution.declaration.placement;
         try {
           const dispose = host.registerEditor(
             commandId,
             `Открыть панель «${contribution.declaration.title}»`,
             () => {
               const id = pluginPanelKind(contribution.packageName, contribution.declaration.id);
-              if (placement === "aside") {
-                host.asideSection.value = id;
-                host.asideHidden.value = false;
-                return;
-              }
               host.section.value = id;
               host.showSidebar();
             },

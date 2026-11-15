@@ -180,7 +180,10 @@ export function registerTabCommands({
       const tab = findTab(args)!;
       contextId.value = tab.id;
       const index = props.tabs.indexOf(tab);
-      const target = strip.value?.querySelectorAll<HTMLElement>('[role="tab"]')[index];
+      const target =
+        strip.value?.querySelectorAll<HTMLElement>('[role="tab"]')[index] ??
+        // The compact strip draws only the selected tab.
+        strip.value?.querySelector<HTMLElement>('[role="tab"]');
       if (target) return menu.value?.openForElement(target);
     },
     hasTab,

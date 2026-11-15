@@ -152,7 +152,8 @@ test(
       probe: "panel",
       value: 42,
     });
-    await browser.evaluate("window.fixture.run('ide.workbench.aside.toggle')");
+    // Hiding the sidebar must not unmount the panel: it stays mounted behind v-show.
+    await browser.evaluate("window.fixture.run('ide.workbench.sidebar.toggle')");
     await browser.evaluate("window.fixture.openPanel()");
     expect(await browser.evaluate("window.pluginProbe.mounts")).toBe(mounts);
     expect(

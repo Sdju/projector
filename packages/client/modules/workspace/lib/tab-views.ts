@@ -22,7 +22,13 @@ import { KeybindingsEditor } from "../../ide/index.ts";
 import { AnalyticsSettings } from "../../analytics/index.ts";
 import { LanInfoPanel } from "../../network/index.ts";
 import { DockerPanel } from "../../docker/index.ts";
-import { AgentChat, AgentJobTab, AgentTaskTab, roleFromParam } from "../../agent/index.ts";
+import {
+  AgentChat,
+  AgentInbox,
+  AgentJobTab,
+  AgentTaskTab,
+  roleFromParam,
+} from "../../agent/index.ts";
 import { clientAgents } from "../../agents-integration/catalog/index.ts";
 import { BrowserPanel } from "../../browser/index.ts";
 import { EntryInfoTab } from "../modules/tree/index.ts";
@@ -94,6 +100,12 @@ export function baseTabViews(): TabViews {
     analytics: { component: AnalyticsSettings, keepAlive: true, scroll: true },
     network: { component: LanInfoPanel, ownKeys: true, keepAlive: true },
     docker: { component: DockerPanel, keepAlive: true },
+    inbox: {
+      component: AgentInbox,
+      keepAlive: true,
+      scroll: true,
+      props: () => ({ scopeId: "agent-inbox:tab" }),
+    },
     "entry-info": {
       component: EntryInfoTab,
       keepAlive: true,

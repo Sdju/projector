@@ -257,7 +257,7 @@ export default definePlugin({
 
 `mount(container, context)` создаёт UI выбранным плагином способом и возвращает disposer; Vue не обязателен. `context` содержит `projectId`, `device`, `signal`, `params`, `assetUrl(relative)`, `commands.run(ide.*)`, `workspace.openFile(path, options)` и `workspace.openTab(id, params)`. CSS и разметка плагина живут в обычном DOM на origin страницы.
 
-- Панель manifest с `placement: "sidebar"` добавляется в существующий `SidebarRegistry`, с `placement: "aside"` — в правую полосу `profile.aside`. Виды монтируются общим host-компонентом; скрытие не размонтирует панель, закрытие/disable вызывает disposer, повторное enable создаёт новый экземпляр.
+- Панель manifest с `placement: "sidebar"` добавляется в существующий `SidebarRegistry`, с `placement: "aside"` — в нижнюю (служебную) группу той же левой полосы. Виды монтируются общим host-компонентом; скрытие не размонтирует панель, закрытие/disable вызывает disposer, повторное enable создаёт новый экземпляр.
 - Вкладка добавляется в `TabRegistry`/`TabViews`; скрытие и перенос между dock-блоками сохраняют stateful view через существующий panel host. Закрытие и disable вызывают cleanup. Восстановленная вкладка отключённого плагина показывает объяснение и закрывается штатной кнопкой; чужой плагин с тем же локальным id её не занимает.
 - Для каждой панели и вкладки workspace регистрирует `ide.*` команду с `title`/`description`; команды самого плагина тоже входят в scope workspace и видны агенту.
 

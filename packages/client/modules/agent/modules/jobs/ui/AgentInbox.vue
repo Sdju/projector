@@ -421,7 +421,10 @@ const groupBadge = (group: InboxGroup) =>
 .inbox {
   display: grid;
   align-content: start;
+  /* In a wide tab the list stays a readable column instead of stretching over the dock. */
+  width: min(100%, 760px);
   min-width: 0;
+  margin-inline: auto;
   padding: var(--sp-3) 0;
   color: var(--text);
   font-size: var(--fs-xs);

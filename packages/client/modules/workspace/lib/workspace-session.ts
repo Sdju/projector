@@ -31,6 +31,8 @@ export interface WorkspaceSessionContext {
   restoreSections?: (sections: SidebarType[]) => void;
   treeWidth: Ref<number | undefined>;
   sidebarHidden: Ref<boolean>;
+  /** Последняя запущенная сессия (программа или встроенный агент). */
+  launcher?: Ref<string>;
   mobile: Ref<boolean>;
   mobileSurface: Ref<MobileSurface>;
   /** Whether the profile has terminals; a saved terminal surface falls back to the editor without them. */
@@ -99,6 +101,7 @@ export function useWorkspaceSession(ctx: WorkspaceSessionContext) {
         mobileSurface: ctx.mobileSurface.value,
         treeWidth: ctx.treeWidth.value,
         sidebarHidden: ctx.sidebarHidden.value,
+        launcher: ctx.launcher?.value,
         layout: serializeDockLayout(ctx.layout.value),
       };
     },
@@ -172,6 +175,7 @@ export function useWorkspaceSession(ctx: WorkspaceSessionContext) {
       ctx.section.value = exists(saved?.section ?? "") ? saved!.section : "files";
       ctx.treeWidth.value = saved?.treeWidth;
       ctx.sidebarHidden.value = !!saved?.sidebarHidden;
+      if (ctx.launcher) ctx.launcher.value = saved?.launcher || "shell";
       ctx.reloadGit();
       void restoreSession(saved, generation);
     },

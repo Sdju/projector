@@ -132,9 +132,9 @@ The terminal read is the `{ action: "read", lines }` POST on the terminal contro
 
 ## Workspace panels
 
-The workspace has a second rail on the right for owner-specific panels. The base project has no sections there; a profile adds them through `profile.aside`, and the embedding page supplies their views with the `asideViews` prop of `ProjectWorkspace` (the same `SidebarView` contract as the left sidebar). The panel starts collapsed, and the rail itself is hidden on narrow screens. Commands are `ide.workbench.aside.toggle`, `ide.workbench.aside.section.show` `{ section }`, `ide.workbench.aside.refresh` and `ide.workbench.aside.section.close` `{ section }`; they are available only while the workspace has right-rail sections.
+The workspace has no right rail. Service sections (Hub, trash and plugin panels declared with `placement: "aside"`) form the bottom group of the left section rail: a profile adds them through `profile.utility` (`SidebarType.utility`), and they open with `ide.workbench.section.show` `{ section }` like any other sidebar section. The former `ide.workbench.aside.*` commands are removed.
 
-Local and GitHub/GitLab profiles put the global work inbox in that rail as section `inbox`. Its own scope registers `ide.inbox.open` (the header bell), `ide.inbox.refresh`, `ide.inbox.work.open` `{ key }`, `ide.inbox.work.stop` `{ key }`, `ide.inbox.notice.open` `{ key }`, `ide.inbox.notice.trust` `{ key }`, `ide.inbox.notice.read` `{ key }`, `ide.inbox.read.all` and `ide.inbox.notifications.allow`. The panel and bell share one feed; the page's server pushes its jobs, the Hub pushes device and other-device changes, and on a Hub device page the same commands read and control jobs on every online device.
+Local and GitHub/GitLab profiles offer the global work inbox as the dock tab `inbox`; `ide.workbench.inbox.open` opens or focuses it (the header bell runs it). Its own scope registers `ide.inbox.open` (the header bell), `ide.inbox.refresh`, `ide.inbox.work.open` `{ key }`, `ide.inbox.work.stop` `{ key }`, `ide.inbox.notice.open` `{ key }`, `ide.inbox.notice.trust` `{ key }`, `ide.inbox.notice.read` `{ key }`, `ide.inbox.read.all` and `ide.inbox.notifications.allow`. The panel and bell share one feed; the page's server pushes its jobs, the Hub pushes device and other-device changes, and on a Hub device page the same commands read and control jobs on every online device.
 
 ## Reload and server mode
 
@@ -213,13 +213,12 @@ Commit diff tabs are history: staging, discarding or moving files never closes t
 
 ## Корзина проекта
 
-The `trash` section of the right rail exists for writable profiles. Its scope is
+The `trash` section of the left rail (utility group) exists for writable profiles. Its scope is
 `trash:<projectId>` with `{ surface: 'trash', projectId, count, busy }`. The panel shows a tree of
 `.projector-trash`: top-level entries keep their original base name, folders expand to any depth,
 file sizes are immediate and folder sizes are recursive; the badge is the entry count and the header
-sums the trash size. It is added by `workspaceAside`, starts collapsed with the other right-rail panels
-and is shown with `ide.workbench.aside.section.show` `{ section: 'trash' }` (or
-`ide.workbench.aside.toggle`); the rail itself is hidden on narrow screens.
+sums the trash size. It is added by `workspaceUtility` and is shown with
+`ide.workbench.section.show` `{ section: 'trash' }`.
 
 - `ide.trash.list` returns `{ entries }` with every top-level entry (`id`, `path`, `name`, `directory`,
   `deletedAt`, `size`) and re-reads the trash.
@@ -354,7 +353,7 @@ All chat commands are registered once per workspace (`registerAgentCommands` in 
 - `ide.hub.open` — открыть настроенный Hub в новой вкладке; на странице Hub — к списку
   устройств.
 
-Раздел **Hub** правой полосы workspace регистрирует `ide.hub.devices.refresh`,
+Раздел **Hub** служебной группы левой полосы workspace регистрирует `ide.hub.devices.refresh`,
 `ide.hub.device.open`, `ide.hub.device.notify`, `ide.hub.notifications.allow` и `ide.hub.open`
 в собственной области страницы, чтобы те же действия были доступны агенту без открытия
 настроек.

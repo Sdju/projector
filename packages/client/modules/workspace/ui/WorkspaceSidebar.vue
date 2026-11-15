@@ -39,14 +39,6 @@ const props = defineProps<{
   executeCommand?: (id: string, args?: unknown) => Promise<unknown>;
   /** Разделы — вертикальная полоса-остров слева; иначе вкладки сверху панели (мобильный вид). */
   rail?: boolean;
-  /** Сторона рабочей области: полоса и панель разворачиваются зеркально. */
-  side?: "left" | "right";
-  /** Команда, сворачивающая и раскрывающая панель с полосы разделов. */
-  toggleCommand?: string;
-  /** Команда кнопки обновления раздела. */
-  refreshCommand?: string;
-  /** Команда закрытия временного раздела. */
-  closeCommand?: string;
 }>();
 const section = defineModel<string>("section", { required: true });
 const emit = defineEmits<{
@@ -120,6 +112,7 @@ const items = computed(() => {
     group?: string;
     kind: string;
     closable?: boolean;
+    utility?: boolean;
   }> = [];
   for (const type of props.sections.list()) {
     const kind = type.kind ?? type.id;
@@ -134,6 +127,7 @@ const items = computed(() => {
       group: type.group && props.sections.has(type.group) ? type.group : undefined,
       kind,
       closable: type.closable,
+      utility: type.utility,
     });
   }
   return result;
@@ -150,7 +144,7 @@ const activeView = computed(() => {
 const setPanel = (id: string, panel: unknown) =>
   panel ? panels.set(id, panel as SidebarPanel) : panels.delete(id);
 const refreshing = computed(() => localRefreshing.value || !!panels.get(section.value)?.refreshing);
-const refreshCommandId = computed(() => props.refreshCommand ?? "ide.workbench.sidebar.refresh");
+const refreshCommandId = computed(() => "ide.workbench.sidebar.refresh");
 provide(sectionRefreshKey, {
   refreshing,
   command: refreshCommandId,
@@ -176,8 +170,7 @@ function select(id: string) {
     section.value = id;
     return;
   }
-  if (props.hidden || section.value === id)
-    emit("command", props.toggleCommand ?? "ide.workbench.sidebar.toggle");
+  if (props.hidden || section.value === id) emit("command", "ide.workbench.sidebar.toggle");
   section.value = id;
 }
 
@@ -194,8 +187,8 @@ defineExpose({
   <aside
     v-show="rail || !hidden"
     class="sidebar"
-    :class="{ 'with-rail': rail, 'side-right': side === 'right' }"
-    :aria-label="side === 'right' ? 'Дополнительные панели' : 'Обзор проекта'"
+    :class="{ 'with-rail': rail }"
+    aria-label="Обзор проекта"
   >
     <SidebarTabs
       :section="section"
@@ -203,9 +196,8 @@ defineExpose({
       :vertical="rail"
       :collapsed="rail && hidden"
       :refreshing="refreshing"
-      :project-settings="side !== 'right' && capabilities.settings"
-      :label="side === 'right' ? 'Дополнительные панели' : 'Разделы проекта'"
-      :scope-id="side === 'right' ? 'aside-sections' : 'sidebar-sections'"
+      :project-settings="capabilities.settings"
+      label="Разделы проекта"
       @update:section="select"
       @command="(id, args) => emit('command', id, args)"
     />
@@ -228,8 +220,8 @@ defineExpose({
           class="panel-head-close"
           :title="`Закрыть «${activeType.title}»`"
           :aria-label="`Закрыть «${activeType.title}»`"
-          :data-command="closeCommand ?? 'ide.workbench.section.close'"
-          @click="emit('command', closeCommand ?? 'ide.workbench.section.close', { section })"
+          data-command="ide.workbench.section.close"
+          @click="emit('command', 'ide.workbench.section.close', { section })"
         >
           <IconX aria-hidden="true" />
         </button>
@@ -239,8 +231,8 @@ defineExpose({
         class="panel-close"
         title="Закрыть раздел"
         aria-label="Закрыть раздел"
-        :data-command="closeCommand ?? 'ide.workbench.section.close'"
-        @click="emit('command', closeCommand ?? 'ide.workbench.section.close', { section })"
+        data-command="ide.workbench.section.close"
+        @click="emit('command', 'ide.workbench.section.close', { section })"
       >
         <IconX aria-hidden="true" />
       </button>
@@ -291,10 +283,6 @@ defineExpose({
   overflow: visible;
   border: 0;
   background: none;
-}
-/* Правая панель зеркалит левую: полоса разделов уходит к правому краю окна */
-.sidebar.side-right.with-rail {
-  flex-direction: row-reverse;
 }
 .panel {
   display: contents;

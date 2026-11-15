@@ -3,12 +3,14 @@ import type { WorkspaceCapabilities } from "../../workspace-api/index.ts";
 import UiButton from "../../../common/ui/UiButton.vue";
 import { AgentInboxBell } from "../../agent/index.ts";
 import LayoutMenu from "./LayoutMenu.vue";
+import NewSessionMenu from "./NewSessionMenu.vue";
 import type { LayoutPreset } from "../lib/workbench-layout.ts";
 import IconAnalytics from "~icons/lucide/chart-no-axes-column";
 import IconMedia from "~icons/lucide/sparkles";
 import IconSettings from "~icons/lucide/settings-2";
 
 defineProps<{
+  projectId: string;
   capabilities: Readonly<WorkspaceCapabilities>;
   /** Узкий экран: раскладка блоков заменена поверхностями, остаются запуск и ссылки. */
   mobile?: boolean;
@@ -19,7 +21,7 @@ defineProps<{
   layoutGroups: { id: string; role?: string; label: string; hidden: boolean }[];
   preset?: LayoutPreset;
   presetsAvailable: boolean;
-  /** The profile has the global work inbox in its right rail. */
+  /** The profile has the global work inbox tab: the bell opens it. */
   inbox?: boolean;
 }>();
 const emit = defineEmits<{
@@ -34,11 +36,16 @@ const emit = defineEmits<{
       {{ terminalsError }}
     </p>
     <div class="toolbar-spacer" />
-    <slot name="terminal-actions" />
-    <AgentInboxBell
-      v-if="inbox"
-      @open="emit('command', 'ide.workbench.aside.section.show', { section: 'inbox' })"
+    <NewSessionMenu
+      v-if="capabilities.terminals && !mobile"
+      variant="split"
+      :busy="terminalsBusy"
+      :agent="capabilities.agent"
+      :project-id="projectId"
+      @command="(id, args) => emit('command', id, args)"
     />
+    <slot name="terminal-actions" />
+    <AgentInboxBell v-if="inbox" @open="emit('command', 'ide.workbench.inbox.open')" />
     <UiButton
       shape="icon"
       size="sm"

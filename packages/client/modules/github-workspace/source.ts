@@ -3,13 +3,14 @@ import type { GithubRepository, GithubEntry } from "@ai-projector/core/modules/g
 import {
   connectionFilesProvider,
   createLocalWorkspaceProfile,
+  inboxTab,
   numberedReadProvider,
   readonlyFileContent,
   readonlyWorkspaceFeatures,
   singletonTab,
   snapshotGitProvider,
   snapshotTreePage,
-  workspaceAside,
+  workspaceUtility,
   WORKSPACE_ACTION_UNAVAILABLE,
   type WorkspaceProfile,
 } from "../workspace-api/index.ts";
@@ -298,7 +299,7 @@ export function createGithubWorkspaceProfile(
   return {
     id: "github",
     layout: "editor",
-    aside: workspaceAside,
+    utility: workspaceUtility,
     sidebar: [
       { id: "issues", title: "Issues" },
       { id: "pulls", title: "Pull requests" },
@@ -307,6 +308,7 @@ export function createGithubWorkspaceProfile(
       { id: "releases", title: "Releases", requires: "releases" },
     ],
     tabs: [
+      inboxTab,
       connectionTab,
       singletonTab(
         "repository",

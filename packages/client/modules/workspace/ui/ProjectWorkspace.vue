@@ -38,8 +38,8 @@ import {
 import { createPanelHosts } from "../panel-hosts.ts";
 import { TerminalCloseDialog } from "../../terminal/index.ts";
 import { useDocker } from "../../docker/index.ts";
-import { asideSections, sidebarSections, type SidebarViews } from "../lib/sidebar-views.ts";
-import { useWorkspaceAside } from "../lib/aside-panels.ts";
+import { sidebarSections, type SidebarViews } from "../lib/sidebar-views.ts";
+import { provideLastSession } from "../lib/session-launchers.ts";
 import { registerTreeCommands } from "../lib/tree-commands.ts";
 import { provideTabHost, useWorkspaceTabTypes, type TabViews } from "../lib/tab-views.ts";
 import {
@@ -57,9 +57,8 @@ const props = defineProps<{
   beforeCloseProjectSettings?: () => boolean;
   saveProjectSettings?: () => void | Promise<void>;
   tabViews?: TabViews; // views of the kinds the embedding page owns
-  /** Views of the sidebar and right-rail sections the embedding page owns. */
+  /** Views of the sidebar sections the embedding page owns. */
   sidebarViews?: SidebarViews;
-  asideViews?: SidebarViews;
 }>();
 const profile = workspaceProfile(props.projectId);
 const capabilities = profileCapabilities(profile);
@@ -76,7 +75,6 @@ const { mobile, mobileSurface, mobileSidebarOpen, sidebarInvisible, showSidebar 
   useMobileSurfaces(sidebarHidden);
 const { treeWidth, sizes, resizeTree, resizeTreeKey } = useSidebarResize(workspaceElement);
 const sidebar = ref<InstanceType<typeof WorkspaceSidebar>>();
-const asidePanel = ref<InstanceType<typeof WorkspaceSidebar>>();
 const editorCommands = useCommandScope(`editor:${props.projectId}`, () => ({
   surface: "editor",
   projectId: props.projectId,
@@ -130,28 +128,16 @@ const branches = useGitBranches(() => props.projectId);
 const loadGit = () => (capabilities.git ? overview.load() : Promise.resolve());
 const section = ref("files");
 const extraSections = ref<SidebarType[]>([]);
-const { pluginSidebarSections, pluginAsideSections, mergedSidebarViews, mergedAsideViews } =
-  usePluginWorkspaceViews(props.sidebarViews, props.asideViews);
+const { pluginSidebarSections, mergedSidebarViews } = usePluginWorkspaceViews(props.sidebarViews);
+/** The program the header launcher repeats; it travels with the session. */
+const lastSession = ref("shell");
+provideLastSession(lastSession);
 const sections = computed(() =>
   extendSidebarRegistry(sidebarSections(profile, capabilities), () => [
     ...extraSections.value,
     ...pluginSidebarSections.value,
   ]),
 );
-/** Правая полоса: разделы приходят из профиля, их виды — от страницы, встроившей workspace. */
-const asideRegistry = extendSidebarRegistry(asideSections(profile, capabilities), () => [
-  ...pluginAsideSections.value,
-]);
-const {
-  visible: asideVisible,
-  hidden: asideHidden,
-  section: asideSection,
-} = useWorkspaceAside({
-  registry: asideRegistry,
-  mobile,
-  register: registerEditor,
-  refresh: () => asidePanel.value?.refreshSection(),
-});
 function openTree(scope: FileScope) {
   if (!capabilities.snapshots) throw new Error("Источник не умеет показывать файлы снимка");
   const id = `tree:${fileScopeKey(scope)}`;
@@ -341,8 +327,6 @@ registerPluginWorkspaceCommands({
   openTab,
   section,
   showSidebar,
-  asideSection,
-  asideHidden,
 });
 // The workspace is the default surface: its commands work even before the first focus.
 editorCommands.scope.activate();
@@ -436,6 +420,7 @@ useWorkspaceSession({
   restoreSections,
   treeWidth,
   sidebarHidden,
+  launcher: lastSession,
   mobile,
   mobileSurface,
   terminals: capabilities.terminals,
@@ -493,8 +478,6 @@ onBeforeUnmount(() => overview.cancel());
     class="workspace"
     :class="{
       'sidebar-hidden': sidebarInvisible,
-      'has-aside': asideVisible,
-      'aside-hidden': asideHidden,
       zen: zenMode,
     }"
     :data-surface="mobile ? mobileSurface : undefined"
@@ -503,6 +486,7 @@ onBeforeUnmount(() => overview.cancel());
     <div class="toolbar-host">
       <Teleport to="#header-tools" defer>
         <WorkbenchToolbar
+          :project-id="projectId"
           :capabilities="capabilities"
           :mobile="mobile"
           :sidebar-hidden="sidebarInvisible"
@@ -511,7 +495,7 @@ onBeforeUnmount(() => overview.cancel());
           :layout-groups="layoutGroups"
           :preset="currentPreset"
           :presets-available="presetsAvailable"
-          :inbox="asideRegistry.has('inbox')"
+          :inbox="tabTypes.has('inbox')"
           @command="(id, args) => editorCommands.run(id, args)"
         >
           <template #terminal-actions><slot name="terminal-actions" /></template>
@@ -592,41 +576,6 @@ onBeforeUnmount(() => overview.cancel());
         @command="(id, args) => editorCommands.run(id, args)"
       />
     </section>
-    <WorkspaceSidebar
-      v-if="asideVisible"
-      ref="asidePanel"
-      class="aside"
-      :inert="zenMode"
-      v-model:section="asideSection"
-      side="right"
-      :project-id="projectId"
-      :capabilities="capabilities"
-      :sections="asideRegistry"
-      :views="mergedAsideViews"
-      :hidden="asideHidden"
-      :rail="true"
-      :active="active"
-      :revision="revision"
-      :overview="overview"
-      :history="history"
-      :branches="branches"
-      :files="files"
-      :git-sync="gitSync"
-      :execute-command="(id, args) => editorCommands.scope.executeCommand(id, args)"
-      toggle-command="ide.workbench.aside.toggle"
-      refresh-command="ide.workbench.aside.refresh"
-      close-command="ide.workbench.aside.section.close"
-      @command="
-        (id, args) =>
-          (id.startsWith('ide.docker.') ? docker.commands : editorCommands).run(id, args)
-      "
-      @open-commit-tree="openCommitTree"
-      @open-search="openSearch"
-      @refresh="refresh"
-      @changed="treeChanged"
-      @deleted="entryDeleted"
-      @moved="entryMoved"
-    />
     <MobileSurfaces
       v-if="mobile"
       v-show="!zenMode"
@@ -660,7 +609,6 @@ onBeforeUnmount(() => overview.cancel());
 <style scoped>
 .workspace {
   --rail-w: 40px;
-  --aside-width: clamp(240px, 21vw, 320px);
   display: grid;
   grid-template-columns: var(--tree-width, clamp(240px, 21vw, 320px)) var(--island-gap) minmax(
       0,
@@ -675,31 +623,6 @@ onBeforeUnmount(() => overview.cancel());
 .workspace.sidebar-hidden {
   grid-template-columns: calc(var(--rail-w) - var(--island-gap)) var(--island-gap) minmax(0, 1fr);
   column-gap: 0;
-}
-/* Правая полоса разделов: её колонка остаётся, даже когда панель свёрнута. */
-.workspace.has-aside {
-  grid-template-columns:
-    var(--tree-width, clamp(240px, 21vw, 320px)) var(--island-gap) minmax(0, 1fr)
-    var(--island-gap) var(--aside-width);
-}
-.workspace.sidebar-hidden.has-aside {
-  grid-template-columns:
-    calc(var(--rail-w) - var(--island-gap)) var(--island-gap) minmax(0, 1fr) var(--island-gap)
-    var(--aside-width);
-}
-.workspace.has-aside.aside-hidden {
-  grid-template-columns:
-    var(--tree-width, clamp(240px, 21vw, 320px)) var(--island-gap) minmax(0, 1fr)
-    var(--island-gap) calc(var(--rail-w) - var(--island-gap));
-}
-.workspace.sidebar-hidden.has-aside.aside-hidden {
-  grid-template-columns:
-    calc(var(--rail-w) - var(--island-gap)) var(--island-gap) minmax(0, 1fr) var(--island-gap)
-    calc(var(--rail-w) - var(--island-gap));
-}
-.workspace > .aside {
-  grid-column: 5;
-  grid-row: 3;
 }
 .tree-resize {
   grid-column: 2;
@@ -728,31 +651,10 @@ onBeforeUnmount(() => overview.cancel());
     overflow: auto;
   }
   .workspace {
-    --aside-width: clamp(200px, 24vw, 260px);
     grid-template-columns: 260px var(--island-gap) minmax(0, 1fr);
   }
   .workspace.sidebar-hidden {
     grid-template-columns: calc(var(--rail-w) - var(--island-gap)) var(--island-gap) minmax(0, 1fr);
-  }
-  .workspace.has-aside {
-    grid-template-columns: 260px var(--island-gap) minmax(0, 1fr) var(--island-gap) var(
-        --aside-width
-      );
-  }
-  .workspace.sidebar-hidden.has-aside {
-    grid-template-columns:
-      calc(var(--rail-w) - var(--island-gap)) var(--island-gap) minmax(0, 1fr) var(--island-gap)
-      var(--aside-width);
-  }
-  .workspace.has-aside.aside-hidden {
-    grid-template-columns:
-      260px var(--island-gap) minmax(0, 1fr) var(--island-gap)
-      calc(var(--rail-w) - var(--island-gap));
-  }
-  .workspace.sidebar-hidden.has-aside.aside-hidden {
-    grid-template-columns:
-      calc(var(--rail-w) - var(--island-gap)) var(--island-gap) minmax(0, 1fr) var(--island-gap)
-      calc(var(--rail-w) - var(--island-gap));
   }
 }
 @media (max-width: 700px), (max-width: 1050px) and (max-height: 500px) and (pointer: coarse) {
@@ -803,18 +705,13 @@ onBeforeUnmount(() => overview.cancel());
   margin-top: var(--island-gap);
 }
 .workspace.zen,
-.workspace.zen.sidebar-hidden,
-.workspace.zen.has-aside,
-.workspace.zen.sidebar-hidden.has-aside,
-.workspace.zen.has-aside.aside-hidden,
-.workspace.zen.sidebar-hidden.has-aside.aside-hidden {
+.workspace.zen.sidebar-hidden {
   position: relative;
   grid-template-columns: minmax(0, 1fr);
   grid-template-rows: minmax(0, 1fr);
   column-gap: 0;
 }
 .workspace.zen > .sidebar,
-.workspace.zen > .aside,
 .workspace.zen > .tree-resize,
 .workspace.zen > .sidebar-backdrop,
 .workspace.zen > .workspace-status,
