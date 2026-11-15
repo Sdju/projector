@@ -1,8 +1,10 @@
 import { commandArgs } from "../../../common/utilities/commands.ts";
 import { chatsOf, resolveChat } from "../../agent-core/index.ts";
-import type { RegisterCommand } from "../../agent-core/index.ts";
+import type { ChatRef, ChatSide, RegisterCommand } from "../../agent-core/index.ts";
 
 const CHAT = "Ключ чата из ide.agent.chats.list; без него — чат, с которым работали последним";
+/** The side thread of a chat and its read-only status: all this group needs from it. */
+type SideChat = ChatRef & ChatSide;
 
 function text(args: Record<string, unknown>, key: string): string {
   const value = args[key];
@@ -16,7 +18,7 @@ function text(args: Record<string, unknown>, key: string): string {
  */
 export function registerSideCommands(register: RegisterCommand, projectId: string): void {
   const anyChat = () => chatsOf(projectId).length > 0;
-  const find = (args: unknown) => resolveChat(projectId, commandArgs(args).chat);
+  const find = (args: unknown): SideChat => resolveChat(projectId, commandArgs(args).chat);
 
   register(
     "ide.agent.side.open",

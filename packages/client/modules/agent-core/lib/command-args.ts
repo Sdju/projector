@@ -1,4 +1,4 @@
-import type { ChatController } from "../model/chat-registry.ts";
+import type { ChatRef } from "../model/chat-contracts.ts";
 
 /** A required text argument of a chat command. */
 export function text(args: Record<string, unknown>, key: string): string {
@@ -9,7 +9,7 @@ export function text(args: Record<string, unknown>, key: string): string {
 
 /** The newest message of the user, which `edit`, `retry` and `rewind` take when no turn is named. */
 export function turnArg(
-  chat: ChatController,
+  chat: Pick<ChatRef, "turns">,
   args: Record<string, unknown>,
   role: "user" | "assistant",
 ): string {

@@ -1,13 +1,15 @@
 import { commandArgs } from "../../../common/utilities/commands.ts";
 import { chatsOf, resolveChat } from "../../agent-core/index.ts";
-import type { RegisterCommand } from "../../agent-core/index.ts";
+import type { ChatForms, ChatRef, RegisterCommand } from "../../agent-core/index.ts";
 
 const CHAT = "Ключ чата из ide.agent.chats.list; без него — чат, с которым работали последним";
+/** The form in the composer: the only thing this group of commands needs from a chat. */
+type FormChat = ChatRef & ChatForms;
 
 /** The form that replaced the composer: the user answers it, these commands only show or hide it. */
 export function registerFormCommands(register: RegisterCommand, projectId: string) {
   const hasForm = () => chatsOf(projectId).some((chat) => !chat.busy() && !!chat.pendingForm());
-  const find = (args: unknown) =>
+  const find = (args: unknown): FormChat =>
     resolveChat(projectId, commandArgs(args).chat, (chat) => !!chat.pendingForm());
 
   register(

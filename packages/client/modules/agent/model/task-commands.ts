@@ -1,6 +1,6 @@
 import { commandArgs } from "../../../common/utilities/commands.ts";
 import { chatsOf, resolveChat } from "../../agent-core/index.ts";
-import type { RegisterCommand } from "../../agent-core/index.ts";
+import type { ChatRef, RegisterCommand } from "../../agent-core/index.ts";
 
 /** The commands for subagents and background commands of the open chats of a project. */
 export function registerTaskCommands(register: RegisterCommand, projectId: string): void {
@@ -8,7 +8,7 @@ export function registerTaskCommands(register: RegisterCommand, projectId: strin
     "ide.agent.tasks.list",
     "Задачи чата агента",
     (args) => {
-      const chat = resolveChat(projectId, commandArgs(args).chat);
+      const chat: ChatRef = resolveChat(projectId, commandArgs(args).chat);
       return chat.tasks().map((task) => ({
         chat: chat.key,
         task: task.id,

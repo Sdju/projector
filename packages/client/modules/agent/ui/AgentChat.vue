@@ -9,22 +9,19 @@ import {
   activateChat,
   agentCommandHandler,
   agentLabel,
-  chatTasks,
   chatsOf,
-  fetchMcpServers,
   isBuiltinAgent,
   provideChatContext,
   registerChat,
   shownPlan,
   useAgent,
   type AgentBackendId,
-  type ChatController,
   type ChatUsage,
-  type RewindScope,
 } from "../../agent-core/index.ts";
 import { openAgentChat } from "../model/open-agent.ts";
 import { chatDropHandlers } from "../lib/chat-drop.ts";
 import { useChatBranch } from "../model/chat-branch.ts";
+import { createChatController } from "../model/chat-controller.ts";
 import { useChatReadout } from "../model/chat-readout.ts";
 import { AgentActivityDock, AgentJobRequests, useChatJobs } from "../modules/jobs/index.ts";
 import {
@@ -33,7 +30,6 @@ import {
   AgentSecrets,
   AgentTaskView,
   AgentTurn,
-  lensActions,
   useAgentLens,
   useChatTaskView,
 } from "../../agent-turns/index.ts";
@@ -64,7 +60,7 @@ import ImageModal from "../../../common/ui/ImageModal.vue";
 import AgentSessions from "./AgentSessions.vue";
 import AgentChatMenu from "./AgentChatMenu.vue";
 import { useChipActions } from "../model/use-chip-actions.ts";
-import { exportChat, downloadChat as saveChatMarkdown } from "../lib/export.ts";
+import { downloadChat as saveChatMarkdown } from "../lib/export.ts";
 import { previousUser } from "../lib/previous-user.ts";
 import { AgentSecretShow, useSecretShows } from "../../agent-secret-show/index.ts";
 import { useChatScroll } from "../model/chat-scroll.ts";
@@ -92,6 +88,15 @@ const { api } = useIdeCommands();
 const chatMenu = ref<InstanceType<typeof AgentChatMenu>>();
 const featuresIsland = ref<InstanceType<typeof AgentFeaturesIsland>>();
 const judgeIsland = ref<InstanceType<typeof AgentJudgeIsland>>();
+const agent = useAgent(
+  props.projectId,
+  plain.value ? undefined : agentCommandHandler(api, props.projectId),
+  {
+    backend: props.backend,
+    chatId: props.chatId,
+    role: props.role,
+  },
+);
 const {
   key: chatKey,
   turns,
@@ -142,7 +147,6 @@ const {
   setFeatureOverrides,
   judgeOverride,
   setJudgeOverride,
-  worktreeId,
   worktreeInfo,
   mergeCopy,
   discardCopy,
@@ -153,11 +157,7 @@ const {
   decide,
   answer,
   answerSecret,
-} = useAgent(props.projectId, plain.value ? undefined : agentCommandHandler(api, props.projectId), {
-  backend: props.backend,
-  chatId: props.chatId,
-  role: props.role,
-});
+} = agent;
 const emit = defineEmits<{ title: [title: string] }>();
 const { shows: secretShows, dismiss: dismissSecretShow } = useSecretShows(
   props.projectId,
@@ -404,63 +404,21 @@ const { compact } = useAutoCompact({
   toBottom,
 });
 // The chat publishes itself to the workspace's commands (see `registerAgentCommands`).
-const controller: ChatController = {
-  key: chatKey,
+const controller = createChatController({
   projectId: props.projectId,
   backend: props.backend,
   label: agentName.value,
-  busy: () => busy.value,
-  needsUser: () =>
-    permissions.value.length > 0 || questions.value.length > 0 || secrets.value.length > 0,
+  chat: agent,
   visible: () => !!root.value && root.value.getClientRects().length > 0,
-  turns: () => turns.value,
-  tasks: () => chatTasks(turns.value),
-  queue: () => queue.value,
-  controls: () => controls.value,
-  selection: () => selection.value,
-  capabilities: () => capabilities.value,
-  setControl,
-  loadSessions,
-  resumeSession,
-  removeSession,
-  toggleControlsMenu: () => controlsMenu.value?.toggle(),
-  send: (text) => send(text),
-  attach: async (chips) => composer.value?.attach(chips),
-  appendText: async (text) => composer.value?.appendText(text),
+  composer: () => composer.value,
+  controls: () => controlsMenu.value,
   pendingForm: () => composerForm.value,
-  showForm: () => composer.value?.showForm(),
-  hideForm: () => composer.value?.hideForm(),
-  inject: async (text) => {
-    await send(text);
-    const item = queue.value.findLast((entry) => entry.text === text.trim());
-    if (!item) return false;
-    return injectQueued(item.id);
-  },
-  stop,
-  edit,
-  retry,
   fork,
-  rewind: async (id, scope) => {
-    const result = await rewindTo(id, scope);
-    return result ?? { ok: true, files: [] };
-  },
-  showVersion,
-  removeQueued,
-  exportMarkdown: () => exportChat(turns.value, agentName.value),
   compact,
-  status: () => side.status(),
-  openSide: () => side.openPanel(),
-  askSide: (text) => side.ask(text),
-  clearSide: () => side.clear(),
-  ...lensActions(lens),
-  mcpServers: () => fetchMcpServers(props.backend, props.projectId),
-  worktree: async () => (worktreeId() ? worktreeInfo() : undefined),
-  mergeWorktree: mergeCopy,
-  discardWorktree: discardCopy,
-  setIsolate: (on) => {
-    isolate.value = on;
-  },
-};
+  rewindTo,
+  lens,
+  side,
+});
 onBeforeUnmount(registerChat(controller));
 // A file chip opens its file in the editor; an image chip opens the picture in the chat viewer.
 const { open: openChip, image: chipPreview } = useChipActions(props.projectId, api, (message) => {

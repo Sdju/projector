@@ -34,7 +34,7 @@ export { AgentMemorySettings } from "./modules/settings/index.ts";
 export { AgentJudgeSettings } from "./modules/settings/index.ts";
 export { registerAgentCommands } from "./model/agent-commands.ts";
 export { attachChipsToChat, attachRangeToChat, attachTextToChat } from "./model/attach.ts";
-export type { AttachChatOptions, AttachTextOptions } from "./model/attach.ts";
+export type { AttachChatOptions, AttachTextOptions, AttachedChat } from "./model/attach.ts";
 export { useAgentActivity } from "./modules/jobs/index.ts";
 export type { AgentActivityItem } from "./modules/jobs/index.ts";
 export { formatElapsed, useElapsedClock } from "../agent-core/index.ts";

@@ -1,7 +1,10 @@
 import { fetchRecentChats } from "../../agent-core/index.ts";
 import { chatTabCommand } from "../../agent-core/index.ts";
-import { chatsOf, waitForChat, type ChatController } from "../../agent-core/index.ts";
-import type { FileRange, MessageChip } from "../../agent-core/index.ts";
+import { chatsOf, waitForChat } from "../../agent-core/index.ts";
+import type { ChatComposer, ChatRef, FileRange, MessageChip } from "../../agent-core/index.ts";
+
+/** The chat that took the chips: its key and the draft the chips went to. */
+export type AttachedChat = ChatRef & ChatComposer;
 
 export interface AttachChatOptions {
   /** A chat from `ide.agent.chats.list`; without it, the chat in use gets the chips. */
@@ -31,7 +34,7 @@ export function attachChipsToChat(
   projectId: string,
   chips: MessageChip[],
   options: AttachChatOptions,
-): Promise<ChatController> {
+): Promise<AttachedChat> {
   return withChat(projectId, options, (chat) => chat.attach(chips));
 }
 
@@ -48,7 +51,7 @@ export async function attachTextToChat(
   projectId: string,
   text: string,
   options: AttachTextOptions,
-): Promise<ChatController> {
+): Promise<AttachedChat> {
   const body = text.trim();
   if (!body) throw new Error("Выделите текст");
   const source = options.source?.trim();
@@ -61,8 +64,8 @@ export async function attachTextToChat(
 async function withChat(
   projectId: string,
   options: AttachChatOptions,
-  apply: (chat: ChatController) => Promise<void>,
-): Promise<ChatController> {
+  apply: (chat: AttachedChat) => Promise<void>,
+): Promise<AttachedChat> {
   const open = chatsOf(projectId);
   if (options.chat) {
     const named = open.find((chat) => chat.key === options.chat);

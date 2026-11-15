@@ -1,8 +1,10 @@
 import { commandArgs } from "../../../common/utilities/commands.ts";
 import { chatsOf, resolveChat } from "../../agent-core/index.ts";
-import type { RegisterCommand } from "../../agent-core/index.ts";
+import type { ChatLens, ChatRef, RegisterCommand } from "../../agent-core/index.ts";
 
 const CHAT = "Ключ чата из ide.agent.chats.list; без него — чат, с которым работали последним";
+/** Lens of a chat: the only thing this group of commands needs from it. */
+type LensChat = ChatRef & ChatLens;
 
 /**
  * Lens: a short caption of what the agent is doing now, shown in the work block. It reads the
@@ -10,7 +12,7 @@ const CHAT = "Ключ чата из ide.agent.chats.list; без него — �
  */
 export function registerLensCommands(register: RegisterCommand, projectId: string): void {
   const hasTurns = () => chatsOf(projectId).some((chat) => chat.turns().length > 0);
-  const find = (args: unknown) => resolveChat(projectId, commandArgs(args).chat);
+  const find = (args: unknown): LensChat => resolveChat(projectId, commandArgs(args).chat);
 
   register(
     "ide.agent.lens.show",

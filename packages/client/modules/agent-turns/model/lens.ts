@@ -6,6 +6,7 @@ import type {
   AgentHistoryTurn,
   AgentSelection,
   AgentTurn,
+  ChatLens,
   QueuedMessage,
 } from "../../agent-core/index.ts";
 
@@ -339,8 +340,8 @@ export function useAgentLens(options: AgentLensOptions) {
 
 export type AgentLens = ReturnType<typeof useAgentLens>;
 
-/** The chat's Lens as the workspace commands see it (see `ChatController`). */
-export function lensActions(lens: AgentLens) {
+/** The chat's Lens as the workspace commands see it. */
+export function lensActions(lens: AgentLens): ChatLens {
   return {
     lensOpen: () => lens.state.open,
     openLens: () => lens.open(),

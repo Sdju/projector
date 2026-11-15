@@ -1,7 +1,7 @@
 import { commandArgs } from "../../../common/utilities/commands.ts";
 import { text, turnArg } from "../../agent-core/index.ts";
 import { registerBranchCommands } from "./branch-commands.ts";
-import { chatsOf, resolveChat, type ChatController } from "../../agent-core/index.ts";
+import { chatsOf, resolveChat, type ChatRef } from "../../agent-core/index.ts";
 import { registerJobCommands } from "./job-commands.ts";
 import { registerRoleCommands } from "./role-commands.ts";
 import { registerPresetCommands } from "../../agent-presets/index.ts";
@@ -37,9 +37,9 @@ export function registerAgentCommands(register: RegisterCommand, projectId: stri
   const anyChat = () => chatsOf(projectId).length > 0;
   const external = () => chatsOf(projectId).some((chat) => !isBuiltinAgent(chat.backend));
   const idle = () => chatsOf(projectId).some((chat) => !chat.busy());
-  const find = (args: unknown, accept?: (chat: ChatController) => boolean) =>
+  const find = (args: unknown, accept?: (chat: ChatRef) => boolean) =>
     resolveChat(projectId, commandArgs(args).chat, accept);
-  const notProjector = (chat: ChatController) => !isBuiltinAgent(chat.backend);
+  const notProjector = (chat: ChatRef) => !isBuiltinAgent(chat.backend);
 
   register(
     "ide.agent.chats.list",
