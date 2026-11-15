@@ -1,9 +1,18 @@
 import { randomBytes } from "node:crypto";
-import { mkdir, readFile, readdir, rm } from "node:fs/promises";
+import { mkdir, readdir, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { dataDir } from "@ai-projector/core/modules/app-paths/index.ts";
 import { writeFileAtomic } from "../atomic-files/index.ts";
 import { jobsChanged } from "./change-events.ts";
+import { isAgentHistoryTurn } from "./run-record.ts";
+import {
+  isCount,
+  isRecord,
+  isText,
+  optionalField,
+  readStateFile,
+  type ParsedState,
+} from "./state-file.ts";
 import type { AgentBackendId, AgentPermissionMode } from "./backend.ts";
 import type { AgentSelection } from "./controls.ts";
 import type { JudgeVerdict } from "@ai-projector/core/modules/agent-judge/index.ts";
@@ -106,6 +115,64 @@ export function jobDirectory(id: string): string {
 
 export const newJobId = () => randomBytes(6).toString("hex");
 
+const JOB_STATUSES: readonly AgentJobStatus[] = [
+  "queued",
+  "running",
+  "needs-user",
+  "done",
+  "error",
+  "stopped",
+];
+const isJobStatus = (value: unknown): value is AgentJobStatus =>
+  JOB_STATUSES.includes(value as AgentJobStatus);
+const isTextList = (value: unknown): boolean => Array.isArray(value) && value.every(isText);
+
+/**
+ * Проверяет запись `job.json`. Файл описывает одно задание, поэтому негодная запись означает
+ * испорченный файл целиком: применить её частично нельзя. Обязательны поля, без которых задание
+ * не показать и не продолжить после перезапуска; необязательные проверяются, только если есть.
+ * `messageId` в их числе: записи, сделанные до его появления, должны читаться.
+ */
+function parseJob(id: string, value: unknown): ParsedState<AgentJob> | undefined {
+  if (!isRecord(value) || value.id !== id) return;
+  if (!isText(value.backend) || !value.backend) return;
+  if (!isText(value.task) || !isText(value.projectId) || !isText(value.cwd)) return;
+  if (typeof value.unattended !== "boolean") return;
+  if (!isJobStatus(value.status)) return;
+  if (!isCount(value.rev) || !isCount(value.createdAt) || !isText(value.result)) return;
+  if (!isTextList(value.files) || !Array.isArray(value.pending)) return;
+  if (
+    !optionalField(
+      value,
+      "history",
+      (item) => Array.isArray(item) && item.every(isAgentHistoryTurn),
+    )
+  )
+    return;
+  for (const key of ["worktree", "role", "selection"] as const)
+    if (!optionalField(value, key, isRecord)) return;
+  for (const key of ["messageId", "error", "runId", "sessionId", "base", "origin"] as const)
+    if (!optionalField(value, key, isText)) return;
+  if (!optionalField(value, "dirty", isTextList)) return;
+  for (const key of ["startedAt", "endedAt"] as const)
+    if (!optionalField(value, key, isCount)) return;
+  if (!optionalField(value, "worktreeCleared", (item) => typeof item === "boolean")) return;
+  return { value: value as unknown as AgentJob };
+}
+
+/**
+ * Журнал — история показа хода: негодную запись можно безопасно выбросить, не теряя остальные,
+ * поэтому неверный элемент не делает файл повреждённым.
+ */
+function parseJournal(value: unknown): ParsedState<JournalEntry[]> | undefined {
+  if (!Array.isArray(value)) return;
+  const entries = value.filter(isJournalEntry);
+  return { value: entries, dropped: value.length - entries.length };
+}
+
+const isJournalEntry = (value: unknown): value is JournalEntry =>
+  isRecord(value) && isCount(value.at) && isText(value.event) && "data" in value;
+
 function writeAtomic(file: string, data: unknown): Promise<void> {
   return writeFileAtomic(file, JSON.stringify(data));
 }
@@ -124,19 +191,22 @@ export async function saveJournal(id: string, journal: JournalEntry[]): Promise<
 }
 
 export async function loadJob(id: string): Promise<AgentJob | null> {
-  try {
-    return JSON.parse(await readFile(join(jobDirectory(id), "job.json"), "utf8"));
-  } catch {
-    return null;
-  }
+  // Идентификатор приходит от клиента: негодный — это отсутствующее задание, а не ошибка.
+  if (!JOB_ID.test(id)) return null;
+  const read = await readStateFile(join(jobDirectory(id), "job.json"), "Файл задания", (value) =>
+    parseJob(id, value),
+  );
+  return read.status === "ok" ? read.value : null;
 }
 
 export async function loadJournal(id: string): Promise<JournalEntry[]> {
-  try {
-    return JSON.parse(await readFile(join(jobDirectory(id), "journal.json"), "utf8"));
-  } catch {
-    return [];
-  }
+  if (!JOB_ID.test(id)) return [];
+  const read = await readStateFile(
+    join(jobDirectory(id), "journal.json"),
+    "Журнал задания",
+    parseJournal,
+  );
+  return read.status === "ok" ? read.value : [];
 }
 
 export async function jobIds(): Promise<string[]> {

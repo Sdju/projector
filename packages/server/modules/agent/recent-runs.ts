@@ -1,7 +1,15 @@
-import { mkdir, readFile } from "node:fs/promises";
+import { mkdir } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { dataDir } from "@ai-projector/core/modules/app-paths/index.ts";
 import { writeFileAtomic, withFileLock } from "../atomic-files/index.ts";
+import {
+  isCount,
+  isRecord,
+  isText,
+  optionalField,
+  readStateFile,
+  type ParsedState,
+} from "./state-file.ts";
 import type { AgentBackendId } from "./backend.ts";
 import { runsChanged } from "./change-events.ts";
 
@@ -35,24 +43,29 @@ const recentRunsPath = () => join(dataDir(), "agent", "recent-runs.json");
 async function loadFromDisk(path: string): Promise<RecentRun[]> {
   const cached = stores.get(path);
   if (cached) return cached;
-  let list: RecentRun[] = [];
-  try {
-    const parsed = JSON.parse(await readFile(path, "utf8")) as unknown;
-    if (Array.isArray(parsed)) {
-      list = parsed.filter(
-        (item): item is RecentRun =>
-          !!item &&
-          typeof item === "object" &&
-          typeof (item as RecentRun).id === "string" &&
-          typeof (item as RecentRun).backend === "string" &&
-          typeof (item as RecentRun).endedAt === "number",
-      );
-    }
-  } catch {
-    // Missing or unreadable file starts fresh.
-  }
+  const read = await readStateFile(path, "Список недавних запусков", parseRecentRuns);
+  const list = read.status === "ok" ? read.value : [];
   stores.set(path, list);
   return list;
+}
+
+/** Негодную запись в списке недавних запусков безопасно выбросить: список только для панели. */
+function parseRecentRuns(value: unknown): ParsedState<RecentRun[]> | undefined {
+  if (!Array.isArray(value)) return;
+  const runs = value.filter(isRecentRun);
+  return { value: runs, dropped: value.length - runs.length };
+}
+
+const RECENT_STATUSES = new Set(["done", "error", "stopped"]);
+function isRecentRun(value: unknown): value is RecentRun {
+  if (!isRecord(value)) return false;
+  if (!isText(value.id) || !isText(value.backend)) return false;
+  if (!isText(value.projectId) || !isText(value.chat) || !isText(value.topic)) return false;
+  if (!RECENT_STATUSES.has(value.status as string)) return false;
+  if (!isCount(value.startedAt) || !isCount(value.endedAt)) return false;
+  for (const key of ["error", "resultPreview", "session"])
+    if (!optionalField(value, key, isText)) return false;
+  return optionalField(value, "awaitingReply", (item) => typeof item === "boolean");
 }
 
 async function saveToDisk(path: string, list: RecentRun[]): Promise<void> {
