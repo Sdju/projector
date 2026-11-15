@@ -7,6 +7,9 @@
 10.11.2026. `0.11.0` выпущен вручную, `0.11.1` — через OIDC с SLSA provenance: этим trusted
 publisher подтверждён. `0.12.0` выпущен 12.11.2026 из GitHub Release тем же OIDC: все три
 пакета с provenance, повторный запуск workflow пропускает уже опубликованные версии.
+`0.13.0` выпущен 15.11.2026 так же из GitHub Release: все три пакета с provenance, Hub на
+`projector.zede.su` пересобран из опубликованного tarball'а (совпадает с registry по
+`dist.integrity`) и отвечает `GET /api/hub/health`, коннектор локального Projector — `online`.
 
 ## Открыто
 
@@ -21,6 +24,8 @@ publisher подтверждён. `0.12.0` выпущен 12.11.2026 из GitHub
 
 - [ ] Чистая машина без Node, GTK и build tools: установка, запуск, обновление.
 - [ ] `vp run build:distribution` и `vp run check` остаются зелёными.
+- [ ] Windows-прогон `agent-project-roles-api.test.mjs` иногда отвечает `400` на правку роли:
+      тело ответа теперь попадает в ошибку теста, причина ещё не найдена.
 
 Когда проверки закрыты, удалите этот файл и пункт из `docs/in-process/README.md`; ограничения,
 которые останутся навсегда, живут в [distribution](../distribution.md#известные-ограничения-установки).
