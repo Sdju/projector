@@ -1,8 +1,7 @@
-import { mkdir, readFile, writeFile, rename } from "node:fs/promises";
-import { os } from "@ai-projector/core/modules/os/index.ts";
+import { readFile } from "node:fs/promises";
 import { join } from "node:path";
-import { randomUUID } from "node:crypto";
 import { dataDir } from "@ai-projector/core/modules/app-paths/index.ts";
+import { writeFileAtomic, withFileLock } from "../atomic-files/index.ts";
 import { vault as systemVault } from "../secrets/index.ts";
 import { HttpError } from "../http/index.ts";
 
@@ -29,7 +28,6 @@ export const useIntegrationVault = (next: typeof systemVault) => {
 const account = (id: string) => `integration:${id}`;
 const empty = (): StoredIntegration => ({ enabled: false, settings: {}, credentials: {} });
 export const integrationsPath = () => join(dataDir(), "integrations.json");
-let queue = Promise.resolve();
 
 async function readFileRaw(): Promise<IntegrationFile> {
   try {
@@ -43,11 +41,9 @@ async function readFileRaw(): Promise<IntegrationFile> {
   }
 }
 async function writeFileRaw(file: IntegrationFile) {
-  await mkdir(dataDir(), { recursive: true });
-  const tmp = `${integrationsPath()}.${randomUUID()}.tmp`;
-  await writeFile(tmp, JSON.stringify(file, null, 2) + "\n", { mode: 0o600 });
-  await rename(tmp, integrationsPath());
-  await os.tools.restrictToOwner(integrationsPath());
+  await writeFileAtomic(integrationsPath(), JSON.stringify(file, null, 2) + "\n", {
+    ownerOnly: true,
+  });
 }
 /** Strict: a locked, denied or broken keyring throws instead of looking like "no credentials". */
 async function openCredentials(id: string, stored: StoredIntegration) {
@@ -96,7 +92,7 @@ export async function updateIntegration(
   id: string,
   update: (config: IntegrationConfig) => IntegrationConfig,
 ): Promise<void> {
-  const operation = queue.then(async () => {
+  await withFileLock(integrationsPath(), async () => {
     const file = await readFileRaw();
     const stored = file.integrations[id] ?? empty();
     const credentials = await openCredentials(id, stored);
@@ -113,8 +109,6 @@ export async function updateIntegration(
     file.integrations[id] = { ...rest, ...persisted };
     await writeFileRaw(file);
   });
-  queue = operation.catch(() => {});
-  await operation;
 }
 
 /**
@@ -122,7 +116,7 @@ export async function updateIntegration(
  * The file is rewritten only after the stored value reads back identically.
  */
 export async function migrateIntegrationSecrets(): Promise<string[]> {
-  const operation = queue.then(async () => {
+  return withFileLock(integrationsPath(), async () => {
     if ((await vault.storage()).backend !== "keyring") return [];
     const file = await readFileRaw();
     const moved: string[] = [];
@@ -138,11 +132,6 @@ export async function migrateIntegrationSecrets(): Promise<string[]> {
     if (moved.length) await writeFileRaw(file);
     return moved;
   });
-  queue = operation.then(
-    () => {},
-    () => {},
-  );
-  return operation;
 }
 
 /**

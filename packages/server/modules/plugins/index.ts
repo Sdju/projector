@@ -13,6 +13,7 @@ import { syncPluginTrustNotices, type RevokedPlugin } from "../trust-notices/ind
 import { deleteState, readState, updateState } from "./state.ts";
 import { hashPackage, isTrusted } from "./trust.ts";
 import type { PluginApply, PluginCatalog, PluginCodeDiagnostic, PluginInfo } from "./types.ts";
+import { installedProjectorVersion } from "./version.ts";
 
 export { readPluginIcon } from "./icon.ts";
 export { watchPluginDirectory } from "./watch.ts";
@@ -32,7 +33,6 @@ interface Candidate {
   source: "managed" | "direct";
 }
 
-const currentProjectorVersion = "0.12.0";
 let applyPluginRegistry: PluginApply = () => [];
 
 /** The composition owns the agent and balance registries; discovery only asks it to reconcile. */
@@ -104,7 +104,7 @@ export async function discoverPlugins(): Promise<PluginCatalog> {
       const manifest = validatePluginManifest(
         await readJson(join(candidate.path, "package.json")),
         {
-          projectorVersion: currentProjectorVersion,
+          projectorVersion: installedProjectorVersion(),
         },
       );
       const versions = grouped.get(manifest.name) ?? [];
@@ -165,7 +165,7 @@ export async function discoverPlugins(): Promise<PluginCatalog> {
       continue;
     }
     try {
-      const loaded = await loadPluginPackage(selected[0].candidate, currentProjectorVersion);
+      const loaded = await loadPluginPackage(selected[0].candidate, installedProjectorVersion());
       const enabled = saved?.enabled ?? false;
       const agents = loaded.agents;
       const balances = loaded.balances;
@@ -327,7 +327,7 @@ export async function trustPlugin(id: string): Promise<PluginCatalog> {
   if (!plugin.requiresTrust) throw new Error("Плагин не содержит исполняемого кода");
   if (plugin.server) {
     const manifest = validatePluginManifest(await readJson(join(plugin.path, "package.json")), {
-      projectorVersion: currentProjectorVersion,
+      projectorVersion: installedProjectorVersion(),
     });
     await ensurePluginDependencies(plugin.path, manifest);
   }
@@ -362,11 +362,11 @@ export async function installPlugin(sourcePath: unknown): Promise<PluginCatalog>
   const source = await realpath(resolve(sourcePath));
   if (!(await lstat(source)).isDirectory()) throw new Error("Плагин должен быть папкой");
   const manifest = validatePluginManifest(await readJson(join(source, "package.json")), {
-    projectorVersion: currentProjectorVersion,
+    projectorVersion: installedProjectorVersion(),
   });
   const loaded = await loadPluginPackage(
     { path: source, source: "direct" },
-    currentProjectorVersion,
+    installedProjectorVersion(),
   );
   if (loaded.diagnostics.length) throw new Error(loaded.diagnostics[0].message);
   const destination = destinationFor(manifest, packagesDirectory());

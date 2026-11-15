@@ -11,23 +11,10 @@ import { countRu } from "../../../../../common/utilities/plural.ts";
 import { sizeLabel } from "../../../../../common/utilities/release-format.ts";
 import { readoutLines, useTabReadout } from "../../../../../common/utilities/tab-readout.ts";
 import { useCommandRegistrar, useCommandScope } from "../../../../../common/utilities/commands.ts";
-import { workspaceRequest } from "../../../../workspace-api/index.ts";
-
-interface EntryInfo {
-  path: string;
-  name: string;
-  directory: boolean;
-  size: number;
-  files: number;
-  directories: number;
-  links: number;
-  skipped: number;
-  modified: string | null;
-  truncated: boolean;
-}
+import { workspaceRequest, type WorkspaceEntryInfo } from "../../../../workspace-api/index.ts";
 
 const props = defineProps<{ projectId: string; path: string; directory?: boolean }>();
-const info = ref<EntryInfo>();
+const info = ref<WorkspaceEntryInfo>();
 const loading = ref(false);
 const error = ref("");
 let generation = 0;
@@ -69,7 +56,7 @@ async function load() {
   error.value = "";
   info.value = undefined;
   try {
-    const data = await workspaceRequest<EntryInfo>(props.projectId, "info", {
+    const data = await workspaceRequest(props.projectId, "info", {
       path: props.path,
     });
     if (current === generation) info.value = data;

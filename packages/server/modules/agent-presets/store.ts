@@ -1,6 +1,6 @@
 import { randomBytes } from "node:crypto";
-import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
-import { dirname, join } from "node:path";
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
 import { dataDir } from "@ai-projector/core/modules/app-paths/index.ts";
 import {
   isAgentPresetId,
@@ -8,6 +8,7 @@ import {
   type AgentPreset,
   type AgentPresetSettings,
 } from "@ai-projector/core/modules/agent-preset/index.ts";
+import { writeFileAtomic, withFileLock } from "../atomic-files/index.ts";
 
 /** Where the user's own presets live: `$XDG_DATA_HOME/projector/agent/presets.json`. */
 export const presetsFile = () => join(dataDir(), "agent", "presets.json");
@@ -42,18 +43,9 @@ async function readState(): Promise<Stored> {
   }
 }
 
-/** One write at a time: two settings requests must not lose each other's change. */
-let queue: Promise<unknown> = Promise.resolve();
-
+/** Пишется целиком и с закрытыми для остальных правами: очередь держит `withFileLock`. */
 async function writeState(state: Stored): Promise<void> {
-  const path = presetsFile();
-  await mkdir(dirname(path), { recursive: true });
-  const temporary = `${path}.${process.pid}.${randomBytes(4).toString("hex")}.tmp`;
-  await writeFile(temporary, `${JSON.stringify(state, null, 2)}\n`, {
-    encoding: "utf8",
-    mode: 0o600,
-  });
-  await rename(temporary, path);
+  await writeFileAtomic(presetsFile(), `${JSON.stringify(state, null, 2)}\n`);
 }
 
 function newPresetId(existing: readonly AgentPreset[]): string {
@@ -70,21 +62,19 @@ export async function presetSettings(): Promise<AgentPresetSettings> {
 export async function createPreset(value: unknown): Promise<AgentPresetSettings> {
   const preset = normalizeAgentPreset(value);
   if (!preset) throw new Error("Некорректный пресет: укажите название и текст или форму");
-  const task = queue.then(async () => {
+  return withFileLock(presetsFile(), async () => {
     const state = await readState();
     state.presets = [...state.presets, { id: newPresetId(state.presets), ...preset }];
     await writeState(state);
     return presetSettings();
   });
-  queue = task.catch(() => undefined);
-  return task;
 }
 
 export async function savePreset(id: string, value: unknown): Promise<AgentPresetSettings> {
   if (!isAgentPresetId(id)) throw new Error(`Неизвестный пресет: ${String(id)}`);
   const preset = normalizeAgentPreset(value);
   if (!preset) throw new Error("Некорректный пресет: укажите название и текст или форму");
-  const task = queue.then(async () => {
+  return withFileLock(presetsFile(), async () => {
     const state = await readState();
     if (!state.presets.some((item) => item.id === id))
       throw new Error(`Неизвестный пресет: ${String(id)}`);
@@ -92,13 +82,11 @@ export async function savePreset(id: string, value: unknown): Promise<AgentPrese
     await writeState(state);
     return presetSettings();
   });
-  queue = task.catch(() => undefined);
-  return task;
 }
 
 export async function deletePreset(id: string): Promise<AgentPresetSettings> {
   if (!isAgentPresetId(id)) throw new Error(`Неизвестный пресет: ${String(id)}`);
-  const task = queue.then(async () => {
+  return withFileLock(presetsFile(), async () => {
     const state = await readState();
     if (!state.presets.some((item) => item.id === id))
       throw new Error(`Неизвестный пресет: ${String(id)}`);
@@ -106,6 +94,4 @@ export async function deletePreset(id: string): Promise<AgentPresetSettings> {
     await writeState(state);
     return presetSettings();
   });
-  queue = task.catch(() => undefined);
-  return task;
 }

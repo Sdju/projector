@@ -1,4 +1,10 @@
 import type { FileScope } from "@ai-projector/core/modules/workspace/index.ts";
+import {
+  READ_ACTION_DOMAINS,
+  type WorkspaceParams,
+  type WorkspaceReadAction,
+  type WorkspaceReadDomain,
+} from "./actions.ts";
 import type { SidebarType } from "./sidebar.ts";
 import type { TabType } from "./tabs.ts";
 
@@ -23,9 +29,12 @@ export type WorkspaceCapability =
   | "entryInfo";
 export type WorkspaceCapabilities = Record<WorkspaceCapability, boolean>;
 
-export type WorkspaceParams = Record<string, string>;
 export interface ReadProvider {
-  read(action: string, params: WorkspaceParams, signal?: AbortSignal): Promise<unknown>;
+  read(
+    action: WorkspaceReadAction,
+    params: WorkspaceParams,
+    signal?: AbortSignal,
+  ): Promise<unknown>;
 }
 export type FileWrite = "file" | "move" | "entry" | "import" | "trash";
 export interface WorkspaceWatchPatch {
@@ -134,45 +143,12 @@ export function profileCapabilities(profile: WorkspaceProfile): Readonly<Workspa
   return capabilities;
 }
 
-/** Which provider serves a read action; the table is the only place that knows the split. */
-const READ_DOMAIN: Record<
-  string,
-  "files" | "git" | "search" | "issues" | "pulls" | "discussions" | "pipelines" | "releases"
-> = {
-  tree: "files",
-  file: "files",
-  info: "files",
-  trash: "files",
-  "trash-sizes": "files",
-  external: "files",
-  root: "files",
-  git: "git",
-  branches: "git",
-  log: "git",
-  commit: "git",
-  "commit-diff": "git",
-  diff: "git",
-  gutter: "git",
-  search: "search",
-  paths: "files",
-  issues: "issues",
-  issue: "issues",
-  pulls: "pulls",
-  pull: "pulls",
-  "pull-files": "pulls",
-  "pull-diff": "pulls",
-  changes: "files",
-  "compare-file": "files",
-  discussions: "discussions",
-  discussion: "discussions",
-  pipelines: "pipelines",
-  pipeline: "pipelines",
-  job: "pipelines",
-  releases: "releases",
-  release: "releases",
-};
-export function readProviderFor(profile: WorkspaceProfile, action: string): ReadProvider {
-  const domain = READ_DOMAIN[action];
+/** Which provider serves a read action; `READ_ACTION_DOMAINS` is the only place that knows the split. */
+export function readProviderFor(
+  profile: WorkspaceProfile,
+  action: WorkspaceReadAction,
+): ReadProvider {
+  const domain: WorkspaceReadDomain | undefined = READ_ACTION_DOMAINS[action];
   if (!domain) throw new Error(`Неизвестное действие workspace: ${action}`);
   const provider = profile.providers[domain];
   if (!provider) throw new Error("Действие недоступно для этого проекта");

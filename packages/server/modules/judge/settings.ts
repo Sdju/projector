@@ -6,7 +6,7 @@ import {
   normalizeJudgeSettings,
   type JudgeSettings,
 } from "@ai-projector/core/modules/agent-judge/index.ts";
-import { writeFileAtomic } from "../providers/index.ts";
+import { writeFileAtomic } from "../atomic-files/index.ts";
 
 const file = () => join(dataDir(), "agent", "judge.json");
 

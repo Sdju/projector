@@ -232,7 +232,7 @@ export function useTreeOperations({
       if (relative)
         await navigator.clipboard.writeText(paths.map((path) => path || ".").join("\n"));
       else {
-        const data = await workspaceRequest<{ root: string }>(props.projectId, "root");
+        const data = await workspaceRequest(props.projectId, "root");
         await navigator.clipboard.writeText(
           paths.map((path) => data.root + (path ? "/" + path : "")).join("\n"),
         );

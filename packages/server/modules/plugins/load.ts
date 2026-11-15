@@ -45,7 +45,7 @@ export interface LoadedPluginPackage {
 /** Reads one installed package and every declared entry; diagnostics stay per contribution. */
 export async function loadPluginPackage(
   candidate: PluginPackageCandidate,
-  projectorVersion: string,
+  projectorVersion?: string,
 ): Promise<LoadedPluginPackage> {
   const manifest = validatePluginManifest(await readJson(join(candidate.path, "package.json")), {
     projectorVersion,

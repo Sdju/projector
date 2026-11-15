@@ -7,6 +7,7 @@ export {
   createProjectPreset,
   deleteProjectPreset,
   projectPresetState,
+  projectPresetTrustDescriptor,
   projectPresetsRelativeFile,
   projectPresetsTrustFile,
   saveProjectPreset,

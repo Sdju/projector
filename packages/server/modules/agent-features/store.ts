@@ -1,5 +1,5 @@
-import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
-import { dirname, join } from "node:path";
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
 import { dataDir } from "@ai-projector/core/modules/app-paths/index.ts";
 import {
   agentFeatureCatalog,
@@ -8,6 +8,7 @@ import {
   hasFeatureAgent,
   type AgentFeature,
 } from "./catalog.ts";
+import { writeFileAtomic, withFileLock } from "../atomic-files/index.ts";
 
 /** Where the user's choices live: `$XDG_DATA_HOME/projector/agent/features.json`. */
 export const featuresFile = () => join(dataDir(), "agent", "features.json");
@@ -49,11 +50,7 @@ async function readState(): Promise<Stored> {
 
 /** Writes through a temporary file, so a failed save never leaves half a settings file. */
 async function writeState(state: Stored): Promise<void> {
-  const path = featuresFile();
-  await mkdir(dirname(path), { recursive: true });
-  const temporary = `${path}.${process.pid}.tmp`;
-  await writeFile(temporary, `${JSON.stringify(state, null, 2)}\n`, "utf8");
-  await rename(temporary, path);
+  await writeFileAtomic(featuresFile(), `${JSON.stringify(state, null, 2)}\n`);
 }
 
 /** The agents a feature is on for: the saved choice, or the feature's defaults before the first change. */
@@ -89,9 +86,6 @@ export async function featureSettings() {
   };
 }
 
-/** One write at a time: two toggles read the same file and must not lose each other's change. */
-let queue: Promise<unknown> = Promise.resolve();
-
 /** Turns one feature on or off for one agent; returns the state the island should show. */
 export async function setFeatureAgent(
   featureId: string,
@@ -101,7 +95,7 @@ export async function setFeatureAgent(
   const feature = agentFeatureCatalog.get(featureId);
   if (!feature) throw new Error(`Неизвестная возможность: ${featureId}`);
   if (!hasFeatureAgent(agentId)) throw new Error(`Неизвестный агент: ${agentId}`);
-  const task = queue.then(async () => {
+  return withFileLock(featuresFile(), async () => {
     const state = await readState();
     const current = enabledAgents(feature, state);
     state.features[feature.id] = enabled
@@ -117,8 +111,6 @@ export async function setFeatureAgent(
     await writeState(state);
     return featureSettings();
   });
-  queue = task.catch(() => undefined);
-  return task;
 }
 
 /** The ids of the features the agent has on: the chat's choice, or the user's defaults. */

@@ -1,7 +1,7 @@
-import { randomUUID } from "node:crypto";
-import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { dataDir } from "@ai-projector/core/modules/app-paths/index.ts";
+import { writeFileAtomic, withFileLock } from "../atomic-files/index.ts";
 
 export interface StoredPluginState {
   enabled: boolean;
@@ -11,9 +11,6 @@ export interface StoredPluginState {
 }
 
 export type PluginState = Record<string, StoredPluginState>;
-
-/** Writes are serialized: discovery and an enable action may run at the same time. */
-let pending: Promise<unknown> = Promise.resolve();
 
 export function statePath(): string {
   return join(dataDir(), "plugins.json");
@@ -51,35 +48,22 @@ export async function readState(): Promise<PluginState> {
 }
 
 async function writeState(state: PluginState): Promise<void> {
-  await mkdir(dataDir(), { recursive: true });
-  const file = statePath();
-  const temporary = `${file}.${randomUUID()}.tmp`;
-  try {
-    await writeFile(temporary, `${JSON.stringify({ plugins: state }, null, 2)}\n`, {
-      mode: 0o600,
-    });
-    await rename(temporary, file);
-  } finally {
-    await rm(temporary, { force: true });
-  }
+  await writeFileAtomic(statePath(), `${JSON.stringify({ plugins: state }, null, 2)}\n`);
 }
 
+/** Writes are serialized per file: discovery and an enable action may run at the same time. */
 export async function updateState(id: string, value: StoredPluginState): Promise<void> {
-  const task = pending.then(async () => {
+  await withFileLock(statePath(), async () => {
     const state = await readState();
     state[id] = value;
     await writeState(state);
   });
-  pending = task.catch(() => undefined);
-  return task;
 }
 
 export async function deleteState(id: string): Promise<void> {
-  const task = pending.then(async () => {
+  await withFileLock(statePath(), async () => {
     const state = await readState();
     delete state[id];
     await writeState(state);
   });
-  pending = task.catch(() => undefined);
-  return task;
 }

@@ -1,8 +1,7 @@
-import { createHash, randomBytes } from "node:crypto";
-import { mkdir, readFile, realpath, rename, writeFile } from "node:fs/promises";
-import { dirname, isAbsolute, join, relative } from "node:path";
+import { randomBytes } from "node:crypto";
+import { rename, writeFile } from "node:fs/promises";
+import { join } from "node:path";
 import { dataDir } from "@ai-projector/core/modules/app-paths/index.ts";
-import { os } from "@ai-projector/core/modules/os/index.ts";
 import {
   isServiceRoleId,
   normalizeAgentRole,
@@ -10,146 +9,87 @@ import {
   type AgentRole,
   type AgentRoleView,
 } from "@ai-projector/core/modules/agent-role/index.ts";
-import { loadProjects } from "../projects/index.ts";
+import {
+  createTrustStore,
+  projectTrustDescriptor,
+  projectWriteTarget,
+  readTrustedProjectFile,
+  trustStateOf,
+  writeTrustedProjectFile,
+  type ProjectTrustDescriptor,
+  type TrustedProjectFile,
+  type TrustedProjectFileSpec,
+  type TrustRecord,
+} from "../trusted-project-file/index.ts";
 
 /** Roles a project keeps in its repository; inert until the user trusts this exact file. */
 export const projectRolesRelativeFile = ".projector/roles.json";
 export const projectRolesTrustFile = () => join(dataDir(), "agent", "role-trust.json");
 
-interface TrustFile {
-  version: 1;
-  projects: Record<string, { hash: string; at: string }>;
+interface RoleTrustEntry extends TrustRecord {
+  at: string;
 }
 
-const hashOf = (text: string) => createHash("sha256").update(text).digest("hex");
+const rolesTrust = createTrustStore<RoleTrustEntry>({
+  file: projectRolesTrustFile,
+  fields: ["hash", "at"],
+});
 
-async function projectRoot(projectId: string): Promise<string> {
-  const project = (await loadProjects()).find((item) => item.id === projectId);
-  if (!project) throw new Error("Проект не найден");
-  return realpath(project.path);
-}
+const rolesFile = (projectId: string): TrustedProjectFileSpec<AgentRole[], RoleTrustEntry> => ({
+  projectId,
+  relativeFile: projectRolesRelativeFile,
+  trust: rolesTrust,
+  parse: rolesOf,
+  fallback: [],
+  escape: "Файл ролей проекта указывает за его пределы",
+  unreadable: "Не удалось прочитать роли проекта",
+});
 
-function readTrustFile(text: string): TrustFile {
-  try {
-    const value = JSON.parse(text) as { projects?: unknown };
-    const projects: TrustFile["projects"] = {};
-    if (value?.projects && typeof value.projects === "object" && !Array.isArray(value.projects))
-      for (const [path, item] of Object.entries(value.projects as Record<string, unknown>)) {
-        const row = item as { hash?: unknown; at?: unknown };
-        if (typeof row?.hash === "string" && typeof row.at === "string")
-          projects[path] = { hash: row.hash, at: row.at };
-      }
-    return { version: 1, projects };
-  } catch {
-    return { version: 1, projects: {} };
-  }
-}
-
-async function readTrust(): Promise<TrustFile> {
-  try {
-    return readTrustFile(await readFile(projectRolesTrustFile(), "utf8"));
-  } catch {
-    return { version: 1, projects: {} };
-  }
-}
-
-let queue: Promise<unknown> = Promise.resolve();
-
-async function writeTrust(file: TrustFile): Promise<void> {
-  const path = projectRolesTrustFile();
-  await mkdir(dirname(path), { recursive: true });
-  const temporary = `${path}.${randomBytes(4).toString("hex")}.tmp`;
-  await writeFile(temporary, `${JSON.stringify(file, null, 2)}\n`, {
-    encoding: "utf8",
-    mode: 0o600,
-  });
-  await rename(temporary, path);
-  await os.tools.restrictToOwner(path);
-}
-
-/** Rejects a `.projector` folder or roles file that escapes the project through a symlink. */
-async function safeProjectFile(root: string, file: string): Promise<string> {
-  const real = await realpath(file);
-  const rel = relative(root, real);
-  if (rel.startsWith("..") || isAbsolute(rel))
-    throw new Error("Файл ролей проекта указывает за его пределы");
-  return real;
+/** Состояние ролей проекта: файл, его хеш и решение пользователя. */
+function roleState(projectId: string, file: TrustedProjectFile<AgentRole[]>) {
+  const state: AgentProjectRoleState = {
+    projectId,
+    path: file.root,
+    file: file.file,
+    exists: file.exists,
+    trusted: file.trusted,
+    roles: file.value.map((role) => ({ ...role, inherited: false })),
+  };
+  if (file.hash) state.hash = file.hash;
+  if (file.problem) state.problem = file.problem;
+  return state;
 }
 
 function rolesOf(text: string): AgentRole[] {
-  const value = JSON.parse(text) as { roles?: unknown };
-  if (!Array.isArray(value?.roles)) throw new Error("В файле ролей проекта нет roles");
-  const roles: AgentRole[] = [];
-  for (const item of value.roles) {
+  let value: unknown;
+  try {
+    value = JSON.parse(text);
+  } catch {
+    throw new Error("Файл ролей проекта повреждён");
+  }
+  const roles = (value as { roles?: unknown })?.roles;
+  if (!Array.isArray(roles)) throw new Error("В файле ролей проекта нет roles");
+  const result: AgentRole[] = [];
+  for (const item of roles) {
     const role = normalizeAgentRole(item);
     if (!role || role.kind !== "chat" || isServiceRoleId(role.id)) continue;
-    if (roles.some((known) => known.id === role.id)) continue;
-    roles.push(role);
+    if (result.some((known) => known.id === role.id)) continue;
+    result.push(role);
   }
-  return roles;
+  return result;
 }
 
 /** The project's role file and its trust decision; a broken or unsafe file is reported, not used. */
 export async function projectRoleState(projectId: string): Promise<AgentProjectRoleState> {
-  const root = await projectRoot(projectId);
-  const file = join(root, projectRolesRelativeFile);
-  const trust = await readTrust();
-  try {
-    const raw = await readFile(file, "utf8");
-    const real = await safeProjectFile(root, file);
-    const hash = hashOf(raw);
-    let roles: AgentRole[];
-    try {
-      roles = rolesOf(raw);
-    } catch (error) {
-      return {
-        projectId,
-        path: root,
-        file: real,
-        exists: true,
-        trusted: false,
-        hash,
-        roles: [],
-        problem:
-          error instanceof Error && error.message.startsWith("В файле")
-            ? error.message
-            : "Файл ролей проекта повреждён",
-      };
-    }
-    return {
-      projectId,
-      path: root,
-      file: real,
-      exists: true,
-      trusted: trust.projects[root]?.hash === hash,
-      hash,
-      roles: roles.map((role) => ({ ...role, inherited: false })),
-    };
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === "ENOENT")
-      return {
-        projectId,
-        path: root,
-        file,
-        exists: false,
-        trusted: false,
-        roles: [],
-      };
-    return {
-      projectId,
-      path: root,
-      file,
-      exists: false,
-      trusted: false,
-      roles: [],
-      problem: error instanceof Error ? error.message : "Не удалось прочитать роли проекта",
-    };
-  }
+  return roleState(projectId, await readTrustedProjectFile(rolesFile(projectId)));
 }
 
-function projectRolesFile(root: string): string {
-  return join(root, projectRolesRelativeFile);
-}
+/** Вид доверия к ролям проекта для реестра `project-trust`. */
+export const projectRoleTrustDescriptor: ProjectTrustDescriptor = projectTrustDescriptor(
+  "roles",
+  rolesTrust,
+  async (projectId) => trustStateOf(await readTrustedProjectFile(rolesFile(projectId))),
+);
 
 function newRoleId(existing: readonly AgentRole[]): string {
   for (;;) {
@@ -159,14 +99,11 @@ function newRoleId(existing: readonly AgentRole[]): string {
 }
 
 async function writeRoles(root: string, roles: AgentRole[]): Promise<void> {
-  const file = projectRolesFile(root);
-  const directory = dirname(file);
-  await mkdir(directory, { recursive: true });
-  // `.projector` itself may be a symlink out of the project.
-  const realDirectory = await realpath(directory);
-  const rel = relative(root, realDirectory);
-  if (rel.startsWith("..") || isAbsolute(rel))
-    throw new Error("Папка .projector указывает за пределы проекта");
+  const file = await projectWriteTarget(
+    root,
+    projectRolesRelativeFile,
+    "Папка .projector указывает за пределы проекта",
+  );
   const temporary = `${file}.${randomBytes(4).toString("hex")}.tmp`;
   await writeFile(temporary, `${JSON.stringify({ version: 1, roles }, null, 2)}\n`, {
     encoding: "utf8",
@@ -179,15 +116,16 @@ async function modify(
   projectId: string,
   action: (roles: AgentRole[]) => AgentRole[],
 ): Promise<AgentProjectRoleState> {
-  const task = queue.then(async () => {
-    const state = await projectRoleState(projectId);
-    if (state.problem) throw new Error(state.problem);
-    const roles = state.roles.map(({ inherited: _inherited, ...role }) => role);
-    await writeRoles(state.path, action(roles));
-    return projectRoleState(projectId);
+  const file = await writeTrustedProjectFile({
+    ...rolesFile(projectId),
+    change: action,
+    write: writeRoles,
+    // Роли проекта после любой правки требуют нового подтверждения: даже совпавшие байты не
+    // должны продлевать доверие незаметно для пользователя.
+    afterWrite: "reset",
+    record: (hash) => ({ hash, at: new Date().toISOString() }),
   });
-  queue = task.catch(() => undefined);
-  return task;
+  return roleState(projectId, file);
 }
 
 /** Creates a project role; the new file is untrusted until the user approves its hash. */
@@ -240,16 +178,12 @@ export async function setProjectRoleTrust(
   const state = await projectRoleState(projectId);
   if (trusted && !state.exists) throw new Error("В проекте нет файла ролей");
   if (trusted && (!state.hash || state.problem))
-    throw new Error("Файл ролей проекта нельзя доверять");
-  const task = queue.then(async () => {
-    const file = await readTrust();
-    if (trusted) file.projects[state.path] = { hash: state.hash!, at: new Date().toISOString() };
-    else delete file.projects[state.path];
-    await writeTrust(file);
-    return projectRoleState(projectId);
-  });
-  queue = task.catch(() => undefined);
-  return task;
+    throw new Error("Файлу ролей проекта нельзя доверять");
+  await rolesTrust.set(
+    state.path,
+    trusted ? { hash: state.hash!, at: new Date().toISOString() } : null,
+  );
+  return projectRoleState(projectId);
 }
 
 /** The role of a trusted project file; untrusted roles never reach chats, jobs or tasks. */

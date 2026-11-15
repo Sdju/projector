@@ -1,9 +1,9 @@
 import { spawn } from "node:child_process";
-import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
-import { dirname } from "node:path";
+import { readFile, rm } from "node:fs/promises";
 import { join } from "node:path";
 import type { ToolSet } from "ai";
 import { dataDir } from "@ai-projector/core/modules/app-paths/index.ts";
+import { writeFileAtomic } from "../../atomic-files/index.ts";
 import { guardProjectHooks, type GuardOptions } from "./projector-guard.ts";
 
 /** When a hook runs: before a tool (it may forbid the call), after it, and when the turn is over. */
@@ -134,10 +134,7 @@ export async function writeUserHooks(text: string): Promise<void> {
         }
     }
   }
-  await mkdir(dirname(path), { recursive: true });
-  const temporary = `${path}.${process.pid}.tmp`;
-  await writeFile(temporary, text.trim() + "\n", { mode: 0o600 });
-  await rename(temporary, path);
+  await writeFileAtomic(path, text.trim() + "\n");
 }
 
 interface Outcome {

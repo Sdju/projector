@@ -1,7 +1,6 @@
 import type { Ref } from "vue";
 import { workspaceRequest } from "../../workspace-api/index.ts";
 import { isLiveFile, type OpenFile } from "../open-file.ts";
-import type { FileContent } from "@ai-projector/core/modules/workspace/index.ts";
 import type { useOpenFiles } from "./open-files.ts";
 
 export interface GitChangeSyncContext {
@@ -66,7 +65,7 @@ export function useGitChangeSync(ctx: GitChangeSyncContext) {
         (tab.original === undefined && action !== "discard"),
     );
     if (current?.path === path && action === "discard") {
-      const exists = await workspaceRequest<FileContent>(ctx.projectId(), "file", { path }).then(
+      const exists = await workspaceRequest(ctx.projectId(), "file", { path }).then(
         () => true,
         () => false,
       );

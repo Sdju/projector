@@ -19,7 +19,7 @@ const props = defineProps<{
   onOpen?: (path: string, pinned?: boolean, originalPath?: string) => void;
 }>();
 const { data, loading, error, reload } = useAsyncData<FileChangeList>({
-  load: () => workspaceScopeRequest<FileChangeList>(props.projectId, props.scope, "changes"),
+  load: () => workspaceScopeRequest(props.projectId, props.scope, "changes"),
   keys: () => [props.projectId, fileScopeKey(props.scope), props.revision],
   enabled: () => props.scope.kind === "compare",
   disabledError: "Раздел ждёт сравнение двух снимков",
