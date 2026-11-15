@@ -34,7 +34,7 @@ async function load() {
   const current = ++generation;
   error.value = "";
   try {
-    const data = await workspaceRequest<GitCommitDetail>(props.projectId, "commit", {
+    const data = await workspaceRequest(props.projectId, "commit", {
       hash: props.scope.rev,
     });
     if (current === generation) detail.value = data;

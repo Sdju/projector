@@ -316,7 +316,7 @@ const zenMode = useChatZenFocus({
 });
 // The project folder: edited files and dropped paths are shown relative to it.
 const projectRoot = ref("");
-void workspaceRequest<{ root: string }>(props.projectId, "root")
+void workspaceRequest(props.projectId, "root")
   .then((data) => {
     projectRoot.value = data.root;
   })

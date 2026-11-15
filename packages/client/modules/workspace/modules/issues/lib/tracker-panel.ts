@@ -4,7 +4,7 @@ import {
   useCommandRegistrar,
   useCommandScope,
 } from "../../../../../common/utilities/commands.ts";
-import type { usePagedList } from "./paged-list.ts";
+import type { PagedList } from "./paged-list.ts";
 
 export interface TrackerPanelOptions {
   /** Имя scope и поверхности: `issues` → `issues:<projectId>`, команды `ide.issues.*`. */
@@ -19,7 +19,7 @@ export interface TrackerPanelOptions {
   host?: string;
   projectId: () => string;
   active: () => boolean;
-  list: ReturnType<typeof usePagedList>;
+  list: PagedList<{ number: number }>;
   open: (item: { number: number; title: string }, pinned: boolean) => void;
 }
 

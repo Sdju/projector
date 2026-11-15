@@ -1,5 +1,5 @@
 import { ref, type Ref } from "vue";
-import type { Release, ReleaseList } from "@ai-projector/core/modules/workspace/index.ts";
+import type { Release } from "@ai-projector/core/modules/workspace/index.ts";
 import { workspaceRequest } from "../../../../workspace-api/index.ts";
 
 /** Release list of one repository with numbered pages, newest first. */
@@ -12,7 +12,7 @@ export function useReleases(projectId: () => string) {
   const error = ref("");
   let generation = 0;
   const page = (cursor: number) =>
-    workspaceRequest<ReleaseList>(projectId(), "releases", { page: String(cursor) });
+    workspaceRequest(projectId(), "releases", { page: String(cursor) });
   const message = (err: unknown) =>
     err instanceof Error ? err.message : "Не удалось прочитать релизы";
   async function load() {

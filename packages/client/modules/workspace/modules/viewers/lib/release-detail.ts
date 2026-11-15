@@ -20,7 +20,7 @@ export function useReleaseDetail(projectId: () => string, tag: () => string) {
       loading.value = !detail.value;
       error.value = "";
       try {
-        const data = await workspaceRequest<ReleaseDetail>(
+        const data = await workspaceRequest(
           currentProject,
           "release",
           { tag: currentTag },

@@ -2,10 +2,7 @@
 import UiHint from "../../../../../common/ui/UiHint.vue";
 import EmojiText from "../../../../../common/ui/EmojiText.vue";
 import { computed } from "vue";
-import type {
-  DiscussionComment,
-  DiscussionDetail,
-} from "@ai-projector/core/modules/workspace/index.ts";
+import type { DiscussionComment } from "@ai-projector/core/modules/workspace/index.ts";
 import { readoutLines, useTabReadout } from "../../../../../common/utilities/tab-readout.ts";
 import { useTrackerDetail } from "../lib/tracker-detail.ts";
 import TrackerComments, { type TrackerComment } from "./TrackerComments.vue";
@@ -14,7 +11,7 @@ import TrackerDetail from "./TrackerDetail.vue";
 /** Вкладка discussion: метаданные, Markdown-тело, комментарии и ответы на них. */
 const props = defineProps<{ projectId: string; number: number }>();
 const emit = defineEmits<{ open: [path: string] }>();
-const { detail, loading, error } = useTrackerDetail<DiscussionDetail>(
+const { detail, loading, error } = useTrackerDetail(
   () => props.projectId,
   () => props.number,
   "discussion",

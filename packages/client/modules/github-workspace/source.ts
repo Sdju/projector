@@ -1,11 +1,16 @@
 import { deviceUrl } from "../../common/utilities/device-url.ts";
 import type { GithubRepository, GithubEntry } from "@ai-projector/core/modules/github/index.ts";
-import type { FileContent, FileEntry } from "@ai-projector/core/modules/workspace/index.ts";
-import { treePageRange } from "@ai-projector/core/modules/workspace/index.ts";
 import {
+  connectionFilesProvider,
   createLocalWorkspaceProfile,
+  numberedReadProvider,
+  readonlyFileContent,
+  readonlyWorkspaceFeatures,
   singletonTab,
+  snapshotGitProvider,
+  snapshotTreePage,
   workspaceAside,
+  WORKSPACE_ACTION_UNAVAILABLE,
   type WorkspaceProfile,
 } from "../workspace-api/index.ts";
 import { formatProjectRef } from "../project/index.ts";
@@ -43,51 +48,12 @@ export function createGithubConnectionProfile(repository: string): WorkspaceProf
     id: "github-connection",
     layout: "editor",
     tabs: [connectionTab],
-    features: {
-      terminals: false,
-      docker: false,
-      agent: false,
-      settings: false,
-      persist: false,
-      externalFiles: false,
-    },
+    features: readonlyWorkspaceFeatures,
     providers: {
-      files: {
-        assetUrl: () => "",
-        async read(action) {
-          if (action === "root") return { root: formatProjectRef({ kind: "github", repository }) };
-          if (action === "tree") return { entries: [], truncated: false };
-          throw new Error("Подключите GitHub, чтобы открыть файлы");
-        },
-      },
-    },
-  };
-}
-
-const UNAVAILABLE = "Действие недоступно для этого источника workspace";
-
-/** Read provider for a numbered resource (issues, pull requests): a list action and a single-item one. */
-function numberedProvider(
-  listAction: string,
-  itemAction: string,
-  noun: string,
-  repository: string,
-  list: (
-    repository: string,
-    params: Record<string, string>,
-    signal?: AbortSignal,
-  ) => Promise<unknown>,
-  item: (repository: string, number: number, signal?: AbortSignal) => Promise<unknown>,
-) {
-  return {
-    read(action: string, params: Record<string, string>, signal?: AbortSignal) {
-      if (action === listAction) return list(repository, params, signal);
-      if (action === itemAction) {
-        const number = Number(params.number);
-        if (!Number.isInteger(number) || number <= 0) throw new Error(`Укажите номер ${noun}`);
-        return item(repository, number, signal);
-      }
-      throw new Error(UNAVAILABLE);
+      files: connectionFilesProvider(
+        () => formatProjectRef({ kind: "github", repository }),
+        "Подключите GitHub, чтобы открыть файлы",
+      ),
     },
   };
 }
@@ -101,9 +67,23 @@ export function createGithubEnabledLocalProfile(
   repository: string,
 ): WorkspaceProfile {
   const local = createLocalWorkspaceProfile(projectId);
-  const issues = numberedProvider("issues", "issue", "issue", repository, readIssues, readIssue);
-  const pulls = numberedProvider("pulls", "pull", "pull request", repository, readPulls, readPull);
-  const discussions = numberedProvider(
+  const issues = numberedReadProvider(
+    "issues",
+    "issue",
+    "issue",
+    repository,
+    readIssues,
+    readIssue,
+  );
+  const pulls = numberedReadProvider(
+    "pulls",
+    "pull",
+    "pull request",
+    repository,
+    readPulls,
+    readPull,
+  );
+  const discussions = numberedReadProvider(
     "discussions",
     "discussion",
     "обсуждения",
@@ -235,20 +215,11 @@ export function createGithubWorkspaceProfile(
       throw error;
     }
   }
-  const git: WorkspaceProfile["providers"]["git"] = {
-    allBranches: false,
-    async read(action, params, signal) {
-      const snapshot = metadata;
-      if (action === "git") return { available: true, branch: snapshot.branch, changes: [] };
-      if (action === "gutter") return { available: false, original: "" };
-      if (!["log", "commit", "commit-diff"].includes(action)) throw new Error(UNAVAILABLE);
-      return (api.readGit ?? readGit)(
-        action,
-        { ...params, repository, sha: snapshot.commit },
-        signal,
-      );
-    },
-  };
+  const git: WorkspaceProfile["providers"]["git"] = snapshotGitProvider({
+    repository,
+    snapshot: () => metadata,
+    readGit: api.readGit ?? readGit,
+  });
   const files: WorkspaceProfile["providers"]["files"] = {
     snapshots: true,
     compare: true,
@@ -279,23 +250,9 @@ export function createGithubWorkspaceProfile(
         const name = action === "changes" ? "compare-changes" : "compare-file";
         return (api.readGit ?? readGit)(name, { ...params, repository }, signal);
       }
-      if (action === "tree") {
-        const entries: FileEntry[] = (await directory(snapshot, path, signal)).map((entry) => ({
-          name: entry.name,
-          path: path ? `${path}/${entry.name}` : entry.name,
-          directory: entry.type === "tree",
-          executable: entry.mode === "100755",
-          disabled: entry.type === "commit",
-        }));
-        const page = treePageRange(entries, path, params);
-        return {
-          entries: entries.slice(page.offset, page.end),
-          truncated: page.nextOffset !== null,
-          total: page.total,
-          nextOffset: page.nextOffset,
-        };
-      }
-      if (action !== "file") throw new Error(UNAVAILABLE);
+      if (action === "tree")
+        return snapshotTreePage(await directory(snapshot, path, signal), path, params);
+      if (action !== "file") throw new Error(WORKSPACE_ACTION_UNAVAILABLE);
       if (
         !path ||
         path.includes("\\") ||
@@ -311,18 +268,10 @@ export function createGithubWorkspaceProfile(
       if (entry.size > 5 * 1024 * 1024)
         throw new Error("Просмотр файлов больше 5 MiB пока недоступен");
       const file = await api.readFile(repository, entry.sha, path, signal);
-      const content: FileContent & { image: boolean } = {
-        path,
-        content: file.content,
-        binary: file.binary,
-        size: file.size,
-        readonly: true,
-        image: !!file.image && !/\.svg$/i.test(path),
-      };
-      return content;
+      return readonlyFileContent(path, file);
     },
   };
-  const issues = numberedProvider(
+  const issues = numberedReadProvider(
     "issues",
     "issue",
     "issue",
@@ -330,7 +279,7 @@ export function createGithubWorkspaceProfile(
     api.readIssues ?? readIssues,
     api.readIssue ?? readIssue,
   );
-  const pulls = numberedProvider(
+  const pulls = numberedReadProvider(
     "pulls",
     "pull",
     "pull request",
@@ -338,7 +287,7 @@ export function createGithubWorkspaceProfile(
     api.readPulls ?? readPulls,
     api.readPull ?? readPull,
   );
-  const discussions = numberedProvider(
+  const discussions = numberedReadProvider(
     "discussions",
     "discussion",
     "обсуждения",
@@ -372,14 +321,7 @@ export function createGithubWorkspaceProfile(
       jobTab,
       releaseTab,
     ],
-    features: {
-      terminals: false,
-      docker: false,
-      agent: false,
-      settings: false,
-      persist: false,
-      externalFiles: false,
-    },
+    features: readonlyWorkspaceFeatures,
     providers: {
       files,
       git,

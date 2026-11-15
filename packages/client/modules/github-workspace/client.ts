@@ -16,27 +16,13 @@ import type {
   ReleaseDetail,
   ReleaseList,
 } from "@ai-projector/core/modules/workspace/index.ts";
-export class GithubRequestError extends Error {
-  readonly status: number;
-  constructor(message: string, status: number) {
-    super(message);
-    this.status = status;
-  }
-}
-export async function readGit<T>(
-  action: string,
-  params: Record<string, string>,
-  signal?: AbortSignal,
-): Promise<T> {
-  const response = await fetch(
-    `/api/integrations/github/browse/${action}?${new URLSearchParams(params)}`,
-    { signal },
-  );
-  const data = await response.json();
-  if (!response.ok)
-    throw new GithubRequestError(data.error || "Не удалось прочитать GitHub", response.status);
-  return data;
-}
+import { createBrowseReader, WorkspaceRequestError } from "../workspace-api/index.ts";
+/** GitHub сообщает об ошибке тем же типом, что и остальные интеграции. */
+export { WorkspaceRequestError as GithubRequestError };
+export const readGit = createBrowseReader(
+  "/api/integrations/github/browse",
+  "Не удалось прочитать GitHub",
+);
 export const readRepository = (repository: string, ref = "", signal?: AbortSignal) =>
   readGit<GithubRepository>("repository", { repository, ref }, signal);
 export const readTree = (repository: string, sha: string, signal?: AbortSignal) =>

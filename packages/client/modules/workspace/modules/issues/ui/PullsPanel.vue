@@ -30,7 +30,7 @@ const props = withDefaults(
     /** Хост в описаниях команд. */
     host?: string;
     /** Действие провайдера, отдающее список. */
-    action?: string;
+    action?: "pulls";
   }>(),
   {
     title: "Pull requests",
@@ -44,10 +44,9 @@ const props = withDefaults(
 const emit = defineEmits<{
   open: [pull: { number: number; title: string }, pinned?: boolean];
 }>();
-const list = usePagedList<PullRequest>(
+const list = usePagedList(
   () => props.projectId,
   props.action,
-  "pulls",
   `Не удалось прочитать ${props.noun}`,
 );
 const { commands, open } = useTrackerPanel({

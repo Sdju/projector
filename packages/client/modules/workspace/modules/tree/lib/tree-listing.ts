@@ -5,7 +5,6 @@ import { workspaceScopeRequest } from "../../../../workspace-api/index.ts";
 import {
   TREE_PAGE_SIZE,
   fileScopeKey,
-  type TreePage,
   type FileEntry,
   type FileScope,
 } from "@ai-projector/core/modules/workspace/index.ts";
@@ -60,7 +59,7 @@ export function useTreeListing(
     const count = append ? TREE_PAGE_SIZE : Math.max(TREE_PAGE_SIZE, previous.length);
     const reveal = !append ? revealChild() || previous.at(-1)?.path || "" : "";
     try {
-      const data = await workspaceScopeRequest<TreePage>(
+      const data = await workspaceScopeRequest(
         props.projectId,
         props.scope,
         "tree",

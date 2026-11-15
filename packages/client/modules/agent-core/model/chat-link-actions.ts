@@ -46,7 +46,7 @@ export function chatLinkActions(projectId: string, api: ChatApi): ChatLinkAction
   const scope = `editor:${projectId}`;
   let root: Promise<string> | undefined;
   function projectRoot() {
-    root ??= workspaceRequest<{ root: string }>(projectId, "root")
+    root ??= workspaceRequest(projectId, "root")
       .then((data) => data.root)
       .catch((error) => {
         root = undefined;

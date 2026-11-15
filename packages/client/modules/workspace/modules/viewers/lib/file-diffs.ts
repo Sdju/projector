@@ -1,5 +1,4 @@
-import { ref, watch } from "vue";
-import { workspaceRequest } from "../../../../workspace-api/index.ts";
+import { ref, watch, type Ref } from "vue";
 
 export interface FileDiffState<T> {
   loading: boolean;
@@ -7,17 +6,25 @@ export interface FileDiffState<T> {
   data?: T;
 }
 
+export interface FileDiffs<T> {
+  expanded: Ref<Set<string>>;
+  /** Code height per file: survives collapsing and expanding again. */
+  heights: Ref<Record<string, number>>;
+  diffs: Ref<Record<string, FileDiffState<T>>>;
+  toggle(path: string, value?: boolean): Promise<void>;
+  reset(): void;
+}
+
 /**
  * Expanded files of a commit or merge request: the code is read on first expansion and cached
- * until the source changes. `resetOn` drops cached sides when the source revision moves.
+ * until the source changes. `read` owns the action and its parameters; `resetOn` drops cached
+ * sides when the source revision moves.
  */
 export function useFileDiffs<T>(options: {
-  projectId: () => string;
-  action: string;
-  params: () => Record<string, string>;
+  read: (path: string) => Promise<T>;
   errorFallback: string;
   resetOn?: () => unknown;
-}) {
+}): FileDiffs<T> {
   const expanded = ref(new Set<string>());
   /** Code height per file: survives collapsing and expanding again. */
   const heights = ref<Record<string, number>>({});
@@ -29,10 +36,7 @@ export function useFileDiffs<T>(options: {
     const current = generation;
     diffs.value[path] = { loading: true, error: "" };
     try {
-      const data = await workspaceRequest<T>(options.projectId(), options.action, {
-        ...options.params(),
-        path,
-      });
+      const data = await options.read(path);
       if (current === generation) diffs.value[path] = { loading: false, error: "", data };
     } catch (err) {
       if (current === generation)

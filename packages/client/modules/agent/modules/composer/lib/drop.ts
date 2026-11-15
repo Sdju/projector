@@ -56,7 +56,7 @@ export function useComposerDrop(options: {
     const projectId = options.projectId();
     if (!projectId) return;
     try {
-      root = (await workspaceRequest<{ root: string }>(projectId, "root")).root;
+      root = (await workspaceRequest(projectId, "root")).root;
     } catch {
       root = "";
     }
