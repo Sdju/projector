@@ -245,10 +245,12 @@ async function launch(
     else if (text === "quit") handlers.onQuit();
   });
   await new Promise<void>((resolve, reject) => {
+    // The host compiles C# on first start, and a loaded machine can take seconds before the
+    // form is shown: a slow tray is not a missing one.
     const timer = setTimeout(() => {
       child.kill();
       reject(new Error("Трей не ответил"));
-    }, 8000);
+    }, 20_000);
     const onLine = (line: string) => {
       if (line.trim() !== "ready") return;
       clearTimeout(timer);

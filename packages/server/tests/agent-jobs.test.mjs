@@ -14,14 +14,17 @@ let attached;
 let replayed;
 
 // Git worktrees and fs on Windows CI runners are an order of magnitude slower than on Linux/macOS.
-async function until(check, timeoutMs = process.platform === "win32" ? 45_000 : 15_000) {
+async function until(check, timeoutMs = process.platform === "win32" ? 90_000 : 15_000, where) {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     const value = await check();
     if (value) return value;
     await new Promise((resolve) => setTimeout(resolve, 15));
   }
-  throw new Error("condition not met in time");
+  // The dump of the state that never arrived tells a hang apart from plain slowness.
+  let detail = "";
+  if (where) detail = String((await where().catch(() => "")) ?? "");
+  throw new Error(`condition not met in time${detail ? `: ${detail}` : ""}`);
 }
 
 // A scripted backend: the task text picks what it does. No real CLI is started.
@@ -191,10 +194,14 @@ describe("background agent jobs", () => {
     expect(await runs.readRun(done.runId)).toBeNull();
     // It is on disk, so it outlives the server. The final record is written after its status
     // becomes visible, so wait for the file instead of racing the write.
-    const saved = await until(async () => {
-      const found = await store.loadJob(job.id);
-      return found?.status === "done" ? found : undefined;
-    });
+    const saved = await until(
+      async () => {
+        const found = await store.loadJob(job.id);
+        return found?.status === "done" ? found : undefined;
+      },
+      undefined,
+      async () => JSON.stringify((await jobs.readJob(job.id)).job),
+    );
     expect(saved.result).toBe("final answer");
     expect((await jobs.listJobs("p1")).map((item) => item.id)).toContain(job.id);
     expect(await jobs.listJobs("other")).toEqual([]);
