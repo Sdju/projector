@@ -36,9 +36,12 @@ export async function writeFileAtomic(
   if (options.ownerOnly) await os.tools.restrictToOwner(file);
 }
 
-/** Moves a damaged file out of the way so that defaults written next never overwrite it. */
+/**
+ * Moves a damaged file out of the way so that defaults written next never overwrite it. Два
+ * повреждения подряд не должны попасть в одну копию, поэтому к времени добавлен суффикс.
+ */
 export async function setAsideBroken(file: string): Promise<string> {
-  const backup = `${file}.broken-${Date.now()}`;
+  const backup = `${file}.broken-${Date.now()}-${randomUUID().slice(0, 8)}`;
   await rename(file, backup).catch(() => {});
   return backup;
 }
