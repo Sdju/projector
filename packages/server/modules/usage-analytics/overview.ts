@@ -4,7 +4,7 @@ import type {
   UsageHeatDay,
 } from "@ai-projector/core/modules/usage-analytics/index.ts";
 import { ANALYTICS_HEATMAP_DAYS } from "@ai-projector/core/modules/usage-analytics/index.ts";
-import { readAgentUsage } from "../agent/index.ts";
+import { listAgentBackends, readAgentUsage } from "../agent/index.ts";
 import { loadProjects } from "../projects/index.ts";
 import { readLimitSeries } from "./limits.ts";
 import { readProviderSpend } from "./providers.ts";
@@ -122,7 +122,7 @@ export async function usageAnalytics(days: number, now = Date.now()): Promise<Us
     byTask: taskBreakdown(records, service.byTask),
     service: service.totals,
     serviceCalls: service.calls,
-    limits: readLimitSeries(since, now),
+    limits: readLimitSeries(since, now, listAgentBackends()),
     providers: readProviderSpend(since),
     sources: readUsageSources().map((source) => {
       const counts = nativeCounts.get(source.agent);

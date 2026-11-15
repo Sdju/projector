@@ -4,7 +4,8 @@ import { useChartLayout } from "../../../common/utilities/chart-layout.ts";
 
 const props = withDefaults(
   defineProps<{
-    points: { label: string; values: Record<string, number> }[];
+    points: { label: string; day?: string; values: Record<string, number> }[];
+    selectable?: boolean;
     series: { key: string; label: string; color: string }[];
     height?: number;
     format?: (value: number) => string;
@@ -14,6 +15,8 @@ const props = withDefaults(
   }>(),
   { height: 180 },
 );
+
+const emit = defineEmits<{ select: [day: string] }>();
 
 const format = (value: number) => props.format?.(value) ?? String(Math.round(value));
 const totals = computed(() =>
@@ -84,7 +87,7 @@ const empty = computed(() => totals.value.every((value) => value === 0));
       <svg
         :viewBox="`0 0 ${width} ${height}`"
         :aria-label="ariaLabel"
-        role="img"
+        :role="selectable ? 'group' : 'img'"
         preserveAspectRatio="none"
       >
         <g class="grid">
@@ -103,7 +106,29 @@ const empty = computed(() => totals.value.every((value) => value === 0));
           </text>
         </g>
         <g class="bars">
-          <g v-for="bar in bars" :key="bar.center">
+          <g
+            v-for="(bar, index) in bars"
+            :key="bar.center"
+            :role="selectable ? 'button' : undefined"
+            :tabindex="selectable ? 0 : undefined"
+            :aria-label="selectable ? `${points[index]?.label}: ${format(bar.total)}` : undefined"
+            :class="{ selectable }"
+            @click="selectable && points[index]?.day && emit('select', points[index].day!)"
+            @keydown.enter.prevent="
+              selectable && points[index]?.day && emit('select', points[index].day!)
+            "
+            @keydown.space.prevent="
+              selectable && points[index]?.day && emit('select', points[index].day!)
+            "
+          >
+            <rect
+              v-if="selectable"
+              :x="bar.center - step / 2"
+              :y="pad.t"
+              :width="step"
+              :height="innerHeight"
+              fill="transparent"
+            />
             <rect
               v-for="segment in bar.segments"
               :key="segment.key"
@@ -166,6 +191,16 @@ svg {
   width: 100%;
   height: 100%;
   overflow: visible;
+}
+.selectable {
+  cursor: pointer;
+}
+.selectable:focus {
+  outline: none;
+}
+.selectable:focus > rect:first-child,
+.selectable:hover > rect:first-child {
+  fill: color-mix(in srgb, var(--text) 8%, transparent);
 }
 .grid line {
   stroke: var(--line);

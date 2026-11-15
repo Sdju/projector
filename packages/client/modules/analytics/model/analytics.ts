@@ -20,6 +20,14 @@ export type { BreakdownRow } from "./rows.ts";
 const limitTitle = (window: string) => windowLabel(window);
 
 export function useUsageAnalytics() {
+  const sections = [
+    { id: "overview", label: "Обзор и лимиты" },
+    { id: "activity", label: "Активность" },
+    { id: "breakdown", label: "Структура расхода" },
+    { id: "finance", label: "Кошельки" },
+    { id: "sources", label: "Источники" },
+  ] as const;
+  const section = ref<(typeof sections)[number]["id"]>("overview");
   const days = ref<AnalyticsRange>(30);
   const data = shallowRef<UsageAnalytics | null>(null);
   const loading = ref(false);
@@ -96,6 +104,19 @@ export function useUsageAnalytics() {
     days: days.value,
   }));
   commands.scope.registerCommand({
+    id: "ide.analytics.section.set",
+    title: "Открыть раздел аналитики",
+    description:
+      "Переключает обзор и лимиты, активность, структуру расхода, кошельки или источники журналов.",
+    arguments: { section: "overview | activity | breakdown | finance | sources" },
+    run: (value) => {
+      const next = sections.find((item) => item.id === commandArgs(value).section);
+      if (!next) throw new Error("Неизвестный раздел аналитики");
+      section.value = next.id;
+      return { section: section.value };
+    },
+  });
+  commands.scope.registerCommand({
     id: "ide.analytics.refresh",
     title: "Обновить аналитику расхода",
     description:
@@ -169,6 +190,7 @@ export function useUsageAnalytics() {
   const dailyPoints = computed(() =>
     (data.value?.daily ?? []).map((day) => ({
       label: formatDay(day.day),
+      day: day.day,
       values: {
         input: day.input,
         output: day.output,
@@ -310,6 +332,8 @@ export function useUsageAnalytics() {
   );
 
   return {
+    section,
+    sections,
     ranges: ANALYTICS_RANGES,
     days,
     data,

@@ -22,6 +22,8 @@ import UsageHeatmap from "./UsageHeatmap.vue";
 import UsageLine from "./UsageLine.vue";
 
 const {
+  section,
+  sections,
   ranges,
   days,
   data,
@@ -72,6 +74,26 @@ const {
 } = useUsageAnalytics();
 
 const tokenSeries = usageTokenSeries;
+const limitGroups = computed(() => {
+  const groups = new Map<string, typeof limitCards.value>();
+  for (const card of limitCards.value) {
+    const group = groups.get(card.series.agent) ?? [];
+    group.push(card);
+    groups.set(card.series.agent, group);
+  }
+  return [...groups.entries()]
+    .map(([agent, cards]) => ({
+      agent,
+      title: cards[0]!.title,
+      cards: [...cards].sort(
+        (a, b) =>
+          (a.series.periodSeconds ?? Number.POSITIVE_INFINITY) -
+            (b.series.periodSeconds ?? Number.POSITIVE_INFINITY) ||
+          a.label.localeCompare(b.label, "ru"),
+      ),
+    }))
+    .sort((a, b) => a.title.localeCompare(b.title, "ru"));
+});
 
 const stats = computed(() => {
   const value = totals.value;
@@ -131,12 +153,13 @@ const stats = computed(() => {
     @pointerdown="commands.scope.activate()"
   >
     <UiInline :gap="2" justify="between" wrap>
-      <UiInline :gap="1" wrap aria-label="Период аналитики">
+      <UiInline class="selection-buttons" :gap="1" wrap aria-label="Период аналитики">
         <UiButton
           v-for="range in ranges"
           :key="range"
           size="sm"
           :active="days === range"
+          :aria-pressed="days === range"
           @click="commands.run('ide.analytics.range.set', { days: range })"
           >{{ formatRange(range) }}</UiButton
         >
@@ -154,13 +177,53 @@ const stats = computed(() => {
     <UiLoader v-if="!data && loading" :padding="3">Считаю расход…</UiLoader>
 
     <template v-if="data">
-      <div class="stats">
-        <UiCard v-for="stat in stats" :key="stat.label" appearance="frame" density="compact">
-          <UiStat :label="stat.label" :value="stat.value" :hint="stat.hint" />
+      <nav class="section-nav selection-buttons" aria-label="Разделы аналитики">
+        <UiButton
+          v-for="item in sections"
+          :key="item.id"
+          size="sm"
+          :active="section === item.id"
+          :aria-pressed="section === item.id"
+          @click="commands.run('ide.analytics.section.set', { section: item.id })"
+          >{{ item.label }}</UiButton
+        >
+      </nav>
+      <div v-show="section === 'overview'" class="section-content">
+        <div class="stats">
+          <UiCard v-for="stat in stats" :key="stat.label" appearance="frame" density="compact">
+            <UiStat :label="stat.label" :value="stat.value" :hint="stat.hint" />
+          </UiCard>
+        </div>
+
+        <UiCard appearance="frame" as="section">
+          <header class="card-head">
+            <h4>Лимиты подписок</h4>
+            <span>остаток и темп расхода окна</span>
+          </header>
+          <div v-if="limitGroups.length" class="limit-groups">
+            <section v-for="group in limitGroups" :key="group.agent" class="limit-group">
+              <h5>{{ group.title }}</h5>
+              <div class="limits">
+                <LimitCard
+                  v-for="card in group.cards"
+                  :key="card.series.window"
+                  :series="card.series"
+                  :title="card.title"
+                  :label="card.label"
+                  :tone="card.tone"
+                  :now="now.getTime()"
+                />
+              </div>
+            </section>
+          </div>
+          <UiEmpty v-else density="compact" align="start">
+            Лимиты ещё не проверялись. Нажмите «Обновить» — Projector спросит их у настроенных
+            агентов.
+          </UiEmpty>
+          <UiLoader v-if="probing" size="sm">Запрашиваю лимиты у агентов…</UiLoader>
         </UiCard>
       </div>
-
-      <div class="grid">
+      <div v-show="section === 'activity'" class="grid">
         <UiCard appearance="frame" class="wide" as="section">
           <header class="card-head">
             <h4>Активность за год</h4>
@@ -170,6 +233,22 @@ const stats = computed(() => {
             :days="heatmapDays"
             :selected="selectedDay"
             @select="commands.run('ide.analytics.day.set', { day: $event })"
+          />
+        </UiCard>
+
+        <UiCard appearance="frame" class="wide" as="section">
+          <header class="card-head">
+            <h4>Токены по дням</h4>
+            <span>{{ rangeLabel }} · выберите столбец для подробностей дня</span>
+          </header>
+          <UsageBarChart
+            :points="dailyPoints"
+            :series="tokenSeries"
+            :format="tokens"
+            :height="190"
+            selectable
+            @select="commands.run('ide.analytics.day.set', { day: $event })"
+            aria-label="Токены по дням, разделённые по кэшу"
           />
         </UiCard>
 
@@ -192,20 +271,6 @@ const stats = computed(() => {
           @today="commands.run('ide.analytics.day.today')"
         />
 
-        <UiCard appearance="frame" class="wide" as="section">
-          <header class="card-head">
-            <h4>Токены по дням</h4>
-            <span>{{ rangeLabel }}</span>
-          </header>
-          <UsageBarChart
-            :points="dailyPoints"
-            :series="tokenSeries"
-            :format="tokens"
-            :height="190"
-            aria-label="Токены по дням, разделённые по кэшу"
-          />
-        </UiCard>
-
         <UiCard v-if="priced" appearance="frame" class="wide" as="section">
           <header class="card-head">
             <h4>Стоимость по дням</h4>
@@ -218,38 +283,12 @@ const stats = computed(() => {
             aria-label="Стоимость ответов по дням"
           />
         </UiCard>
-
-        <UiCard v-if="providerRows.length" appearance="frame" class="wide" as="section">
-          <header class="card-head">
-            <h4>Кошельки</h4>
-            <span>общий остаток и каждый провайдер отдельно</span>
-          </header>
-          <div class="wallet-totals">
-            <div v-for="total in providerTotals" :key="total.currency" class="wallet-total">
-              <span class="wallet-caption">все кошельки · {{ total.currency }}</span>
-              <strong>{{
-                total.total === null ? "—" : formatMoney(total.total, total.currency)
-              }}</strong>
-              <span class="wallet-note"
-                >потрачено {{ formatMoney(total.spent, total.currency) }} ·
-                {{ countRu(total.wallets, "кошелёк", "кошелька", "кошельков")
-                }}<template v-if="total.unknown"> · {{ total.unknown }} без баланса</template></span
-              >
-            </div>
-          </div>
-          <div class="providers">
-            <ProviderBalanceCard
-              v-for="entry in providerRows"
-              :key="`${entry.provider}:${entry.currency}`"
-              :entry="entry"
-            />
-          </div>
-        </UiCard>
-
+      </div>
+      <div v-show="section === 'breakdown'" class="grid">
         <UiCard appearance="frame" class="wide" as="section">
           <header class="card-head">
             <h4>Куда ушли деньги</h4>
-            <UiInline :gap="1" wrap>
+            <UiInline class="selection-buttons" :gap="1" wrap>
               <span v-if="taskPriced" class="task-total">{{
                 taskMode === "cost" ? formatCost(taskTotalCost) : tokens(taskTotalTokens)
               }}</span>
@@ -257,6 +296,7 @@ const stats = computed(() => {
                 v-if="taskPriced"
                 size="sm"
                 :active="taskMode === 'tokens'"
+                :aria-pressed="taskMode === 'tokens'"
                 @click="commands.run('ide.analytics.tasks.mode.set', { mode: 'tokens' })"
                 >Токены</UiButton
               >
@@ -264,6 +304,7 @@ const stats = computed(() => {
                 v-if="taskPriced"
                 size="sm"
                 :active="taskMode === 'cost'"
+                :aria-pressed="taskMode === 'cost'"
                 @click="commands.run('ide.analytics.tasks.mode.set', { mode: 'cost' })"
                 >Деньги</UiButton
               >
@@ -327,56 +368,62 @@ const stats = computed(() => {
           <UiEmpty v-else density="compact" align="start">Нет данных за период</UiEmpty>
         </UiCard>
       </div>
-
-      <UiCard v-if="sourceRows.length" appearance="frame" as="section">
-        <header class="card-head">
-          <h4>Источники журналов</h4>
-          <span>нативные логи агентов</span>
-        </header>
-        <div class="sources">
-          <div
-            v-for="source in sourceRows"
-            :key="source.agent"
-            class="source"
-            :class="`source-${source.status}`"
-          >
-            <UiInline :gap="2" justify="between" wrap>
-              <strong>{{ source.label }}</strong>
-              <span class="source-status">{{ source.statusLabel }}</span>
-            </UiInline>
-            <span class="source-note">{{ source.note }}</span>
+      <div v-show="section === 'finance'" class="section-content">
+        <UiCard v-if="providerRows.length" appearance="frame" class="wide" as="section">
+          <header class="card-head">
+            <h4>Кошельки</h4>
+            <span>общий остаток и каждый провайдер отдельно</span>
+          </header>
+          <div class="wallet-totals">
+            <div v-for="total in providerTotals" :key="total.currency" class="wallet-total">
+              <span class="wallet-caption">все кошельки · {{ total.currency }}</span>
+              <strong>{{
+                total.total === null ? "—" : formatMoney(total.total, total.currency)
+              }}</strong>
+              <span class="wallet-note"
+                >потрачено {{ formatMoney(total.spent, total.currency) }} ·
+                {{ countRu(total.wallets, "кошелёк", "кошелька", "кошельков")
+                }}<template v-if="total.unknown"> · {{ total.unknown }} без баланса</template></span
+              >
+            </div>
           </div>
-        </div>
-        <p class="task-note">
-          Codex, OpenCode, Kimi и Cursor читаются из своих журналов, поэтому в расход попадают и
-          запуски в терминале. Ошибка чтения показана отдельно и не превращается в ноль токенов.
-        </p>
-      </UiCard>
+          <div class="providers">
+            <ProviderBalanceCard
+              v-for="entry in providerRows"
+              :key="`${entry.provider}:${entry.currency}`"
+              :entry="entry"
+            />
+          </div>
+        </UiCard>
+      </div>
+      <div v-show="section === 'sources'" class="section-content">
+        <UiCard v-if="sourceRows.length" appearance="frame" as="section">
+          <header class="card-head">
+            <h4>Источники журналов</h4>
+            <span>нативные логи агентов</span>
+          </header>
+          <div class="sources">
+            <div
+              v-for="source in sourceRows"
+              :key="source.agent"
+              class="source"
+              :class="`source-${source.status}`"
+            >
+              <UiInline :gap="2" justify="between" wrap>
+                <strong>{{ source.label }}</strong>
+                <span class="source-status">{{ source.statusLabel }}</span>
+              </UiInline>
+              <span class="source-note">{{ source.note }}</span>
+            </div>
+          </div>
+          <p class="task-note">
+            Codex, OpenCode, Kimi и Cursor читаются из своих журналов, поэтому в расход попадают и
+            запуски в терминале. Ошибка чтения показана отдельно и не превращается в ноль токенов.
+          </p>
+        </UiCard>
+      </div>
 
-      <UiCard appearance="frame" as="section">
-        <header class="card-head">
-          <h4>Лимиты подписок</h4>
-          <span>остаток и темп расхода окна</span>
-        </header>
-        <div v-if="limitCards.length" class="limits">
-          <LimitCard
-            v-for="card in limitCards"
-            :key="`${card.series.agent}:${card.series.window}`"
-            :series="card.series"
-            :title="card.title"
-            :label="card.label"
-            :tone="card.tone"
-            :now="now.getTime()"
-          />
-        </div>
-        <UiEmpty v-else density="compact" align="start">
-          Лимиты ещё не проверялись. Нажмите «Обновить» — Projector спросит их у настроенных
-          агентов.
-        </UiEmpty>
-        <UiLoader v-if="probing" size="sm">Запрашиваю лимиты у агентов…</UiLoader>
-      </UiCard>
-
-      <UiMessage v-if="!priced" tone="muted" size="xs" variant="note">
+      <UiMessage v-if="!priced && section === 'finance'" tone="muted" size="xs" variant="note">
         Стоимость Projector по токенам не считается: у моделей не задана цена. Её можно указать в
         разделе «Модели и провайдеры»; фактические деньги видны по балансу провайдера.
       </UiMessage>
@@ -385,6 +432,35 @@ const stats = computed(() => {
 </template>
 
 <style scoped>
+.selection-buttons :deep(.btn.active) {
+  color: var(--text);
+  background: var(--active);
+  border-color: var(--text-2);
+}
+.section-nav {
+  display: flex;
+  gap: var(--sp-1);
+  flex-wrap: wrap;
+  padding-bottom: var(--sp-2);
+  border-bottom: 1px solid var(--line);
+}
+.section-content {
+  display: grid;
+  gap: var(--sp-3);
+}
+.limit-groups {
+  display: grid;
+  gap: var(--sp-4);
+}
+.limit-group {
+  display: grid;
+  gap: var(--sp-2);
+}
+.limit-group h5 {
+  margin: 0;
+  color: var(--text-2);
+  font-size: var(--fs-xs);
+}
 .stats {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));

@@ -33,7 +33,12 @@ const meterTone = computed(() => {
 const pace = computed(() => {
   if (exhausted.value) return { text: "Лимит исчерпан", hint: "" };
   if (expected.value === null)
-    return { text: "Темп без оценки", hint: "окно не сообщает длину цикла" };
+    return {
+      text: "Темп без оценки",
+      hint: props.series.periodSeconds
+        ? "окно не сообщает время сброса"
+        : "окно не сообщает длину цикла",
+    };
   const delta = (used.value ?? 0) - expected.value;
   if (delta <= -15)
     return { text: "Ниже темпа", hint: `по времени ожидалось ${formatPercent(expected.value)}` };
