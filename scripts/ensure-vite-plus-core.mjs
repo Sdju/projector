@@ -14,7 +14,7 @@ import {
   createWriteStream,
 } from "node:fs";
 import { createRequire } from "node:module";
-import { tmpdir } from "node:os";
+import { homedir, tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { pipeline } from "node:stream/promises";
@@ -108,6 +108,28 @@ async function downloadTarball(dest) {
   await pipeline(Readable.fromWeb(response.body), createWriteStream(dest));
 }
 
+/** `pnpm` keeps losing `bin/vite.js`, so the launch repairs it. Keep the tarball to stay offline. */
+function cachePath() {
+  const base =
+    process.env.XDG_CACHE_HOME || join(process.env.LOCALAPPDATA || homedir(), "projector", "cache");
+  return join(base, `vite-plus-core-${catalogVersion()}.tgz`);
+}
+
+async function tarball(dest) {
+  const cached = cachePath();
+  if (existsSync(cached)) {
+    cpSync(cached, dest);
+    return;
+  }
+  await downloadTarball(dest);
+  try {
+    mkdirSync(dirname(cached), { recursive: true });
+    cpSync(dest, cached);
+  } catch {
+    /* an unwritable cache only costs the next download */
+  }
+}
+
 async function repair() {
   const roots = matchingRoots();
   if (!roots.length) {
@@ -123,7 +145,7 @@ async function repair() {
   try {
     const tgz = join(staging, "vite-plus-core.tgz");
     // Fetch outside the project so npm's package.json engines/devEngines do not apply.
-    await downloadTarball(tgz);
+    await tarball(tgz);
     const extract = join(staging, "out");
     mkdirSync(extract);
     await tar.x({ file: tgz, cwd: extract });
@@ -145,7 +167,7 @@ if (present()) {
   process.exit(0);
 }
 
-console.warn("ensure-vite-plus-core: нет bin/vite.js, восстанавливаю из npm…");
+console.warn("ensure-vite-plus-core: нет bin/vite.js, восстанавливаю из кэша или npm…");
 const ok = await repair();
 if (!ok) {
   console.error("ensure-vite-plus-core: не удалось восстановить. Выполните pnpm install");
