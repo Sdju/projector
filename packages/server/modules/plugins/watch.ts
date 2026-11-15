@@ -85,7 +85,12 @@ export function watchPluginDirectory(
     directory?.close();
     directory = undefined;
     try {
-      directory = watch(directoryPath(), { recursive: true, persistent: false }, schedule);
+      directory = watch(directoryPath(), { recursive: true, persistent: false }, (_event, name) => {
+        // Per-package storage lives under `data/`: a settings write must not re-read and re-hash
+        // every installed package on the next tick.
+        if (typeof name === "string" && name.split(/[\\/]/, 1)[0] === "data") return;
+        schedule();
+      });
       directory.on("error", () => {
         directory?.close();
         directory = undefined;

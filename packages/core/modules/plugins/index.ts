@@ -48,6 +48,17 @@ export {
   pluginPackageKey,
   pluginPackageName,
 } from "./asset.ts";
+export {
+  parsePluginStorage,
+  pluginStorageBytes,
+  pluginStorageFits,
+  pluginStorageKey,
+  pluginStorageMaxBytes,
+  pluginStorageMaxKeyLength,
+  serializePluginStorage,
+  serializePluginStorageValue,
+  type PluginStorageDocument,
+} from "./storage.ts";
 
 export const pluginApiVersion = 1;
 

@@ -19,6 +19,13 @@
 - [agent-roadmap.md](agent-roadmap.md) — открытые пункты штатного агента Projector и проверки Судьи в браузере.
 - [plugin-agents.md](plugin-agents.md) — что осталось у агентов-плагинов: hosted-жизненный цикл, статусы исчезнувшего агента, пресеты диалектов и изолированный runtime.
 - [plugin-concept/concept.md](plugin-concept/concept.md) — будущее плагинов: npm-поставка, browser runtime, UI и Node capabilities; текущие вклады и доверие — [plugins](../plugins.md).
+- [plugin-server-routes.md](plugin-server-routes.md) — серверные HTTP-маршруты плагина: живой реестр, префикс `/api/plugins/<key>/`, лимиты и жизненный цикл.
+- [plugin-provider-usage.md](plugin-provider-usage.md) — расход и квоты провайдеров из плагина: `registerUsageResolver` против декларативного HTTP-маппинга, адаптеры Zen и Z.AI.
+- [plugin-subagent-spawn.md](plugin-subagent-spawn.md) — запуск субагентов из плагина: `api.jobs` поверх agent-jobs против workflow-вклада и оркестратора в ядре.
+- [plugin-tool-guards.md](plugin-tool-guards.md) — перехват тул-вызовов: policy-engine в ядре, `api.agents.guards`, декларативные правила и предел для чужих ACP-агентов.
+- [plugin-ui-overlay.md](plugin-ui-overlay.md) — overlay и хуки чата для browser-плагинов: `shell.overlay`, стабильные `data-*` и подписка на сообщения вместо MutationObserver.
+- [plugin-storage-settings.md](plugin-storage-settings.md) — настройки и файлы плагина: декларативная схема в манифесте, автоформа в карточке и возможный `api.files` для изменяемых файлов; `api.storage` уже реализован.
+- [plugin-distribution-trust.md](plugin-distribution-trust.md) — поставка и доверие: npm-транспорт, staged install с откатом, curated-каталог, обновления и отзыв.
 - [analytics-agent-logs.md](analytics-agent-logs.md) — расход по нативным журналам Codex, OpenCode, Kimi и Cursor: читатели журналов, нормализация, дедупликация, цена и покрытие.
 - [color-schemes.md](color-schemes.md) — цветовые схемы интерфейса: остались потребители вне CSS (редактор, Markdown, ANSI-палитра терминала, иконки и статика), доводка светлой и контрастной схем и проверки.
 - [file-views.md](file-views.md) — что осталось у файловых снимков: произвольные папки, union-дерево, индекс, поиск по снимку и переименования.

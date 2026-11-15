@@ -1,6 +1,13 @@
-import { pluginCommandPrefix } from "@ai-projector/core/modules/plugins/index.ts";
+import {
+  pluginCommandPrefix,
+  pluginPackageKey,
+  pluginStorageFits,
+  pluginStorageKey,
+  pluginStorageMaxBytes,
+  serializePluginStorageValue,
+} from "@ai-projector/core/modules/plugins/index.ts";
 import { PLUGIN_API_VERSION, type PluginApi } from "@ai-projector/plugin-api";
-import { deviceBase } from "../../common/utilities/device-url.ts";
+import { deviceBase, deviceUrl } from "../../common/utilities/device-url.ts";
 import {
   assetUrlFactory,
   addAgent,
@@ -13,9 +20,26 @@ import {
 } from "./store.ts";
 import type { RuntimePluginInfo } from "./catalog.ts";
 import type { Scope } from "./scope.ts";
+
+/** Package-scoped state on the device that owns the package; the key never becomes a path. */
+function storageUrl(plugin: RuntimePluginInfo): string {
+  return deviceUrl(`/api/plugins/${pluginPackageKey(plugin.id)}/storage`);
+}
+
+async function storageError(response: Response): Promise<Error> {
+  try {
+    const body = (await response.json()) as { error?: unknown };
+    if (typeof body.error === "string" && body.error) return new Error(body.error);
+  } catch {
+    // A non-JSON body is still a failed request; the status below is the fallback message.
+  }
+  return new Error(`Хранилище плагина недоступно (${response.status})`);
+}
+
 export function createApi(plugin: RuntimePluginInfo, scope: Scope): PluginApi {
   const assetUrl = assetUrlFactory(plugin.id, plugin.hash!);
   const commandPrefix = pluginCommandPrefix(plugin.id);
+  const storagePath = storageUrl(plugin);
   const languages = new Set(plugin.languages.map((item) => item.id));
   const panels = new Set(plugin.panels.map((item) => item.id));
   const tabs = new Set(plugin.tabs.map((item) => item.id));
@@ -28,6 +52,26 @@ export function createApi(plugin: RuntimePluginInfo, scope: Scope): PluginApi {
 
   const assertActive = () => {
     if (scope.disposed) throw new Error("Плагин уже выключен");
+  };
+  const storageRequest = async (url: string, init: RequestInit = {}): Promise<Response> => {
+    const response = await fetch(url, { signal: scope.signal, cache: "no-store", ...init });
+    if (!response.ok) throw await storageError(response);
+    return response;
+  };
+  const readStorage = async (): Promise<Record<string, unknown>> => {
+    const response = await storageRequest(storagePath, { headers: { Accept: "application/json" } });
+    const body = (await response.json()) as { data?: unknown };
+    const data = body?.data;
+    return data && typeof data === "object" && !Array.isArray(data)
+      ? (data as Record<string, unknown>)
+      : {};
+  };
+  const assertStorageValue = (value: unknown): void => {
+    const text = serializePluginStorageValue(value);
+    if (!pluginStorageFits(text))
+      throw new Error(
+        `Значение не помещается в хранилище плагина (лимит ${pluginStorageMaxBytes} байт)`,
+      );
   };
   const declared = <T extends { id: string }>(list: T[], id: string, label: string): T => {
     const item = list.find((entry) => entry.id === id);
@@ -139,6 +183,35 @@ export function createApi(plugin: RuntimePluginInfo, scope: Scope): PluginApi {
         const remove = addAgent(plugin.id, contribution, assetUrl);
         scope.add(remove);
         return { dispose: remove };
+      },
+    },
+    storage: {
+      async get(key) {
+        assertActive();
+        const item = pluginStorageKey(key);
+        const data = await readStorage();
+        return Object.hasOwn(data, item) ? data[item] : undefined;
+      },
+      async set(key, value) {
+        assertActive();
+        const item = pluginStorageKey(key);
+        assertStorageValue(value);
+        await storageRequest(storagePath, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ key: item, value }),
+        });
+      },
+      async delete(key) {
+        assertActive();
+        const item = pluginStorageKey(key);
+        await storageRequest(`${storagePath}?key=${encodeURIComponent(item)}`, {
+          method: "DELETE",
+        });
+      },
+      async keys() {
+        assertActive();
+        return Object.keys(await readStorage());
       },
     },
   } as PluginApi;

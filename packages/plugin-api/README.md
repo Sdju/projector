@@ -1,6 +1,6 @@
 # `@ai-projector/plugin-api`
 
-Публичный контракт автора browser-плагина Projector: типы `Plugin`, `PluginApi`,
+Публичный контракт автора browser-плагина Projector: типы `Plugin`, `PluginApi`, `PluginStorageApi`,
 `PluginViewContext`, `LanguageRegistration`, `PanelRegistration`, `TabRegistration` и helper
 `definePlugin`. Пакет не импортирует client/server, Vue или CodeMirror.
 
@@ -63,6 +63,11 @@ export default plugin;
 артефактов (`dist/`), а не от корня пакета. UI монтируется через `mount(container, context)`;
 `context.commands.run` возвращает Promise и ошибки команды, `context.workspace.openFile/openTab`
 работают через workspace выбранного устройства.
+
+`api.storage` — плоский ключ-значение пакета на устройстве, где он установлен: `get`, `set`,
+`delete`, `keys`. Значения сериализуются в JSON, все ключи вместе ограничены 1 МБ; это открытый
+файл с режимом `0600`, а не секретное хранилище. Данные переживают выключение и смену версии и
+удаляются вместе с управляемой установкой.
 
 Языковая грамматика — ordered regex-правила на одну строку: без cross-line состояния, parser tree,
 indent/fold и произвольных CodeMirror extensions. `caseInsensitive` включает регистронезависимый

@@ -189,6 +189,19 @@ export interface AgentClientApi {
   register(contribution: AgentClientRegistration): Disposable;
 }
 
+/**
+ * Package-scoped key-value state kept on disk by the device that owns the package. Values are
+ * plain JSON; all keys of one package share a 1 MB quota. Storage survives disabling and version
+ * changes and is removed together with a managed installation.
+ */
+export interface PluginStorageApi {
+  /** `undefined` when the key was never written. */
+  get(key: string): Promise<unknown>;
+  set(key: string, value: unknown): Promise<void>;
+  delete(key: string): Promise<void>;
+  keys(): Promise<string[]>;
+}
+
 export interface PluginApi {
   readonly apiVersion: PluginApiVersion;
   readonly packageName: string;
@@ -201,6 +214,7 @@ export interface PluginApi {
   readonly tabs: TabApi;
   readonly commands: CommandApi;
   readonly agents: AgentClientApi;
+  readonly storage: PluginStorageApi;
   /** Registers cleanup of this activation scope. */
   onDispose(dispose: PluginDisposer): void;
   readonly signal: AbortSignal;

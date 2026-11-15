@@ -31,8 +31,8 @@
 1. **Поставка.** npm/tarball install/update/remove, staging, `--ignore-scripts`, проверка
    совместимости, rollback и curated-каталог метаданных. Сейчас установка — только копирование
    локальной папки (`POST /api/plugins`, действие `install`); обновления установленной версии нет.
-2. **Browser runtime.** Versioned `PluginContext`: команды, уведомления, settings schema и
-   изолированное key-value хранилище; доверие по хешу. Это доверенный runtime, не sandbox:
+2. **Browser runtime.** Versioned `PluginContext`: команды, уведомления и settings schema; плоское
+   key-value хранилище уже выдаётся как `api.storage`. Это доверенный runtime, не sandbox:
    обновление хеша требует повторного доверия.
 3. **UI и Node capabilities.** Вкладки/renderers и серверные разрешения проектировать отдельно
    после runtime; не расширять `context` неявно.
@@ -45,8 +45,8 @@
 
 Минимальный theme-пакет — `package.json` плюс JSON токенов; правила, примеры и установка — в
 [plugins.md](../../plugins.md). Управляемые установки лежат в `plugins/packages/<id>/<version>/`,
-прямые папки — в `plugins/<folder>/package.json`. `plugins/data/<id>` зарезервирован под будущее
-хранилище плагина и сейчас не используется.
+прямые папки — в `plugins/<folder>/package.json`. `plugins/data/<package-key>/state.json` —
+ключ-значение пакета (`api.storage`, квота 1 МБ, повреждённый файл откладывается).
 
 `plugins.json` хранит enabled-состояние, выбранную версию, хеш и диагностику. `appearance.json`
 остаётся источником выбранной схемы; при отключении внешней темы интерфейс временно использует

@@ -1,7 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { dataDir } from "@ai-projector/core/modules/app-paths/index.ts";
-import { writeFileAtomic, withFileLock } from "../atomic-files/index.ts";
+import { writeFileAtomic, setAsideBroken, withFileLock } from "../atomic-files/index.ts";
 
 export interface StoredPluginState {
   enabled: boolean;
@@ -42,7 +42,12 @@ export async function readState(): Promise<PluginState> {
         };
     }
     return state;
-  } catch {
+  } catch (error) {
+    // A damaged file must not be silently replaced by the next write: preserve it for inspection.
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
+      await setAsideBroken(statePath()).catch(() => undefined);
+      console.warn("Плагины: файл состояния повреждён и отложен");
+    }
     return {};
   }
 }
