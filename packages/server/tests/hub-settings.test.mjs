@@ -194,9 +194,9 @@ test("local pages read the connector roster and remote activity", () => {
       this.body = body;
     },
   };
-  const request = (origin = "http://localhost:4177") => ({
+  const request = (origin) => ({
     socket: { remoteAddress: "127.0.0.1" },
-    headers: { host: "localhost:4177", origin },
+    headers: { host: "localhost:4177", ...(origin ? { origin } : {}) },
     url: "/api/hub/devices",
   });
   setHubDevices([
@@ -221,6 +221,16 @@ test("local pages read the connector roster and remote activity", () => {
     ],
     activity: { laptop: 42 },
   });
+  // A page's same-origin GET has no Origin; a present origin still has to match.
+  void route.handler({
+    req: request("http://localhost:4177"),
+    res: response,
+    url: new URL("http://localhost/api/hub/devices"),
+    method: "GET",
+    path: "/api/hub/devices",
+    params: {},
+  });
+  expect(response.statusCode).toBe(200);
   expect(
     () =>
       void route.handler({

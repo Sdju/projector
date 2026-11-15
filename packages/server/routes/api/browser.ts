@@ -12,7 +12,8 @@ export const routes: RouteDefinition[] = [
     method: "GET",
     path: "/api/browser/session",
     handler: ({ req, res }) => {
-      if (!accessAllowed(req, true))
+      // Read-only: a same-origin GET carries no Origin, so only a foreign one is rejected.
+      if (!accessAllowed(req, false))
         throw new HttpError(403, "Ключ доступен только странице Projector");
       res.setHeader("Cache-Control", "no-store");
       json(res, 200, { key: proxyKey() });
