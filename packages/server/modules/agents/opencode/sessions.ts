@@ -65,6 +65,10 @@ export async function openCodeSessionMeta(
  * How a child session ended, when OpenCode has parked it. ACP does not push the background
  * `<subagent state=…>` notify onto the live prompt wire — only into the next model turn — so the
  * hard-hold path reads this to clear tasks that already finished.
+ *
+ * Only `idle_outcome` says the turn is over. `time_suspended` is a queue claim of the execution
+ * lifecycle: OpenCode 2 sets it for a background child while the child is still working, so it
+ * settles nothing there — it dates from the schema that had no outcome at all.
  */
 export type OpenCodeIdleStatus = "done" | "error" | "stopped";
 
@@ -94,7 +98,7 @@ export function openCodeIdleOutcomes(ids: string[]): Map<string, OpenCodeIdleSta
       if (idle === "succeeded") out.set(row.id, "done");
       else if (idle === "failed") out.set(row.id, "error");
       else if (idle === "interrupted" || idle === "cancelled") out.set(row.id, "stopped");
-      else if (typeof row.time_suspended === "number" && row.time_suspended > 0)
+      else if (!hasIdle && typeof row.time_suspended === "number" && row.time_suspended > 0)
         out.set(row.id, "stopped");
     }
   } catch {

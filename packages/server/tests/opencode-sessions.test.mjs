@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import {
   openCodeDatabasePath,
+  openCodeIdleOutcomes,
   openCodeSessionMeta,
   withOpenCodeBranches,
 } from "../modules/agents/opencode/sessions.ts";
@@ -84,5 +85,73 @@ describe("OpenCode subagent sessions are read from the agent's own database", ()
       // A chat's own agent is its mode, not a subagent: it stays unmarked.
       { id: "ses_build", title: "Build chat" },
     ]);
+  });
+});
+
+describe("OpenCode idle outcomes tell a finished child from a working one", () => {
+  let previous, root;
+  beforeAll(async () => {
+    previous = process.env.XDG_DATA_HOME;
+    root = await mkdtemp(join(tmpdir(), "projector-opencode-idle-"));
+  });
+  afterAll(async () => {
+    if (previous === undefined) delete process.env.XDG_DATA_HOME;
+    else process.env.XDG_DATA_HOME = previous;
+    await rm(root, { recursive: true, force: true });
+  });
+
+  /** Creates a database whose session table has the given extra columns. */
+  async function idleDatabase(directory, table, columns) {
+    await mkdir(join(directory, "opencode"), { recursive: true });
+    const db = new DatabaseSync(join(directory, "opencode", "opencode.db"));
+    db.exec(`CREATE TABLE ${table} (id TEXT PRIMARY KEY, ${columns});`);
+    return db;
+  }
+
+  test("a working child is not stopped by its queue claim, only by idle_outcome", async () => {
+    const directory = join(root, "v2");
+    const db = await idleDatabase(
+      directory,
+      "session_v2",
+      "time_suspended INTEGER, idle_outcome TEXT",
+    );
+    db.exec(`INSERT INTO session_v2 VALUES
+      ('ses_working', 1794860753043, NULL),
+      ('ses_done', NULL, 'succeeded'),
+      ('ses_failed', NULL, 'failed'),
+      ('ses_cancelled', 1794860855000, 'cancelled');`);
+    db.close();
+    process.env.XDG_DATA_HOME = directory;
+    const outcomes = openCodeIdleOutcomes([
+      "ses_working",
+      "ses_done",
+      "ses_failed",
+      "ses_cancelled",
+    ]);
+    // A background child is claimed by the queue right after spawning and stays claimed while it
+    // works: the claim must not end the hard hold, otherwise Projector closes the connection and
+    // the idle SIGTERM kills the subagent mid-step.
+    expect(outcomes.has("ses_working")).toBe(false);
+    expect(outcomes.get("ses_done")).toBe("done");
+    expect(outcomes.get("ses_failed")).toBe("error");
+    expect(outcomes.get("ses_cancelled")).toBe("stopped");
+  });
+
+  test("the schema without idle_outcome still settles on the parked claim", async () => {
+    const directory = join(root, "legacy");
+    const db = await idleDatabase(directory, "session", "time_suspended INTEGER");
+    db.exec(
+      "INSERT INTO session VALUES ('ses_old_stopped', 1794860753043), ('ses_old_live', NULL);",
+    );
+    db.close();
+    process.env.XDG_DATA_HOME = directory;
+    const outcomes = openCodeIdleOutcomes(["ses_old_stopped", "ses_old_live"]);
+    expect(outcomes.get("ses_old_stopped")).toBe("stopped");
+    expect(outcomes.has("ses_old_live")).toBe(false);
+  });
+
+  test("a missing database settles nothing, so the hold survives until a later notify", () => {
+    process.env.XDG_DATA_HOME = join(root, "missing");
+    expect(openCodeIdleOutcomes(["ses_unknown"]).size).toBe(0);
   });
 });
