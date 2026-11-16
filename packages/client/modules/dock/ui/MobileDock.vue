@@ -91,6 +91,7 @@ const handlers = {
             :command-namespace="dock.commandNamespace"
             :command-handlers="handlers"
             :actions="dock.tabActions"
+            compact
             close-saved
           >
             <template #icon="{ tab }"

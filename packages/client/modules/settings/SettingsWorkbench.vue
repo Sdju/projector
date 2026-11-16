@@ -7,6 +7,10 @@ import { computed, nextTick, ref, watch } from "vue";
 import IconSettings from "~icons/lucide/settings-2";
 import IconSearch from "~icons/lucide/search";
 import IconClose from "~icons/lucide/x";
+import IconChevronDown from "~icons/lucide/chevron-down";
+import UiIsland from "../../common/ui/UiIsland.vue";
+import UiIslandLabel from "../../common/ui/UiIslandLabel.vue";
+import { useIslandMenu } from "../../common/utilities/island-menu.ts";
 import UiButton from "../../common/ui/UiButton.vue";
 import { commandArgs, useCommandScope } from "../../common/utilities/commands.ts";
 import { useTabReadout, type TabReadout } from "../../common/utilities/tab-readout.ts";
@@ -30,6 +34,11 @@ const emit = defineEmits<{ select: [id: string] }>();
 const query = ref("");
 const search = ref<UiControlHandle>();
 const sidebar = ref<HTMLElement>();
+const menu = useIslandMenu({
+  anchor: "left",
+  initialFocus: ['[aria-current="page"]', "button"],
+  items: "button",
+});
 const content = ref<HTMLElement>();
 const visited = ref(new Set<string>());
 const filtered = computed(() => {
@@ -167,7 +176,14 @@ commands.scope.registerCommand({
     if (typeof id !== "string" || !known) throw new Error("Неизвестный раздел настроек");
     query.value = "";
     emit("select", id);
+    menu.close();
   },
+});
+commands.scope.registerCommand({
+  id: "ide.settings.navigation.toggle",
+  title: "Выбрать раздел настроек",
+  description: "Открывает или закрывает список разделов настроек на узком экране.",
+  run: () => menu.toggle(),
 });
 commands.scope.registerCommand({
   id: "ide.settings.search",
@@ -218,6 +234,56 @@ function filter(event: Event) {
         /></UiButton>
       </UiInline>
     </UiToolbar>
+    <div class="mobile-navigation">
+      <button
+        :ref="(element) => (menu.trigger.value = element as HTMLElement | undefined)"
+        type="button"
+        class="navigation-trigger"
+        :aria-expanded="menu.open.value"
+        :aria-controls="menu.id"
+        @click="commands.run('ide.settings.navigation.toggle')"
+      >
+        <span
+          ><small>Раздел настроек</small
+          ><strong>{{ active?.title ?? "Выбрать раздел" }}</strong></span
+        >
+        <IconChevronDown aria-hidden="true" />
+      </button>
+    </div>
+    <UiIsland :menu="menu" label="Разделы настроек" :width="360">
+      <nav class="island-navigation" aria-label="Разделы настроек">
+        <template v-for="group in groups" :key="group">
+          <UiIslandLabel>{{ group }}</UiIslandLabel>
+          <template
+            v-for="section in filtered.filter((item) => item.group === group)"
+            :key="section.id"
+          >
+            <button
+              type="button"
+              :aria-current="section.id === selected ? 'page' : undefined"
+              :class="{ selected: section.id === selected }"
+              @click="commands.run('ide.settings.section.open', { id: section.id })"
+            >
+              {{ section.title }}
+            </button>
+            <div v-if="section.items?.length" class="island-items">
+              <button
+                v-for="item in section.items"
+                :key="item.id"
+                type="button"
+                :aria-current="item.id === selected ? 'page' : undefined"
+                :class="{ selected: item.id === selected, problem: item.problem }"
+                @click="commands.run('ide.settings.section.open', { id: item.id })"
+              >
+                <span class="item-title">{{ item.title }}</span
+                ><span v-if="item.hint" class="item-hint">{{ item.hint }}</span>
+              </button>
+            </div>
+          </template>
+        </template>
+        <p v-if="!filtered.length" class="no-results" role="status">Нет подходящих разделов</p>
+      </nav>
+    </UiIsland>
     <div class="layout">
       <nav ref="sidebar" class="sidebar" aria-label="Разделы настроек">
         <div v-for="group in groups" :key="group" class="group">
@@ -372,6 +438,56 @@ svg {
 }
 .search input::-webkit-search-cancel-button {
   display: none;
+}
+.mobile-navigation {
+  display: none;
+}
+.navigation-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: var(--sp-2) var(--sp-3);
+  text-align: left;
+}
+.navigation-trigger span {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.navigation-trigger small {
+  color: var(--muted);
+  font-size: var(--fs-2xs);
+}
+.navigation-trigger strong {
+  font-size: var(--fs-xs);
+  font-weight: 500;
+}
+.island-navigation button {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: var(--control-h);
+  padding: var(--sp-2);
+  border-radius: var(--r-sm);
+  text-align: left;
+  color: var(--text-2);
+}
+.island-navigation button:hover {
+  background: var(--hover);
+}
+.island-navigation button.selected {
+  background: var(--selection);
+  color: var(--text);
+}
+.island-items {
+  margin-left: var(--sp-3);
+  padding-left: var(--sp-2);
+  border-left: 1px solid var(--line);
+}
+.island-items button.problem .item-title::after {
+  content: " •";
+  color: var(--err);
 }
 .layout {
   display: grid;
@@ -542,27 +658,13 @@ svg {
     display: block;
     min-height: 0;
   }
-  .sidebar {
-    display: flex;
-    gap: var(--sp-2);
-    overflow-x: auto;
-    border-right: 0;
+  .mobile-navigation {
+    display: block;
+    background: var(--bg-2);
     border-bottom: 1px solid var(--line);
   }
-  .group {
-    display: flex;
-    gap: var(--sp-1);
-    flex-shrink: 0;
-  }
-  .group + .group {
-    margin-top: 0;
-  }
-  .group h2 {
+  .sidebar {
     display: none;
-  }
-  .group button {
-    width: auto;
-    white-space: nowrap;
   }
   .content {
     padding: var(--sp-4);
