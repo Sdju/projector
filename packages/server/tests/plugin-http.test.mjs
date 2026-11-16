@@ -9,7 +9,7 @@ import { dataDir } from "../../core/modules/app-paths/index.ts";
 import { pluginPackageKey } from "../../core/modules/plugins/index.ts";
 import { registerBuiltinAgents } from "../app/agents.ts";
 import { handleApi } from "../app/api.ts";
-import { clearPluginRoutes } from "../modules/plugin-routes/index.ts";
+import { clearPluginRoutes, pluginRoutePlugins } from "../modules/plugin-routes/index.ts";
 import {
   installPlugin,
   pluginsDirectory,
@@ -159,6 +159,14 @@ test("маршруты плагина живут по объявленному �
 
   await setPluginEnabled(pluginId, true);
   expect((await fetch(`${url}/status`)).status).toBe(200);
+});
+
+test("реестр из прежней ревизии модуля пересобирается, а не роняет обнаружение", () => {
+  // Vite keeps the registry on globalThis across module reloads: an object left by an older
+  // revision has no `entries`, and trusting it broke every plugin with "not iterable".
+  globalThis.projectorPluginRoutes = { router: {}, paths: {} };
+  expect([...pluginRoutePlugins()]).toEqual([]);
+  expect(globalThis.projectorPluginRoutes.entries).toBeInstanceOf(Map);
 });
 
 test("плагин с незарегистрированным маршрутом попадает в ошибки каталога", async () => {

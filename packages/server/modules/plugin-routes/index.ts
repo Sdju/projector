@@ -66,12 +66,23 @@ interface Registry {
 
 const host = globalThis as typeof globalThis & { projectorPluginRoutes?: Registry };
 
-const registry = (): Registry =>
-  (host.projectorPluginRoutes ??= {
-    router: createRouter(),
-    paths: createRouter(),
-    entries: new Map(),
-  });
+function emptyRegistry(): Registry {
+  return { router: createRouter(), paths: createRouter(), entries: new Map() };
+}
+
+/**
+ * The registry lives on `globalThis` so Vite reloads keep the routes. A reload can also meet an
+ * object left by an older revision of this module, and its shape is not trustworthy: reading
+ * `entries` from it failed every discovery with `state.entries is not iterable`. Rebuild such a
+ * registry instead of trusting it; the old routers stop being reachable with it.
+ */
+const registry = (): Registry => {
+  const current = host.projectorPluginRoutes;
+  if (current?.router && current.paths && current.entries instanceof Map) return current;
+  const fresh = emptyRegistry();
+  host.projectorPluginRoutes = fresh;
+  return fresh;
+};
 
 /** `/api/plugins/<package-key>/<pattern>`: the package never supplies its own prefix. */
 export function pluginRouteUrl(plugin: string, path: string): string {
