@@ -1,5 +1,6 @@
 export * from "./api/side.ts";
 export * from "./lib/side-command.ts";
+export * from "./model/chat-panels.ts";
 export * from "./model/mcp-panel.ts";
 export * from "./model/rewind-panel.ts";
 export * from "./model/side-question.ts";

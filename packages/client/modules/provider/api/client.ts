@@ -2,6 +2,7 @@ import type {
   OpenAIProviderPublic,
   OpenAIProvidersPublicState,
   ProviderBalance,
+  ProviderUsage,
 } from "../model/types.ts";
 
 async function request<T>(url: string, init?: RequestInit): Promise<T> {
@@ -20,7 +21,7 @@ export function fetchProviders(): Promise<OpenAIProvidersPublicState> {
 
 export function saveProviders(payload: {
   activeProviderId: string | null;
-  providers: Array<OpenAIProviderPublic & { apiKey?: string }>;
+  providers: Array<OpenAIProviderPublic & { apiKey?: string; balanceApiKey?: string }>;
 }): Promise<OpenAIProvidersPublicState> {
   return request("/api/providers", { method: "PUT", body: JSON.stringify(payload) });
 }
@@ -31,6 +32,19 @@ export function setActiveProvider(id: string): Promise<OpenAIProvidersPublicStat
 
 export function fetchProviderBalance(id?: string): Promise<ProviderBalance> {
   return request(`/api/providers/balance${id ? `?id=${encodeURIComponent(id)}` : ""}`);
+}
+
+/** Расход и квоты провайдера; не путать с денежным балансом. */
+export function fetchProviderUsage(id?: string): Promise<ProviderUsage> {
+  return request(`/api/providers/usage${id ? `?id=${encodeURIComponent(id)}` : ""}`);
+}
+
+/** All enabled wallets in one answer; each entry still carries its provider id and name. */
+export function fetchProviderBalances(): Promise<{
+  wallets: ProviderBalance[];
+  checkedAt: number;
+}> {
+  return request("/api/providers/balances");
 }
 
 /** Model ids the provider offers; a draft passes its own address and key. */

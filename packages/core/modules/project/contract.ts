@@ -21,7 +21,9 @@ export interface Project {
   url: string;
   icon: string;
   mode: LaunchMode;
+  /** Scenario started when the project is run without choosing one. */
   defaultCommandId: string;
+  /** Launch scenarios; the server keeps them in the project's `.projector/scenarios.json`. */
   commands: ProjectCommand[];
   createdAt: string;
   environment?: import("../environment/index.ts").DockerEnvironment;

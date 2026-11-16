@@ -37,17 +37,19 @@ export function runDocker(
   const env = { ...process.env };
   for (const key of Object.keys(env))
     if (/^DOCKER_(HOST|CONTEXT|TLS_VERIFY|CERT_PATH|API_VERSION)$/.test(key)) delete env[key];
+  /** `timeout: 0` lifts the limit; an omitted one keeps the transport default. */
+  const timeout = options.timeout === 0 ? undefined : (options.timeout ?? 15000);
   if (options.onOutput)
     return runStreamingProcess("docker", args, {
       cwd: options.cwd,
-      timeout: options.timeout ?? 15000,
+      timeout,
       signal: options.signal,
       env,
       onOutput: options.onOutput,
     });
   return execute("docker", args, {
     cwd: options.cwd,
-    timeout: options.timeout ?? 15000,
+    timeout,
     signal: options.signal,
     maxBuffer: 4 * 1024 * 1024,
     env,
@@ -74,14 +76,14 @@ export function runNodeScript(
   if (options.onOutput)
     return runStreamingProcess(process.execPath, [script, ...args], {
       cwd: options.cwd,
-      timeout: options.timeout ?? 30000,
+      timeout: options.timeout === 0 ? undefined : (options.timeout ?? 30000),
       signal: options.signal,
       env,
       onOutput: options.onOutput,
     });
   return execute(process.execPath, [script, ...args], {
     cwd: options.cwd,
-    timeout: options.timeout ?? 30000,
+    timeout: options.timeout === 0 ? undefined : (options.timeout ?? 30000),
     signal: options.signal,
     maxBuffer: 4 * 1024 * 1024,
     env,

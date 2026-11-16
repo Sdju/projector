@@ -6,7 +6,7 @@ export interface TreeMenuOptions {
   expanded: ReadonlySet<string>;
   item: (
     id: string,
-    options?: { separator?: boolean; danger?: boolean; label?: string },
+    options?: { separator?: boolean; danger?: boolean; label?: string; args?: unknown },
   ) => ContextMenuItem;
   allowed: (commandId: string) => boolean;
 }
@@ -16,6 +16,13 @@ export function treeMenuItems({ entry, expanded, item, allowed }: TreeMenuOption
   const items: ContextMenuItem[] = [];
   if (entry && !entry.directory) items.push(item("file.open"));
   items.push(item("entry.reveal"));
+  items.push(
+    item("entry.info", {
+      args: entry
+        ? { path: entry.path, kind: entry.directory ? "directory" : "file" }
+        : { path: "", kind: "directory" },
+    }),
+  );
   if (!entry || entry.directory) items.push(item("file.create"), item("directory.create"));
   if (entry)
     items.push(

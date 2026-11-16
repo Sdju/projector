@@ -1,8 +1,9 @@
 import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { dataDir } from "@ai-projector/core/modules/app-paths/index.ts";
 
-export type SkillSource = "user" | "project";
+export type SkillSource = "user" | "project" | "system";
 
 /** A skill (a folder with `SKILL.md`) or a prompt command (`commands/<name>.md`) the agent can use. */
 export interface Skill {
@@ -20,14 +21,23 @@ export interface Skill {
 
 const NAME = /^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/;
 const BODY_CHARS = 30_000;
-/** How many skills the prompt lists, and how much of each description. */
+/** How many user and project skills the prompt lists, and how much of each description. */
 const LISTED = 40;
 const DESCRIPTION_CHARS = 240;
 
 const userRoot = () => join(dataDir(), "agent");
+/** Skills shipped with Projector: skill folders sit in this directory as they are, also in the packaged app. */
+const systemRoot = fileURLToPath(new URL("./system-skills", import.meta.url));
 
-/** Where skills and commands are looked up. A user's own always beats a repository's of the same name. */
-function roots(cwd?: string): { dir: string; source: SkillSource }[] {
+interface SourceRoot {
+  dir: string;
+  source: SkillSource;
+  /** The folder itself holds skill folders and has no `commands/` beside them. */
+  flat?: boolean;
+}
+
+/** Where skills and commands are looked up: the user's own beats a repository's, the built-in ones go last. */
+function roots(cwd?: string): SourceRoot[] {
   return [
     { dir: userRoot(), source: "user" },
     ...(cwd
@@ -36,6 +46,7 @@ function roots(cwd?: string): { dir: string; source: SkillSource }[] {
           { dir: join(cwd, ".claude"), source: "project" as const },
         ]
       : []),
+    { dir: systemRoot, source: "system", flat: true },
   ];
 }
 
@@ -53,7 +64,8 @@ export function parseFrontmatter(text: string): { meta: Record<string, string>; 
 
 async function entries(dir: string) {
   try {
-    return await readdir(dir, { withFileTypes: true });
+    const items = await readdir(dir, { withFileTypes: true });
+    return items.sort((a, b) => a.name.localeCompare(b.name));
   } catch {
     return [];
   }
@@ -72,11 +84,12 @@ function describe(meta: Record<string, string>, body: string, fallback: string):
   return (meta.description || line || fallback).trim().slice(0, DESCRIPTION_CHARS);
 }
 
-async function skillsIn(dir: string, source: SkillSource): Promise<Skill[]> {
+async function skillsIn(root: SourceRoot): Promise<Skill[]> {
   const found: Skill[] = [];
-  for (const entry of await entries(join(dir, "skills"))) {
+  const base = root.flat ? root.dir : join(root.dir, "skills");
+  for (const entry of await entries(base)) {
     if (!entry.isDirectory() || !NAME.test(entry.name)) continue;
-    const raw = await readText(join(dir, "skills", entry.name, "SKILL.md"));
+    const raw = await readText(join(base, entry.name, "SKILL.md"));
     if (!raw) continue;
     const { meta, body } = parseFrontmatter(raw);
     const name = NAME.test(meta.name ?? "") ? meta.name! : entry.name;
@@ -84,23 +97,24 @@ async function skillsIn(dir: string, source: SkillSource): Promise<Skill[]> {
       name,
       description: describe(meta, body, name),
       hint: meta["argument-hint"],
-      source,
+      source: root.source,
       kind: "skill",
       body: body.slice(0, BODY_CHARS),
-      directory: join(dir, "skills", entry.name),
+      directory: join(base, entry.name),
     });
   }
-  for (const entry of await entries(join(dir, "commands"))) {
+  if (root.flat) return found;
+  for (const entry of await entries(join(root.dir, "commands"))) {
     if (!entry.isFile() || !entry.name.endsWith(".md")) continue;
     const name = entry.name.slice(0, -3);
-    const raw = await readText(join(dir, "commands", entry.name));
+    const raw = await readText(join(root.dir, "commands", entry.name));
     if (!NAME.test(name) || !raw) continue;
     const { meta, body } = parseFrontmatter(raw);
     found.push({
       name,
       description: describe(meta, body, name),
       hint: meta["argument-hint"],
-      source,
+      source: root.source,
       kind: "command",
       body: body.slice(0, BODY_CHARS),
     });
@@ -108,9 +122,9 @@ async function skillsIn(dir: string, source: SkillSource): Promise<Skill[]> {
   return found;
 }
 
-/** Everything available in the project: skills and commands, the user's first, then `.projector`, then `.claude`. */
+/** Everything available in the project: skills and commands, the user's first, then `.projector`, `.claude`, built-in. */
 export async function listSkills(cwd?: string): Promise<Skill[]> {
-  const all = (await Promise.all(roots(cwd).map((root) => skillsIn(root.dir, root.source)))).flat();
+  const all = (await Promise.all(roots(cwd).map((root) => skillsIn(root)))).flat();
   const seen = new Set<string>();
   return all.filter((item) => {
     const key = `${item.kind}:${item.name}`;
@@ -129,9 +143,13 @@ export function skillsForRole(skills: readonly Skill[], names?: readonly string[
 
 /** The part of the system prompt that names the skills; their text is read on demand by `use_skill`. */
 export function skillsSection(skills: Skill[]): string {
-  const own = skills.filter((item) => item.kind === "skill").slice(0, LISTED);
-  if (!own.length) return "";
-  return `\n\nНавыки (use_skill с именем загружает инструкцию; делай это, когда описание подходит задаче пользователя):\n${own.map((item) => `- ${item.name}: ${item.description}`).join("\n")}`;
+  const listed = skills.filter((item) => item.kind === "skill");
+  /** Built-in skills are few and replace base prompt text, so they are never cut by the user list. */
+  const builtin = listed.filter((item) => item.source === "system");
+  const own = listed.filter((item) => item.source !== "system").slice(0, LISTED);
+  const shown = [...builtin, ...own];
+  if (!shown.length) return "";
+  return `\n\nНавыки (use_skill с именем загружает инструкцию; делай это, когда описание подходит задаче пользователя):\n${shown.map((item) => `- ${item.name}: ${item.description}`).join("\n")}`;
 }
 
 /**

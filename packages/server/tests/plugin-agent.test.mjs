@@ -78,3 +78,19 @@ test("an explicit terminal program overrides the agent program", () => {
   // The ACP backend reports the terminal program as its own, like every built-in agent.
   expect(backend.program).toBe("fixture-terminal-bin");
 });
+
+test("a declarative plugin agent without command is refused", () => {
+  expect(() => createPluginAgent({ id: "fixture-code", title: "Code Fixture" })).toThrow(
+    /должен указать command/,
+  );
+});
+
+test("a plugin agent carries defaultFeatures from the manifest", () => {
+  const backend = createPluginAgent({
+    id: "fixture-features",
+    title: "Features Fixture",
+    command: "fixture-features",
+    defaultFeatures: ["widgets", "web-search"],
+  });
+  expect(backend.defaultFeatures).toEqual(["widgets", "web-search"]);
+});

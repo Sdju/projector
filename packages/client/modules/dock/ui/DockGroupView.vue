@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import UiPanel from "../../../common/ui/UiPanel.vue";
 import { computed, inject, ref, watch } from "vue";
-import { useEventListener } from "@vueuse/core";
+import { useElementSize, useEventListener, useMediaQuery } from "@vueuse/core";
 import DockTabs from "./DockTabs.vue";
 import DockSlot from "./DockSlot.ts";
 import UiButton from "../../../common/ui/UiButton.vue";
@@ -22,9 +22,20 @@ import { dockKey } from "./context.ts";
 const props = defineProps<{ group: DockGroup }>();
 const dock = inject(dockKey)!;
 const body = ref<HTMLElement>();
+const header = ref<HTMLElement>();
+/** Ниже этой ширины шапки вкладки сворачиваются в выбранную и список: запуск и действия остаются на виду. */
+const COMPACT_HEADER = 360;
+const { width: headerWidth } = useElementSize(header);
+/** В узком окне шапка переносится на строки целиком, и список вкладок ей не нужен. */
+const wrapped = useMediaQuery("(max-width: 700px)");
+const compactHeader = computed(
+  () => !wrapped.value && headerWidth.value > 0 && headerWidth.value < COMPACT_HEADER,
+);
 const zone = ref<DockZone | "">("");
 const focused = computed(() => dock.layout().focused === props.group.id);
 const maximized = computed(() => dock.layout().maximized === props.group.id);
+const zen = computed(() => dock.zen?.() ?? false);
+const zenActive = computed(() => zen.value && focused.value);
 const tabs = computed(() => props.group.panels.map((id) => dock.describe(id)));
 
 function zoneAt(event: DragEvent): DockZone {
@@ -126,12 +137,19 @@ const focus = () => {
     as="section"
     sizing="flex"
     class="dock-group"
-    :class="{ focused, maximized }"
+    :class="{ focused, maximized, zen: zenActive }"
+    :inert="zen && !focused"
     :data-group="group.id"
     @pointerdown.capture="focus"
     @focusin="focus"
   >
-    <header class="dock-header" @dragenter.capture="clearZone" @dragover.capture="clearZone">
+    <header
+      v-show="!zenActive"
+      ref="header"
+      class="dock-header"
+      @dragenter.capture="clearZone"
+      @dragover.capture="clearZone"
+    >
       <div v-if="dock.slots.leading" class="dock-leading">
         <DockSlot :render="dock.slots.leading" :args="{ group }" />
       </div>
@@ -142,6 +160,7 @@ const focus = () => {
         :label="`Вкладки блока`"
         :group="group.id"
         :dim="!focused"
+        :compact="compactHeader"
         :command-namespace="dock.commandNamespace"
         :project-id="dock.projectId"
         :command-handlers="handlers"
@@ -213,10 +232,15 @@ const focus = () => {
 .dock-group.focused {
   border-color: var(--line-strong);
 }
-.dock-group.maximized {
+.dock-group.maximized,
+.dock-group.zen {
   position: absolute;
   inset: 0;
   z-index: var(--z-sticky);
+}
+.dock-group.zen {
+  border-width: 0;
+  border-radius: 0;
 }
 .dock-header {
   display: flex;

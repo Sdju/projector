@@ -1,6 +1,7 @@
 import type { JudgeOverride } from "@ai-projector/core/modules/agent-judge/index.ts";
 import type { AgentRoleSnapshot } from "@ai-projector/core/modules/agent-role/index.ts";
 import { deviceUrl } from "../../../common/utilities/device-url.ts";
+import { clearPendingRequest } from "../model/chat-state.ts";
 import { answerCommand } from "./commands.ts";
 import { EVENTS_UNAVAILABLE, EventStreamRefused, streamViaEvents } from "./event-stream.ts";
 import { parseSse } from "./sse.ts";
@@ -163,13 +164,23 @@ export async function cancelAgentRun(runId: string, base?: string): Promise<void
   });
 }
 
+function toolResultUrl(base?: string): string {
+  return base ? `${base}/agent/tool-result` : deviceUrl("/api/agent/tool-result");
+}
+
 /** Answers a `permission-request` event; the ID is a single-use capability from that stream. */
-export async function answerPermission(id: string, allow: boolean, always = false): Promise<void> {
-  const response = await fetch("/api/agent/tool-result", {
+export async function answerPermission(
+  id: string,
+  allow: boolean,
+  always = false,
+  base?: string,
+): Promise<void> {
+  const response = await fetch(toolResultUrl(base), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ id, output: { allow, always } }),
   });
+  if (!base) clearPendingRequest(id);
   if (!response.ok) throw new Error("Запрос разрешения уже закрыт");
 }
 
@@ -177,12 +188,14 @@ export async function answerPermission(id: string, allow: boolean, always = fals
 export async function answerQuestion(
   id: string,
   answers: Record<string, string[]> | null,
+  base?: string,
 ): Promise<void> {
-  const response = await fetch("/api/agent/tool-result", {
+  const response = await fetch(toolResultUrl(base), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ id, output: answers ? { answers } : {} }),
   });
+  if (!base) clearPendingRequest(id);
   if (!response.ok) throw new Error("Вопрос уже закрыт");
 }
 
@@ -190,12 +203,13 @@ export async function answerQuestion(
  * Answers a `secret-request` event with the typed value, `null` when the user declines. The value
  * goes to the server in this one request and is not kept by the client.
  */
-export async function answerSecret(id: string, value: string | null): Promise<void> {
-  const response = await fetch("/api/agent/tool-result", {
+export async function answerSecret(id: string, value: string | null, base?: string): Promise<void> {
+  const response = await fetch(toolResultUrl(base), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ id, output: value ? { value } : {} }),
   });
+  if (!base) clearPendingRequest(id);
   if (!response.ok) throw new Error("Запрос секрета уже закрыт");
 }
 
@@ -373,22 +387,3 @@ export const mergeWorktree = (projectId: string, id: string) =>
 /** Deletes the isolated copy with everything the agent did in it. */
 export const discardWorktree = (projectId: string, id: string) =>
   post("/api/agent/worktree/discard", projectId, id, "Не удалось удалить копию");
-
-/** An agent process working right now, on any page. */
-export interface LiveAgentRun {
-  id: string;
-  backend: AgentBackendId;
-  projectId: string;
-  chat: string;
-  topic: string;
-  session?: string;
-  /** When the run started (ms since the epoch), for the elapsed time in the island. */
-  startedAt?: number;
-}
-
-export async function fetchLiveRuns(base?: string): Promise<LiveAgentRun[]> {
-  const path = base ? `${base}/agent/runs` : deviceUrl("/api/agent/runs");
-  const response = await fetch(path, { cache: "no-store" });
-  if (!response.ok) throw new Error("Не удалось получить работающие процессы агентов");
-  return (await response.json()).runs ?? [];
-}

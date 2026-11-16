@@ -70,6 +70,15 @@ test("a short chat is shown whole, and a short window is filled from above", asy
   expect(long.window.shown.value.length).toBeGreaterThan(10);
 });
 
+test("a request outside the mounted window can be revealed directly", async () => {
+  const { window } = setup(23);
+  expect(window.shown.value.some((turn) => turn.id === "t4")).toBe(false);
+  expect(await window.reveal("t4")).toBe(true);
+  expect(window.shown.value[0].id).toBe("t4");
+  expect(await window.reveal("t5")).toBe(false);
+  expect(await window.reveal("missing")).toBe(false);
+});
+
 test("nothing is mounted while the history is still being fetched", async () => {
   const { window, waiting, log } = setup(20, true);
   log.value.clientHeight = 900;

@@ -10,6 +10,7 @@ import {
   loadSessionTurns,
   streamAgent,
 } from "../api/client.ts";
+import { fetchLiveRuns } from "../api/runs.ts";
 import { addVersion } from "./branches.ts";
 import { chatHistory } from "./chat-state.ts";
 import { chatKeyOf } from "./chat-key.ts";
@@ -26,11 +27,13 @@ import { chatPresence, createState, loads, queued, releases, sessions } from "./
 import { INTERRUPTED, loadHistory } from "./load-history.ts";
 import { recoverTurn } from "./lost-answer.ts";
 import { isBuiltinAgent } from "./modes.ts";
+import { streamAnswer } from "./run-turn.ts";
 import { watchChat } from "./chat-sync.ts";
 import { saveChat } from "./save-chat.ts";
 import { useExternalAgent } from "./external.ts";
-import { applyAgentEvent, closeAnswer, markAnswerFailed, resetAnswer } from "./turn-events.ts";
+import { answerLooksOpen, applyAgentEvent, closeAnswer, markAnswerFailed } from "./turn-events.ts";
 import { hasChips, messageText, normalizeParts } from "../lib/message-parts.ts";
+import { announceAgentTurnEnd } from "../lib/turn-end.ts";
 import { restoreFormSnapshot } from "./form-reply.ts";
 import { userTurnOf } from "./user-turn.ts";
 import { applyRoleSnapshot } from "./role-apply.ts";
@@ -46,10 +49,6 @@ import type {
 import type { AgentRoleSnapshot } from "@ai-projector/core/modules/agent-role/index.ts";
 
 type SendOptions = { auto?: string; autoTitle?: string; form?: AgentFormAnswer };
-
-/** A restarting server answers again within seconds; this much patience covers a slow restart. */
-const REJOIN_DELAY_MS = 1000;
-const REJOIN_ATTEMPTS = 60;
 
 export function useAgent(
   projectId = "",
@@ -168,22 +167,7 @@ export function useAgent(
       if (["status", "controls", "tool-result"].includes(event.event)) void actions.deliverQueue();
     };
     try {
-      let attach = firstAttach;
-      for (let attempt = 0; ; attempt++) {
-        if (attach) {
-          resetAnswer(assistant);
-        }
-        try {
-          await start(onEvent, signal, attach);
-          if (signal.aborted || !assistant.run) break;
-        } catch (err) {
-          if (err instanceof AgentRunGone || signal.aborted || !assistant.run) throw err;
-          if (attempt >= REJOIN_ATTEMPTS) throw err;
-        }
-        await new Promise((resolve) => setTimeout(resolve, REJOIN_DELAY_MS));
-        attach = assistant.run;
-        if (signal.aborted || !attach) break;
-      }
+      await streamAnswer(assistant, start, onEvent, signal, firstAttach);
     } catch (err) {
       if (err instanceof AgentRunGone) {
         assistant.run = undefined;
@@ -192,7 +176,12 @@ export function useAgent(
     } finally {
       const stopped = signal.aborted;
       state.abort?.abort();
-      closeAnswer(state, assistant, Date.now());
+      // User stop() already dropped `run` and cancelled the process. A remount, HMR or reload
+      // only aborts the stream: keep `run` so the next page can attach to the still-working host.
+      if (!(stopped && assistant.run)) {
+        assistant.run = undefined;
+        closeAnswer(state, assistant, Date.now());
+      }
       state.busy = false;
       state.phase = "";
       state.permissions = [];
@@ -200,6 +189,8 @@ export function useAgent(
       state.secrets = [];
       persist();
       if (!stopped) notifyAnswer(assistant.text, !!state.error);
+      // The answer is over and its edits are on disk: the workspace rereads Git.
+      announceAgentTurnEnd(projectId);
       void drainQueue(stopped && !state.interrupting);
     }
   }
@@ -289,7 +280,14 @@ export function useAgent(
   async function resumeRun(): Promise<void> {
     await ready;
     const assistant = state.turns.at(-1);
-    if (state.busy || assistant?.role !== "assistant" || !assistant.run) return;
+    if (state.busy || assistant?.role !== "assistant") return;
+    if (!assistant.run && answerLooksOpen(assistant)) {
+      const live = (await fetchLiveRuns().catch(() => [])).find(
+        (item) => item.chat === key && item.backend === backend,
+      );
+      if (live) assistant.run = live.id;
+    }
+    if (!assistant.run) return;
     await runTurn(
       assistant,
       (onEvent, signal, attach) =>

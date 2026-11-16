@@ -1,0 +1,46 @@
+{
+  "version": 1,
+  "commands": [
+    {
+      "id": "d956fa0a-99de-42fb-af08-5711094bd113",
+      "name": "dev",
+      "cmd": "pnpm dev"
+    },
+    {
+      "id": "efcef4c1-6a5b-49cf-9165-c01aeae1c169",
+      "name": "preview",
+      "cmd": "pnpm preview"
+    },
+    {
+      "id": "9c3e8e87-0486-4ee2-ad6d-487fd0adc2d3",
+      "name": "build",
+      "cmd": "pnpm build"
+    },
+    {
+      "id": "17c68c22-2080-4097-9cc8-f76359f70c93",
+      "name": "test",
+      "cmd": "pnpm test"
+    },
+    {
+      "id": "e403dead-9b5e-4530-8819-9433eb613854",
+      "name": "check",
+      "cmd": "pnpm check"
+    },
+    {
+      "id": "967435d3-c27c-455e-b18c-578e2bc3acfb",
+      "name": "architecture",
+      "cmd": "pnpm run architecture"
+    },
+    {
+      "id": "df8bc930-b778-4481-a34a-0fbca7452667",
+      "name": "hub",
+      "cmd": "pnpm hub"
+    },
+    {
+      "id": "9fe53786-cd52-4ff8-b89b-d381dc233ace",
+      "name": "deploy:hub",
+      "cmd": "artifacts/projector-hub/deploy.sh"
+    }
+  ],
+  "defaultCommandId": "d956fa0a-99de-42fb-af08-5711094bd113"
+}

@@ -2,17 +2,30 @@
 import UiToolbar from "../../../common/ui/UiToolbar.vue";
 import UiScrollArea from "../../../common/ui/UiScrollArea.vue";
 import UiButton from "../../../common/ui/UiButton.vue";
+import UiInline from "../../../common/ui/UiInline.vue";
 import UiEmpty from "../../../common/ui/UiEmpty.vue";
-import UiLoader from "../../../common/ui/UiLoader.vue";
+import UiSectionRefresh from "../../../common/ui/UiSectionRefresh.vue";
 import DockerDaemonNotice from "./DockerDaemonNotice.vue";
 import { useDockerState } from "../model.ts";
-const { snapshot, error, starting, commands, projectContainers: containers } = useDockerState();
+const {
+  snapshot,
+  error,
+  starting,
+  commands,
+  projectContainers: containers,
+  refresh,
+  refreshPending,
+} = useDockerState();
+defineExpose({ refresh, refreshing: refreshPending });
 </script>
 <template>
   <UiScrollArea class="docker-sidebar" @pointerdown="commands.scope.activate()">
     <UiToolbar as="header" justify="between" text="xs">
-      <span>{{ snapshot?.binding?.name || "Docker" }}</span
-      ><UiButton size="sm" @click="commands.run('ide.docker.open')">открыть</UiButton>
+      <span>{{ snapshot?.binding?.name || "Docker" }}</span>
+      <UiInline :gap="1">
+        <UiButton size="sm" @click="commands.run('ide.docker.open')">открыть</UiButton>
+        <UiSectionRefresh />
+      </UiInline>
     </UiToolbar>
     <DockerDaemonNotice
       v-if="error || snapshot?.error"
@@ -21,10 +34,13 @@ const { snapshot, error, starting, commands, projectContainers: containers } = u
       :starting="starting"
       @start="commands.run('ide.docker.daemon.start')"
     />
-    <UiLoader v-else-if="!snapshot" :padding="3">Подключение к Docker…</UiLoader>
-    <UiEmpty v-else-if="!snapshot.enabled">Включите Docker в настройках интеграций.</UiEmpty>
-    <UiEmpty v-else-if="!snapshot.binding">Откройте Docker и привяжите Compose к проекту.</UiEmpty>
-    <UiEmpty v-else-if="!containers.length">Контейнеры ещё не созданы.</UiEmpty>
+    <template v-else-if="snapshot">
+      <UiEmpty v-if="!snapshot.enabled">Включите Docker в настройках интеграций.</UiEmpty>
+      <UiEmpty v-else-if="!snapshot.binding"
+        >Откройте Docker и привяжите Compose к проекту.</UiEmpty
+      >
+      <UiEmpty v-else-if="!containers.length">Контейнеры ещё не созданы.</UiEmpty>
+    </template>
     <button
       v-for="item in containers"
       :key="item.id"

@@ -22,9 +22,16 @@ import { KeybindingsEditor } from "../../ide/index.ts";
 import { AnalyticsSettings } from "../../analytics/index.ts";
 import { LanInfoPanel } from "../../network/index.ts";
 import { DockerPanel } from "../../docker/index.ts";
-import { AgentChat, AgentJobTab, AgentTaskTab, roleFromParam } from "../../agent/index.ts";
+import {
+  AgentChat,
+  AgentInbox,
+  AgentJobTab,
+  AgentTaskTab,
+  roleFromParam,
+} from "../../agent/index.ts";
 import { clientAgents } from "../../agents-integration/catalog/index.ts";
 import { BrowserPanel } from "../../browser/index.ts";
+import { EntryInfoTab } from "../modules/tree/index.ts";
 import {
   CommitOverview,
   DiscussionView,
@@ -32,6 +39,8 @@ import {
   PullRequestView,
   ReleaseView,
 } from "../modules/viewers/index.ts";
+import { PluginContributionMount, pluginTabKind, runtimeTabs } from "../../plugin-runtime/index.ts";
+import { MediaPanel } from "../../media/index.ts";
 
 /** How a tab kind is drawn; the owner of the kind supplies it, the workspace only mounts it. */
 export interface TabView {
@@ -79,15 +88,33 @@ export interface TabHost {
   openSection(type: SidebarType): void;
   /** Runs an editor command of this workspace (a button of a view is a command too). */
   run(command: string, args?: unknown): void;
+  /** Awaits a command of the editor scope; plugin views get its real result and errors. */
+  executeCommand?(command: string, args?: unknown): Promise<unknown>;
 }
 
 /** Base views of a workspace; agent chats come from the catalog registered before mounting. */
 export function baseTabViews(): TabViews {
   return {
     keybindings: { component: KeybindingsEditor, ownKeys: true, keepAlive: true },
+    media: { component: MediaPanel, keepAlive: true, scroll: true },
     analytics: { component: AnalyticsSettings, keepAlive: true, scroll: true },
     network: { component: LanInfoPanel, ownKeys: true, keepAlive: true },
     docker: { component: DockerPanel, keepAlive: true },
+    inbox: {
+      component: AgentInbox,
+      keepAlive: true,
+      scroll: true,
+      props: () => ({ scopeId: "agent-inbox:tab" }),
+    },
+    "entry-info": {
+      component: EntryInfoTab,
+      keepAlive: true,
+      props: (tab, host) => ({
+        projectId: host.projectId,
+        path: typeof tab.params?.path === "string" ? tab.params.path : "",
+        directory: typeof tab.params?.directory === "boolean" ? tab.params.directory : undefined,
+      }),
+    },
     browser: {
       component: BrowserPanel,
       keepAlive: true,
@@ -194,6 +221,32 @@ export function baseTabViews(): TabViews {
   };
 }
 
+/** Runtime views of plugin tabs; they are comounted by id and disposed when the tab closes. */
+export function pluginTabViews(): TabViews {
+  return Object.fromEntries(
+    runtimeTabs.value.map((contribution) => [
+      pluginTabKind(contribution.packageName, contribution.declaration.id),
+      {
+        component: PluginContributionMount,
+        keepAlive: true,
+        props: (tab, host) => ({
+          kind: "tab",
+          instance: contribution.instance,
+          plugin: contribution.packageName,
+          contributionId: contribution.declaration.id,
+          projectId: host.projectId,
+          params: tab.params,
+          onCommand: (id: string, args?: unknown) =>
+            host.executeCommand?.(id, args) ?? Promise.resolve().then(() => host.run(id, args)),
+          onOpenFile: (path: string, options?: { line?: number; column?: number }) =>
+            host.openFile(path, options?.line),
+          onOpenTab: (id: string, params?: TabParams) => host.openTab(id, params),
+        }),
+      } satisfies TabView,
+    ]),
+  );
+}
+
 interface WorkspaceTabs {
   types: TabRegistry;
   views: TabViews;
@@ -210,10 +263,13 @@ export function useWorkspaceTabTypes(
 ) {
   const types = createTabRegistry(baseTabTypes, profile.tabs);
   const tabs = shallowReactive<WorkspaceTabs>({ types, views: {} });
-  // A plugin can add an agent after the workspace is mounted; its chat tab must appear too.
-  watchEffect(() => {
-    tabs.views = { ...baseTabViews(), ...views };
-  });
+  // A plugin can add an agent, a chat tab or a browser contribution after the workspace is mounted.
+  watchEffect(
+    () => {
+      tabs.views = { ...baseTabViews(), ...views, ...pluginTabViews() };
+    },
+    { flush: "sync" },
+  );
   provide(workspaceTabsKey, tabs);
   const detach = Object.entries(behaviors).map(([id, behavior]) => types.behave(id, behavior));
   onBeforeUnmount(() => detach.forEach((fn) => fn()));

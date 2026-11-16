@@ -7,12 +7,48 @@ import {
   type WorkspaceWatchPatch,
   type WorkspaceWatchHandlers,
 } from "./profile.ts";
+import type {
+  WorkspaceParams,
+  WorkspaceReadAction,
+  WorkspaceReadResult,
+  WorkspaceRequestArgs,
+  WorkspaceScopeReadAction,
+  WorkspaceScopeRequestArgs,
+} from "./actions.ts";
 import {
   fileScopeQuery,
   isLiveScope,
   type FileScope,
+  type SearchOptions,
+  type TrashDirectory,
+  type TrashList,
 } from "@ai-projector/core/modules/workspace/index.ts";
 import { createLocalWorkspaceProfile } from "./local.ts";
+export {
+  READ_ACTION_DOMAINS,
+  type WorkspaceEntryInfo,
+  type WorkspaceParams,
+  type WorkspaceReadAction,
+  type WorkspaceReadActions,
+  type WorkspaceReadDomain,
+  type WorkspaceReadParams,
+  type WorkspaceReadResult,
+  type WorkspaceRequestArgs,
+  type WorkspaceScopeReadAction,
+  type WorkspaceScopeReadActions,
+  type WorkspaceScopeReadParams,
+  type WorkspaceScopeRequestArgs,
+} from "./actions.ts";
+export { createBrowseReader, WorkspaceRequestError, type BrowseReader } from "./transport.ts";
+export {
+  connectionFilesProvider,
+  numberedReadProvider,
+  readonlyFileContent,
+  readonlyWorkspaceFeatures,
+  snapshotGitProvider,
+  snapshotTreePage,
+  WORKSPACE_ACTION_UNAVAILABLE,
+} from "./providers.ts";
 export {
   createWorkspaceProfiles,
   profileCapabilities,
@@ -35,13 +71,19 @@ export {
   type PipelineStageGroup,
   type PipelineStageTone,
 } from "./pipeline-stages.ts";
-export { createSidebarRegistry, type SidebarRegistry, type SidebarType } from "./sidebar.ts";
+export {
+  createSidebarRegistry,
+  workspaceUtility,
+  type SidebarRegistry,
+  type SidebarType,
+} from "./sidebar.ts";
 export { extendSidebarRegistry, groupSidebar } from "./sidebar.ts";
 export {
   ciTabParams,
   createTabRegistry,
   defineTab,
   idTab,
+  inboxTab,
   numberedTab,
   singletonTab,
   tabRecordId,
@@ -118,34 +160,48 @@ function gitWriter(projectId: string) {
   return write;
 }
 
-export async function workspaceRequest<T>(
+/** Приватный транспорт: провайдер видит строковое действие, типы проверяются на публичных входах. */
+async function readAction<R>(
   projectId: string,
-  action: string,
-  params: Record<string, string> = {},
+  action: WorkspaceReadAction,
+  params: unknown,
   signal?: AbortSignal,
-): Promise<T> {
+): Promise<R> {
   const provider = readProviderFor(workspaceProfile(projectId), action);
-  return (await provider.read(action, params, signal)) as T;
+  return (await provider.read(action, (params ?? {}) as WorkspaceParams, signal)) as R;
+}
+
+/** Читает действие workspace; имя действия связывает параметры и тип ответа. */
+export function workspaceRequest<K extends WorkspaceReadAction>(
+  projectId: string,
+  action: K,
+  ...[params, signal]: WorkspaceRequestArgs<K>
+): Promise<WorkspaceReadResult<K>> {
+  return readAction<WorkspaceReadResult<K>>(projectId, action, params, signal);
 }
 
 /**
  * Reads a workspace action from a file scope. The action keeps its name (`tree`, `file`, `diff`);
  * the scope contributes only its parameters, so call sites never spell out `rev` or `from/to`.
  */
-export function workspaceScopeRequest<T>(
+export function workspaceScopeRequest<K extends WorkspaceScopeReadAction>(
   projectId: string,
   scope: FileScope,
-  action: string,
-  params: Record<string, string> = {},
-  signal?: AbortSignal,
-): Promise<T> {
-  return workspaceRequest<T>(projectId, action, { ...params, ...fileScopeQuery(scope) }, signal);
+  action: K,
+  ...[params, signal]: WorkspaceScopeRequestArgs<K>
+): Promise<WorkspaceReadResult<K>> {
+  return readAction<WorkspaceReadResult<K>>(
+    projectId,
+    action,
+    { ...params, ...fileScopeQuery(scope) },
+    signal,
+  );
 }
 
 export function searchWorkspace(
   projectId: string,
   query: string,
-  options: import("@ai-projector/core/modules/workspace/index.ts").SearchOptions,
+  options: SearchOptions,
   signal?: AbortSignal,
   scope?: FileScope,
 ) {
@@ -155,35 +211,27 @@ export function searchWorkspace(
     word: String(!!options.wholeWord),
     regex: String(!!options.regex),
   };
-  if (scope)
-    return workspaceScopeRequest<{
-      hits: import("@ai-projector/core/modules/workspace/index.ts").SearchHit[];
-      truncated: boolean;
-    }>(projectId, scope, "search", params, signal);
-  return workspaceRequest<{
-    hits: import("@ai-projector/core/modules/workspace/index.ts").SearchHit[];
-    truncated: boolean;
-  }>(projectId, "search", params, signal);
+  if (scope) return workspaceScopeRequest(projectId, scope, "search", params, signal);
+  return workspaceRequest(projectId, "search", params, signal);
 }
 
 /** Files and folders of the project whose path matches the query, best first. */
-export async function findWorkspacePaths(projectId: string, query: string, signal?: AbortSignal) {
-  const { paths } = await workspaceRequest<{ paths: { path: string; directory: boolean }[] }>(
-    projectId,
-    "paths",
-    { q: query },
-    signal,
-  );
+export async function findWorkspacePaths(
+  projectId: string,
+  query: string,
+  signal?: AbortSignal,
+  scope?: FileScope,
+  limit?: number,
+) {
+  const params = { q: query, ...(limit ? { limit: String(limit) } : {}) };
+  const { paths } = scope
+    ? await workspaceScopeRequest(projectId, scope, "paths", params, signal)
+    : await workspaceRequest(projectId, "paths", params, signal);
   return paths;
 }
 
 export function gutterRequest(projectId: string, path: string, signal?: AbortSignal) {
-  return workspaceRequest<import("@ai-projector/core/modules/workspace/index.ts").GitGutter>(
-    projectId,
-    "gutter",
-    { path },
-    signal,
-  );
+  return workspaceRequest(projectId, "gutter", { path }, signal);
 }
 
 export async function saveWorkspaceFile(
@@ -267,6 +315,42 @@ export async function mutateWorkspaceEntry(
     { action, path, directory, name },
     "Не удалось выполнить действие",
   )) as { source?: string; destination?: string };
+}
+
+/** Корневой список корзины: без `path` хост отдаёт записи, а не уровень дерева. */
+export async function listWorkspaceTrash(
+  projectId: string,
+  signal?: AbortSignal,
+): Promise<TrashList> {
+  return (await workspaceRequest(projectId, "trash", {}, signal)) as TrashList;
+}
+
+/** One level of a trashed folder, fetched when the tree row is expanded. */
+export async function listWorkspaceTrashDirectory(
+  projectId: string,
+  path: string,
+  signal?: AbortSignal,
+): Promise<TrashDirectory> {
+  return (await workspaceRequest(projectId, "trash", { path }, signal)) as TrashDirectory;
+}
+
+/** Recursive sizes of the direct children of a trash folder; `""` means the trash root. */
+export function workspaceTrashSizes(projectId: string, path = "", signal?: AbortSignal) {
+  return workspaceRequest(projectId, "trash-sizes", { path }, signal);
+}
+
+/** Restores or permanently deletes trash entries; permanent deletion needs `confirm`. */
+export async function mutateWorkspaceTrash(
+  projectId: string,
+  action: "restore" | "delete" | "empty",
+  ids: string[] = [],
+  confirm = false,
+) {
+  return (await fileWriter(projectId)(
+    "trash",
+    { action, ids, confirm },
+    "Не удалось выполнить действие с корзиной",
+  )) as import("@ai-projector/core/modules/workspace/index.ts").TrashMutation;
 }
 
 export async function mutateWorkspaceGit(

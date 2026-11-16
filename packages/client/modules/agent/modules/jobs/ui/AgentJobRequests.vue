@@ -29,6 +29,7 @@ const permissions = computed<(AgentPermission & { job: string })[]>(() =>
         title: `${agentLabel(job.backend)} · ${card.title}`,
         detail: card.detail ?? "",
         persistent: card.persistent === true,
+        ...(card.judge ? { judge: card.judge } : {}),
       })),
   ),
 );

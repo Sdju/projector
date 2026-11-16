@@ -1,4 +1,5 @@
 import { chatsOf } from "../../../../agent-core/index.ts";
+import type { ChatRef, ChatSessions } from "../../../../agent-core/index.ts";
 import type { AgentJobView } from "../../../../agent-core/index.ts";
 import { jobChatTab } from "../lib/job-labels.ts";
 
@@ -26,7 +27,7 @@ export async function continueJobInChat(api: Commands, job: AgentJobView): Promi
   });
   const deadline = Date.now() + 5000;
   while (Date.now() < deadline) {
-    const chat = chatsOf(job.projectId).find(
+    const chat: (ChatRef & ChatSessions) | undefined = chatsOf(job.projectId).find(
       (item) => !known.has(item.key) && item.backend === job.backend,
     );
     if (chat) return chat.resumeSession(job.sessionId!);

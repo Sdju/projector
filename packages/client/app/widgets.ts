@@ -14,6 +14,7 @@ import { inlineIcon } from "../modules/agent-widgets/inline-icon/index.ts";
 import { input } from "../modules/agent-widgets/input/index.ts";
 import { intelligentForm } from "../modules/agent-widgets/intelligent-form/index.ts";
 import { line } from "../modules/agent-widgets/line/index.ts";
+import { media } from "../modules/agent-widgets/media/index.ts";
 import { row } from "../modules/agent-widgets/row/index.ts";
 import { safeSecretShow } from "../modules/agent-widgets/safe-secret-show/index.ts";
 import { slider } from "../modules/agent-widgets/slider/index.ts";
@@ -43,6 +44,7 @@ export function registerBuiltinWidgets(): void {
     input,
     intelligentForm,
     line,
+    media,
     row,
     safeSecretShow,
     slider,

@@ -18,6 +18,7 @@ import UiDialog from "../../../common/ui/UiDialog.vue";
 import UiDialogActions from "../../../common/ui/UiDialogActions.vue";
 import UiHint from "../../../common/ui/UiHint.vue";
 import UiKbd from "../../../common/ui/UiKbd.vue";
+import UiLoader from "../../../common/ui/UiLoader.vue";
 defineProps<{ embedded?: boolean }>();
 const { api, revision } = useIdeCommands();
 const search = ref("");
@@ -214,7 +215,8 @@ onMounted(async () => {
       </div>
     </header>
     <p v-if="error" class="message error" role="alert">{{ error }}</p>
-    <p class="message" role="status">{{ busy ? "Сохранение и загрузка…" : status }}</p>
+    <UiLoader v-if="busy" class="message">Сохранение и загрузка…</UiLoader>
+    <p v-else class="message" role="status">{{ status }}</p>
     <KeybindingsTable
       :rows="rows"
       :busy="busy"

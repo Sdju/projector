@@ -17,13 +17,13 @@ import { readMemory, writeMemory } from "./projector-memory.ts";
 import { fetchPage, PAGE_CHARS } from "./projector-web.ts";
 import { findSkill, listSkills, type Skill } from "./projector-skills.ts";
 import { webSearch } from "./projector-web-search.ts";
-import { widgetCatalog } from "./widgets.ts";
-import { trustedProjectWidgets } from "../../project-widgets/index.ts";
 import { showSecretOnPage } from "./secrets/secret-show.ts";
+
+/** Milliseconds a bash call may run in a Docker environment; `PROJECTOR_AGENT_BASH_SECONDS`, 0 is no limit. */
+const BASH_TIMEOUT = (Number(process.env.PROJECTOR_AGENT_BASH_SECONDS) || 0) * 1_000;
 
 export interface AgentToolContext extends ToolSpecContext {
   cwd?: string;
-  /** The project whose trusted widgets `describe_widget` may describe. */
   projectId?: string;
   signal?: AbortSignal;
   guard: GuardOptions;
@@ -119,14 +119,6 @@ export function createAgentTools(context: AgentToolContext) {
         await guardMemory(context.guard, { scope, mode, text });
         return { text: await writeMemory(scope, context.cwd, text, mode) };
       },
-    }),
-    describe_widget: tool({
-      description:
-        "Полное описание виджета: свойства, ограничения и пример. Для специальных виджетов и виджетов проекта обязательно вызывай перед первым использованием; для обычных описание уже есть в промпте.",
-      inputSchema: z.object({ name: z.string().describe("Имя виджета") }),
-      execute: async ({ name }) => ({
-        description: widgetCatalog.describe(name, await trustedProjectWidgets(context.projectId)),
-      }),
     }),
     ...(context.runTask
       ? {
@@ -256,7 +248,7 @@ export function createAgentTools(context: AgentToolContext) {
       : {}),
     bash: tool({
       description:
-        "Выполнить Bash в окружении проекта: Dev Container для доверенного проекта, Docker для изолированного, иначе машина пользователя. Возвращает stdout, stderr, exitCode; лимит 30 секунд. cwd по умолчанию — открытый проект.",
+        "Выполнить Bash в окружении проекта: Dev Container для доверенного проекта, Docker для изолированного, иначе машина пользователя. Возвращает stdout, stderr, exitCode; ограничения по времени по умолчанию нет. cwd по умолчанию — открытый проект.",
       inputSchema: z.object({ command: z.string().min(1), cwd: z.string().optional() }),
       execute: async ({ command, cwd }, { toolCallId }) => {
         await guardBash(context.guard, command);
@@ -284,14 +276,14 @@ export function createAgentTools(context: AgentToolContext) {
                 ? await runDevcontainerCommand(
                     trusted,
                     ["/bin/bash", "-c", command],
-                    30_000,
+                    BASH_TIMEOUT,
                     context.signal,
                     onOutput,
                   )
                 : await runEnvironmentCommand(
                     environment,
                     ["/bin/bash", "--noprofile", "--norc", "-c", command],
-                    30_000,
+                    BASH_TIMEOUT,
                     context.signal,
                     undefined,
                     onOutput,

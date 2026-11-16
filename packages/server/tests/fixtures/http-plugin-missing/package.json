@@ -1,0 +1,20 @@
+{
+  "name": "@projector-tests/http-plugin-missing",
+  "version": "1.0.0",
+  "description": "Плагин, который не зарегистрировал объявленный маршрут",
+  "projector": {
+    "apiVersion": 1,
+    "server": "server.cjs",
+    "contributes": {
+      "http": [
+        {
+          "id": "status",
+          "path": "status",
+          "methods": [
+            "GET"
+          ]
+        }
+      ]
+    }
+  }
+}

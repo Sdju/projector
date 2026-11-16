@@ -3,6 +3,7 @@ import { realpath } from "node:fs/promises";
 import { posix, resolve } from "node:path";
 
 import { broadcastEvent, onEventClientClose } from "../events/index.ts";
+import { auditProjectTrust } from "../project-trust/index.ts";
 import { pathExcluded, validatePath, within } from "./paths.ts";
 
 interface Directory {
@@ -77,6 +78,29 @@ function schedule(entry: Directory, id: string, delay: number, send: () => void)
   );
 }
 
+const trustTimers = new Map<string, ReturnType<typeof setTimeout>>();
+
+/** Trust files live under two hidden folders; a burst of edits is one audit per project. */
+function trustPath(path: string): boolean {
+  return (
+    path === ".projector" ||
+    path.startsWith(".projector/") ||
+    path === ".devcontainer" ||
+    path.startsWith(".devcontainer/")
+  );
+}
+
+function scheduleTrust(projectId: string): void {
+  clearTimeout(trustTimers.get(projectId));
+  trustTimers.set(
+    projectId,
+    setTimeout(() => {
+      trustTimers.delete(projectId);
+      void auditProjectTrust(projectId);
+    }, 250),
+  );
+}
+
 function changed(entry: Directory, name: string | undefined) {
   const fileChanged = (path: string) =>
     schedule(entry, `f:${path}`, DEBOUNCE_MS, () =>
@@ -86,9 +110,14 @@ function changed(entry: Directory, name: string | undefined) {
     schedule(entry, "d", LISTING_DEBOUNCE_MS, () =>
       broadcastEvent("dir-changed", { projectId: entry.projectId, directory: entry.directory }),
     );
-  if (name === undefined) return void entry.files.forEach(fileChanged);
+  if (name === undefined) {
+    entry.files.forEach(fileChanged);
+    if ([...entry.files].some(trustPath)) scheduleTrust(entry.projectId);
+    return;
+  }
   const path = posix.join(entry.directory, name);
   if (entry.files.has(path)) fileChanged(path);
+  if (trustPath(path)) scheduleTrust(entry.projectId);
 }
 
 /** Running out of inotify watches is the one failure the user can fix: tell the pages. */
@@ -128,7 +157,7 @@ async function reconcile() {
       }
       for (const directory of directories) want(projectId, root, directory).listed = true;
     }
-  for (const key of [...registry.directories.keys()]) if (!wanted.has(key)) closeDirectory(key);
+  for (const key of registry.directories.keys()) if (!wanted.has(key)) closeDirectory(key);
   for (const [key, item] of wanted) {
     const current = registry.directories.get(key);
     if (current) {

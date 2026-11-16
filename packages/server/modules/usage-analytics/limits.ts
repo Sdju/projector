@@ -3,6 +3,7 @@ import {
   limitPeriodSeconds,
   type LimitPoint,
   type LimitSeries,
+  type AgentUsageWindowDefinition,
 } from "@ai-projector/core/modules/usage-analytics/index.ts";
 import {
   insertLimitSample,
@@ -110,7 +111,12 @@ function thin(points: readonly LimitPoint[]): LimitPoint[] {
  * Limit windows as the analytics page shows them: samples of the range plus the newest look,
  * two estimates of where the window is going, and the known cycle length for the pace.
  */
-export function readLimitSeries(since: number, now = Date.now()): LimitSeries[] {
+export function readLimitSeries(
+  since: number,
+  now = Date.now(),
+  agents: readonly { id: string; usageWindows?: readonly AgentUsageWindowDefinition[] }[] = [],
+): LimitSeries[] {
+  const definitions = new Map(agents.map((agent) => [agent.id, agent.usageWindows]));
   const latest = readLatestLimitSamples();
   const samples = readLimitSamples(since);
   const grouped = new Map<string, LimitSample[]>();
@@ -131,7 +137,14 @@ export function readLimitSeries(since: number, now = Date.now()): LimitSeries[] 
     if (!newest) continue;
     if (!list.length || list.at(-1)!.at !== newest.at) list.push(newest);
     const { points, rate } = growth(list);
-    const periodSeconds = limitPeriodSeconds(newest.window);
+    const definition = definitions
+      .get(newest.agent)
+      ?.find((window) => window.name === newest.window);
+    const periodSeconds = definition
+      ? Number.isFinite(definition.periodSeconds) && definition.periodSeconds > 0
+        ? definition.periodSeconds
+        : null
+      : limitPeriodSeconds(newest.window);
     const resetsAt = newest.resetsAt;
     const remainingHours = resetsAt !== null ? Math.max(0, resetsAt - now / 1000) / 3600 : null;
     const projected =

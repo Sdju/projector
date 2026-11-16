@@ -263,6 +263,7 @@ export function useAgentRoleSettings() {
           agent: role.agent,
           selection: role.selection,
           prompt: role.prompt,
+          template: role.template,
           skills: role.skills,
           mcp: role.mcp,
           inherited: role.inherited,
@@ -318,7 +319,7 @@ export function useAgentRoleSettings() {
     palette: false,
     title: "Сохранить chat-роль",
     description:
-      "Меняет название, описание, агента, выбранные настройки, промпт, навыки и MCP chat-роли. selection — объект control id → value; отсутствующее значение наследует умолчание агента. prompt добавляется к системному промпту; skills и mcp — имена, пустой массив выключает их. Не переданные поля сохраняются. Роль действует на новые чаты; уже начатые чаты сохраняют снимок.",
+      "Меняет название, описание, агента, выбранные настройки, промпт, шаблон контекста, навыки и MCP chat-роли. selection — объект control id → value; отсутствующее значение наследует умолчание агента. prompt добавляется к системному промпту; template: true превращает его в шаблон с {system}, {features}, {widgets}, {project}, {memory}, {skills}, {mcp}, {role} и {summary}. skills и mcp — имена, пустой массив выключает их. Не переданные поля сохраняются. Роль действует на новые чаты; уже начатые чаты сохраняют снимок.",
     arguments: {
       role: "string: id chat-роли",
       name: "string: название роли",
@@ -326,6 +327,7 @@ export function useAgentRoleSettings() {
       description: "string: описание (необязательно)",
       selection: "object: control id → value (необязательно)",
       prompt: "string: дополнительные инструкции роли (необязательно)",
+      template: "boolean: промпт роли — шаблон контекста (необязательно)",
       skills: "array: имена навыков; пустой массив выключает (необязательно)",
       mcp: "array: имена MCP-серверов; пустой массив выключает (необязательно)",
     },
@@ -353,6 +355,7 @@ export function useAgentRoleSettings() {
         description: typeof args.description === "string" ? args.description : known.description,
         selection,
         prompt: typeof args.prompt === "string" ? args.prompt : known.prompt,
+        template: typeof args.template === "boolean" ? args.template : known.template,
         skills: names(args.skills, known.skills),
         mcp: names(args.mcp, known.mcp),
       });

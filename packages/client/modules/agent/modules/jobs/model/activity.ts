@@ -57,21 +57,25 @@ export function useAgentActivity() {
 
   const items = computed<AgentActivityItem[]>(() => {
     const local = openChats()
-      .map((chat) => ({
-        chat: chat.key,
-        projectId: chat.projectId,
-        agent: chat.label,
-        topic:
-          chat
-            .turns()
-            .findLast((turn) => turn.role === "user")
-            ?.text.trim()
-            .slice(0, 120) ?? "",
-        busy: chat.busy(),
-        tasks: chat.tasks().filter((task) => task.status === "running").length,
-        startedAt: chat.turns().findLast((turn) => turn.role === "assistant")?.at,
-      }))
-      .filter((item) => item.busy || item.tasks);
+      .map((chat) => {
+        const needsUser = chat.needsUser?.() ?? false;
+        return {
+          chat: chat.key,
+          projectId: chat.projectId,
+          agent: chat.label,
+          topic:
+            chat
+              .turns()
+              .findLast((turn) => turn.role === "user")
+              ?.text.trim()
+              .slice(0, 120) ?? "",
+          busy: chat.busy() && !needsUser,
+          needsUser,
+          tasks: chat.tasks().filter((task) => task.status === "running").length,
+          startedAt: chat.turns().findLast((turn) => turn.role === "assistant")?.at,
+        };
+      })
+      .filter((item) => item.busy || item.tasks || item.needsUser);
     // The page's own chat knows more (background tasks) than the run on the server.
     // An idle/disconnected view must not hide the server's still-running agent.
     const known = new Set(local.map((chat) => chat.chat));
@@ -82,15 +86,19 @@ export function useAgentActivity() {
         known.add(key);
         return true;
       })
-      .map((run) => ({
-        chat: run.chat || run.id,
-        projectId: run.projectId,
-        agent: agentLabel(run.backend),
-        topic: run.topic,
-        busy: true,
-        tasks: 0,
-        startedAt: run.startedAt,
-      }));
+      .map((run) => {
+        const needsUser = run.status === "needs-user" || (run.pending?.length ?? 0) > 0;
+        return {
+          chat: run.chat || run.id,
+          projectId: run.projectId,
+          agent: agentLabel(run.backend),
+          topic: run.topic,
+          busy: !needsUser,
+          needsUser,
+          tasks: 0,
+          startedAt: run.startedAt,
+        };
+      });
     const jobs = jobItems(feed.jobs.value);
     return [...local, ...remote, ...jobs];
   });

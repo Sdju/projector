@@ -37,6 +37,7 @@ export function registerRoleCommands(
           agent: role.agent,
           selection: role.selection,
           prompt: role.prompt,
+          template: role.template,
           skills: role.skills,
           mcp: role.mcp,
           inherited: role.inherited,

@@ -10,8 +10,7 @@ import {
   appUrl,
   startServerLogRotation,
 } from "@ai-projector/core/modules/app-paths/index.ts";
-import { os } from "@ai-projector/core/modules/os/index.ts";
-import { CLAUDE_SESSION_ENV } from "../modules/agents/claude-code/index.ts";
+import { os, PARENT_SESSION_ENV } from "@ai-projector/core/modules/os/index.ts";
 import { openLauncher, startTray } from "../modules/window/index.ts";
 import type { ServerMode } from "@ai-projector/core/modules/server-mode/index.ts";
 import { attachTerminalServer, listTerminalSessions } from "../modules/terminal/index.ts";
@@ -21,6 +20,11 @@ import { registerBuiltinWidgetDefinitions } from "./widgets.ts";
 import { registerBuiltinAgentFeatures } from "./features.ts";
 import { ensureIdeMcpToken, bindIdeCommandEvents } from "../modules/ide/index.ts";
 import { reconcileOnStartup } from "../modules/environments/index.ts";
+import {
+  discoverPlugins,
+  pluginsDirectory,
+  watchPluginDirectory,
+} from "../modules/plugins/index.ts";
 
 import {
   attachSharedTerminalServer,
@@ -59,6 +63,7 @@ export function bindRuntime(
   mode: ServerMode,
   handlers: () => RuntimeHandlers = getRuntimeHandlers,
 ): () => void {
+  os.clearSessionEnv(PARENT_SESSION_ENV);
   // The daemon owns its log file: keep it bounded while dev warnings write megabytes.
   startServerLogRotation();
   // Регистрация при вызове, а не при импорте: импорт конфига Vite не должен трогать агентов.
@@ -68,10 +73,13 @@ export function bindRuntime(
   void ensureIdeMcpToken().catch((error: unknown) =>
     console.error("Ключ IDE MCP:", error instanceof Error ? error.message : error),
   );
-  // Сервер, запущенный из сессии Claude Code, иначе передаёт её метки каждому терминалу и агенту.
-  os.clearSessionEnv(CLAUDE_SESSION_ENV);
   runtime.projectorRuntimeMode = mode;
-  const subscriptions = [bindAgentEventStreams(), bindIdeCommandEvents(), bindWorkspaceEvents()];
+  const subscriptions = [
+    bindAgentEventStreams(),
+    bindIdeCommandEvents(),
+    bindWorkspaceEvents(),
+    watchPluginDirectory(pluginsDirectory, discoverPlugins),
+  ];
   const deactivate = () => subscriptions.forEach((off) => off());
   if (!httpServer) return deactivate;
   const allowed: typeof accessAllowed = (...args) => handlers().accessAllowed(...args);

@@ -159,6 +159,7 @@ test("the readonly GitLab source reads tree, files, history, issues and merge re
       "releases",
     ]);
     expect(profile.tabs.map((tab) => tab.id)).toStrictEqual([
+      "inbox",
       "gitlab-integration",
       "repository",
       "issue",

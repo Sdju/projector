@@ -6,7 +6,11 @@ import { useChatActions } from "../modules/agent-core/model/chat-actions.ts";
 import { registerAgentCommands } from "../modules/agent/model/agent-commands.ts";
 import { registerChat } from "../modules/agent-core/model/chat-registry.ts";
 import { agentCapabilities, agentControls } from "../../server/modules/agent/registry.ts";
-import { claudeCodeBackend } from "../../server/modules/agents/claude-code/claude-code-backend.ts";
+import { createClaudeBackend } from "../../../plugins/claude-code/src/claude-code-backend.ts";
+import { registerAgentBackend } from "../../server/modules/agent/index.ts";
+
+// The plugin backend normally arrives from the installed package; the test registers it directly.
+registerAgentBackend(createClaudeBackend({ require: () => ({}) }));
 
 test("permission policy is the same control for the UI and IDE commands and is saved", async () => {
   const offered = await agentControls("claude-code", "/tmp");
@@ -150,7 +154,10 @@ test("new chats use the latest saved policy and concurrent control saves keep ea
 });
 
 test("a raw run cannot supply an unsupported permission policy", async () => {
+  const backend = createClaudeBackend({
+    require: () => ({}),
+  });
   await expect(
-    claudeCodeBackend.run({ cwd: "/tmp", selection: { "permission-mode": "unknown" } }),
+    backend.run({ cwd: "/tmp", selection: { "permission-mode": "unknown" } }),
   ).rejects.toThrow(/Неизвестный режим/);
 });

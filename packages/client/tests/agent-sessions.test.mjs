@@ -96,10 +96,11 @@ test.concurrent(
     const titles = await browser.evaluate(
       "[...document.querySelectorAll('.item')].map(item => item.textContent.trim())",
     );
-    // The session with a tab is shown once, under the session's title; the two others keep their rows.
+    // The session with a tab is shown once, under the chat's title (the user's words); a leftover
+    // native row with the agent's auto-name is not a second chat.
     expect(titles.length).toBe(3);
-    expect(titles[0]).toContain("Main session");
-    expect(titles.some((title) => title.includes("Main tab"))).toBe(false);
+    expect(titles[0]).toContain("Main tab");
+    expect(titles.some((title) => title.includes("Main session"))).toBe(false);
     expect(titles.some((title) => title.includes("Tab without a session"))).toBe(true);
     expect(titles.some((title) => title.includes("Other session"))).toBe(true);
 
@@ -107,7 +108,7 @@ test.concurrent(
     await browser.evaluate("document.querySelectorAll('.item')[0].click()");
     await settle();
     expect(await browser.evaluate("window.fixture.opened")).toEqual([
-      { chat: "chat-main", title: "Main session" },
+      { chat: "chat-main", title: "Main tab" },
     ]);
     await browser.click('[aria-label="История"]');
     await settle();

@@ -10,6 +10,7 @@ import {
   watch,
 } from "vue";
 import { autoClose, parseWidgetSource } from "../autoclose.ts";
+import UiSkeleton from "../../../common/ui/UiSkeleton.vue";
 import {
   compileScript,
   compileTemplate,
@@ -99,7 +100,7 @@ onErrorCaptured((error) => {
       <pre>{{ source }}</pre>
     </div>
     <component :is="Host" v-else-if="render" :key="generation" />
-    <div v-else class="widget-pending" aria-busy="true" />
+    <div v-else class="widget-pending" aria-busy="true"><UiSkeleton height="56px" /></div>
   </div>
 </template>
 
@@ -108,13 +109,8 @@ onErrorCaptured((error) => {
   margin: 12px 0;
 }
 .widget-pending {
-  height: 56px;
-  border: 1px dashed var(--line);
+  overflow: hidden;
   border-radius: var(--r-md);
-}
-.widget :deep(.project-widget-loading) {
-  color: var(--muted);
-  font-size: var(--fs-2xs);
 }
 .widget :deep(.project-widget-failure) {
   color: var(--err);

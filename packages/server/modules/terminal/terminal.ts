@@ -7,7 +7,12 @@ import {
 import { readTerminalProcesses, terminalActivity } from "./terminal-activity.ts";
 import { randomUUID } from "node:crypto";
 import { rmSync } from "node:fs";
-import { os, bashShellLaunch, type ShellLaunch } from "@ai-projector/core/modules/os/index.ts";
+import {
+  os,
+  bashShellLaunch,
+  PARENT_SESSION_ENV,
+  type ShellLaunch,
+} from "@ai-projector/core/modules/os/index.ts";
 import { terminateProcessTree } from "./terminate.ts";
 import { saveDroppedFile } from "./drop-files.ts";
 import { scenarioDirectory } from "./scenario-folder.ts";
@@ -225,6 +230,7 @@ export function createTerminalSession(
   delete env.CI;
   delete env.FORCE_COLOR;
   delete env.NO_COLOR;
+  for (const name of PARENT_SESSION_ENV) delete env[name];
   if (launch?.docker) {
     for (const key of Object.keys(env))
       if (/^DOCKER_(HOST|CONTEXT|TLS_VERIFY|CERT_PATH|API_VERSION)$/.test(key)) delete env[key];

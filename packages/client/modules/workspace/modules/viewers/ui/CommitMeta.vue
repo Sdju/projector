@@ -47,9 +47,7 @@ async function copy(event: MouseEvent) {
         </UiButton>
       </dd>
       <dt>Автор</dt>
-      <dd>
-        {{ detail.author }} <span class="muted">&lt;{{ detail.email }}&gt;</span>
-      </dd>
+      <dd>{{ detail.author }} <span class="muted">&lt;{{ detail.email }}&gt;</span></dd>
       <dt>Дата</dt>
       <dd>
         {{ absoluteTime(detail.date) }}

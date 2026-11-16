@@ -1,6 +1,6 @@
 {
   "name": "@ai-projector/client",
-  "version": "0.11.0",
+  "version": "0.13.0",
   "private": true,
   "type": "module",
   "exports": {
@@ -8,6 +8,7 @@
   },
   "dependencies": {
     "@ai-projector/core": "workspace:*",
+    "@ai-projector/plugin-api": "workspace:*",
     "@codemirror/commands": "catalog:",
     "@codemirror/language": "catalog:",
     "@codemirror/language-data": "catalog:",
@@ -30,6 +31,7 @@
     "markdown-it": "catalog:",
     "markdown-it-task-lists": "catalog:",
     "pele": "catalog:",
+    "uqr": "catalog:",
     "vue": "catalog:",
     "vue-router": "catalog:",
     "zod": "catalog:"

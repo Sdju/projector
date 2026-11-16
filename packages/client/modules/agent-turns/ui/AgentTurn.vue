@@ -2,6 +2,7 @@
 import UiInline from "../../../common/ui/UiInline.vue";
 import UiButton from "../../../common/ui/UiButton.vue";
 import { computed, inject, ref } from "vue";
+import { zenMode } from "../../../common/utilities/zen-mode.ts";
 import { chatProjectKey } from "../../chat-images/index.ts";
 import { chipIcon, chipLabel, chipTitle } from "../../agent-core/index.ts";
 import { versionsOf, type ForkMode } from "../../agent-core/index.ts";
@@ -128,10 +129,21 @@ const segments = computed(() => {
   for (const tool of props.turn.tools)
     if (tool.parent && known.has(tool.parent))
       children.set(tool.parent, [...(children.get(tool.parent) ?? []), tool]);
+  // A task call names the agent and model that work inside it, as the task event reported them.
+  const startedTasks = new Map(
+    (props.turn.tasks ?? []).flatMap((task) => (task.tool ? [[task.tool, task] as const] : [])),
+  );
   const byId = new Map(
     props.turn.tools
       .filter((tool) => !tool.parent || !known.has(tool.parent))
-      .map((tool) => [tool.id, { ...tool, children: children.get(tool.id) }]),
+      .map((tool) => [
+        tool.id,
+        {
+          ...tool,
+          children: children.get(tool.id),
+          ...(startedTasks.has(tool.id) ? { task: startedTasks.get(tool.id) } : {}),
+        },
+      ]),
   );
   const addWork = (index: number, item: AgentWorkItem) => {
     const last = result.at(-1);
@@ -195,10 +207,10 @@ const lastWork = computed(
 </script>
 
 <template>
-  <article class="turn" :class="[turn.role, { faded: flags.faded }]">
+  <article class="turn" :class="[turn.role, { faded: flags.faded, zen: zenMode }]">
     <div v-if="turn.role === 'user'" class="user-row">
       <UiInline
-        v-if="!flags.readonly"
+        v-if="!flags.readonly && !zenMode"
         :gap="0.5"
         justify="normal"
         class="turn-actions"
@@ -312,7 +324,7 @@ const lastWork = computed(
         </template>
         <template v-else>{{ turn.text }}</template>
       </p>
-      <details v-if="turn.injected" class="injected">
+      <details v-if="turn.injected && !zenMode" class="injected">
         <summary>Возможности Projector</summary>
         <pre class="injected-text">{{ turn.injected }}</pre>
       </details>
@@ -329,7 +341,7 @@ const lastWork = computed(
         />
         <p v-else-if="segment.type === 'note'" class="user-message note">{{ segment.text }}</p>
         <AgentWork
-          v-else
+          v-else-if="!zenMode"
           :items="segment.items"
           :busy="flags.busy"
           :last="flags.last"
@@ -342,12 +354,16 @@ const lastWork = computed(
       </template>
       <!-- Until the first thought or call there is no work block: Lens sits by the thinking dots. -->
       <AgentLensView
-        v-if="waiting && flags.busy && flags.last && lens && lens.state.open"
+        v-if="waiting && flags.busy && flags.last && lens && lens.state.open && !zenMode"
         :lens="lens"
         class="early"
       />
       <UiInline
-        v-if="flags.busy && flags.last && (waiting || flags.phase === 'compacting')"
+        v-if="
+          flags.busy &&
+          flags.last &&
+          (waiting || (zenMode && !!currentWork) || flags.phase === 'compacting')
+        "
         :gap="2"
         justify="normal"
         class="thinking"
@@ -371,7 +387,7 @@ const lastWork = computed(
         }}
       </UiInline>
       <AgentChanges
-        v-if="!flags.busy || !flags.last"
+        v-if="(!flags.busy || !flags.last) && !zenMode"
         :tools="turn.tools"
         :root="root ?? ''"
         :can-revert="flags.canRevert === true && !flags.busy && !flags.readonly"
@@ -391,7 +407,7 @@ const lastWork = computed(
         </UiButton>
       </div>
       <UiInline
-        v-if="turn.text && !(flags.busy && flags.last) && !flags.readonly"
+        v-if="turn.text && !(flags.busy && flags.last) && !flags.readonly && !zenMode"
         :gap="0.5"
         align="normal"
         justify="normal"
@@ -503,7 +519,7 @@ const lastWork = computed(
   border-radius: var(--r-lg);
   background: var(--bg-3);
   color: var(--text);
-  font-size: var(--fs-sm);
+  font-size: var(--chat-fs);
   line-height: 1.6;
   white-space: pre-wrap;
   overflow-wrap: anywhere;

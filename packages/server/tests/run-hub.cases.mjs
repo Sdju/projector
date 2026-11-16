@@ -2,10 +2,12 @@ import { expect, test } from "vite-plus/test";
 import {
   createApprovalBridge,
   createCommandBridge,
+  createQuestionBridge,
+  createSecretBridge,
   completeCommandRequest,
   isBridgeRequestPending,
 } from "../modules/agent/command-bridge.ts";
-import { driveRun, isRunDriven, joinRun } from "../modules/agent/run-hub.ts";
+import { driveRun, isRunDriven, joinRun, pendingRunRequests } from "../modules/agent/run-hub.ts";
 
 // Each test uses its own run id: the hub is kept across module reloads, like the server's other state.
 let counter = 0;
@@ -133,4 +135,64 @@ test("delivery is noted only while someone is watching", () => {
   second.publish("done", { text: "x" });
   expect(second.delivered()).toBe(true);
   second.finish();
+});
+
+test("pendingRunRequests exposes judge permissions, questions and secrets until answered", async () => {
+  const id = runId();
+  const driver = driveRun(id, viewer());
+  const controller = new AbortController();
+
+  let perm;
+  const approve = createApprovalBridge((_e, data) => (perm = data), controller.signal);
+  const verdict = {
+    score: 4,
+    label: "высокий",
+    reason: "Удаление каталога",
+    confidence: "high",
+    effect: "Удалит dist",
+  };
+  void approve({
+    tool: "bash",
+    input: { command: "rm -rf dist" },
+    title: "rm -rf dist",
+    judge: verdict,
+  });
+  driver.publish("permission-request", perm);
+
+  let q;
+  const ask = createQuestionBridge((_e, data) => (q = data), controller.signal);
+  void ask({
+    title: "Выбор базы",
+    custom: true,
+    questions: [
+      {
+        id: "db",
+        question: "Какую БД?",
+        options: [{ id: "pg", label: "Postgres" }],
+        multiple: false,
+      },
+    ],
+  });
+  driver.publish("question-request", q);
+
+  let sec;
+  const secret = createSecretBridge((_e, data) => (sec = data), controller.signal);
+  void secret({
+    label: "API ключ",
+    reason: "Нужен для запроса",
+    destination: { kind: "env_file", file: ".env", key: "API_KEY", replaces: false },
+  });
+  driver.publish("secret-request", sec);
+
+  expect(pendingRunRequests(id)).toMatchObject([
+    { id: perm.id, kind: "permission", tool: "bash", judge: verdict },
+    { id: q.id, kind: "question", title: "Выбор базы", custom: true },
+    { id: sec.id, kind: "secret", title: "API ключ", reason: "Нужен для запроса" },
+  ]);
+
+  completeCommandRequest(perm.id, { output: { allow: true } });
+  completeCommandRequest(q.id, { output: { answers: { db: ["pg"] } } });
+  completeCommandRequest(sec.id, { output: { value: "secret" } });
+  expect(pendingRunRequests(id)).toEqual([]);
+  driver.finish();
 });

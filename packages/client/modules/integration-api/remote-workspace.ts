@@ -68,10 +68,7 @@ export function useRemoteWorkspace<T>(options: {
     if (!metadata.value || (metadata.value as { empty?: boolean }).empty) return;
     const path = options.initialPath();
     if (path) return workspace.value?.openFile(path);
-    const root = await workspaceRequest<{ entries: Array<{ name: string }> }>(
-      options.projectId,
-      "tree",
-    );
+    const root = await workspaceRequest(options.projectId, "tree");
     const readme = root.entries.find((entry) => /^readme\.(?:md|markdown)$/i.test(entry.name));
     if (!disposed && readme) await workspace.value?.openFile(readme.name);
   }

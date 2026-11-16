@@ -41,39 +41,46 @@ const format = (value: number) => props.format?.(value) ?? String(value);
 
 <template>
   <div class="donut">
-    <div class="ring">
-      <svg viewBox="0 0 100 100" role="img" :aria-label="ariaLabel">
-        <circle
-          v-for="arc in arcs"
-          :key="arc.label"
-          cx="50"
-          cy="50"
-          :r="R"
-          fill="none"
-          :stroke="arc.color"
-          stroke-width="13"
-          :stroke-dasharray="arc.dash"
-          :stroke-dashoffset="arc.offset"
-          transform="rotate(-90 50 50)"
-        >
-          <title>{{ arc.label }}: {{ arc.share }}%</title>
-        </circle>
-        <text x="50" y="54" text-anchor="middle" class="center">{{ center ?? format(total) }}</text>
-      </svg>
+    <div class="layout">
+      <div class="ring">
+        <svg viewBox="0 0 100 100" role="img" :aria-label="ariaLabel">
+          <circle
+            v-for="arc in arcs"
+            :key="arc.label"
+            cx="50"
+            cy="50"
+            :r="R"
+            fill="none"
+            :stroke="arc.color"
+            stroke-width="13"
+            :stroke-dasharray="arc.dash"
+            :stroke-dashoffset="arc.offset"
+            transform="rotate(-90 50 50)"
+          >
+            <title>{{ arc.label }}: {{ arc.share }}%</title>
+          </circle>
+          <text x="50" y="54" text-anchor="middle" class="center">
+            {{ center ?? format(total) }}
+          </text>
+        </svg>
+      </div>
+      <ul :class="{ 'with-values': showValues }">
+        <li v-for="arc in arcs" :key="arc.label">
+          <i :style="{ background: arc.color }" />
+          <span class="label" :title="arc.label">{{ arc.label }}</span>
+          <span v-if="showValues" class="value">{{ format(arc.value) }}</span>
+          <span class="share">{{ arc.share }}%</span>
+        </li>
+      </ul>
     </div>
-    <ul>
-      <li v-for="arc in arcs" :key="arc.label">
-        <i :style="{ background: arc.color }" />
-        <span class="label">{{ arc.label }}</span>
-        <span v-if="showValues" class="value">{{ format(arc.value) }}</span>
-        <span class="share">{{ arc.share }}%</span>
-      </li>
-    </ul>
   </div>
 </template>
 
 <style scoped>
 .donut {
+  container-type: inline-size;
+}
+.layout {
   display: grid;
   grid-template-columns: 132px minmax(0, 1fr);
   align-items: center;
@@ -104,9 +111,12 @@ ul {
 }
 li {
   display: grid;
-  grid-template-columns: 8px minmax(0, 1fr) auto auto;
+  grid-template-columns: 8px minmax(0, 1fr) auto;
   align-items: center;
   gap: 6px;
+}
+.with-values li {
+  grid-template-columns: 8px minmax(0, 1fr) auto auto;
 }
 li i {
   width: 8px;
@@ -114,10 +124,8 @@ li i {
   border-radius: 2px;
 }
 .label {
-  overflow: hidden;
   color: var(--muted);
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
 }
 .value {
   color: var(--text-2);
@@ -129,10 +137,13 @@ li i {
   text-align: end;
   font-variant-numeric: tabular-nums;
 }
-@media (max-width: 420px) {
-  .donut {
+@container (max-width: 440px) {
+  .layout {
     grid-template-columns: minmax(0, 1fr);
     justify-items: center;
+  }
+  ul {
+    width: 100%;
   }
 }
 </style>

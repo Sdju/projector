@@ -36,16 +36,16 @@ export interface WidgetDefinition {
   notes?: string[];
   /**
    * Rare components stay in the guide as a name and a use case only. Their properties and example
-   * come from the `describe_widget` tool on demand, so a large catalogue does not tax every answer.
+   * come from `ide.chat.widgets.describe` on demand, so a large catalogue does not tax every answer.
    */
   special?: boolean;
   /**
-   * A compact entry for the permanent guide. The full props and notes stay in `describe_widget`;
-   * use it when a widget has a large type matrix or compatibility options that are rarely needed.
+   * A compact entry for the permanent guide. The full props and notes stay available through the
+   * description command; use it for a large type matrix or rarely needed compatibility options.
    */
   guide?: string;
   /**
-   * Registered for old messages and `describe_widget`, but never offered to the agent. This keeps
+   * Registered for old messages and description commands, but never offered to the agent. This keeps
    * a deprecated widget renderable without spending permanent prompt space on it.
    */
   hidden?: boolean;
@@ -97,6 +97,7 @@ export const BUILTIN_WIDGET_NAMES = [
   "Input",
   "IntelligentForm",
   "Line",
+  "Media",
   "Row",
   "SafeSecretShow",
   "Slider",

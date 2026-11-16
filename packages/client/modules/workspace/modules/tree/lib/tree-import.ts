@@ -17,7 +17,7 @@ import {
 } from "../../../../workspace-api/index.ts";
 import { isLiveScope } from "@ai-projector/core/modules/workspace/index.ts";
 import { treeDragType } from "./tree-drag.ts";
-import type { TreeContext } from "./tree-operations.ts";
+import type { TreeContext } from "./tree-context.ts";
 
 export type ImportChoice =
   | { kind: "replace" }

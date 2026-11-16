@@ -16,33 +16,19 @@ import type {
   ReleaseDetail,
   ReleaseList,
 } from "@ai-projector/core/modules/workspace/index.ts";
+import { createBrowseReader, WorkspaceRequestError } from "../workspace-api/index.ts";
 
-export class GitlabRequestError extends Error {
-  readonly status: number;
-  constructor(message: string, status: number) {
-    super(message);
-    this.status = status;
-  }
-}
+/** GitLab сообщает об ошибке тем же типом, что и остальные интеграции. */
+export { WorkspaceRequestError as GitlabRequestError };
 
 /**
  * Reads one GitLab browse action. `repository` is the canonical `<instance>/<path>` form the
  * server allowlists against the configured instance.
  */
-export async function readGitlab<T>(
-  action: string,
-  params: Record<string, string>,
-  signal?: AbortSignal,
-): Promise<T> {
-  const response = await fetch(
-    `/api/integrations/gitlab/browse/${action}?${new URLSearchParams(params)}`,
-    { signal },
-  );
-  const data = await response.json();
-  if (!response.ok)
-    throw new GitlabRequestError(data.error || "Не удалось прочитать GitLab", response.status);
-  return data;
-}
+export const readGitlab = createBrowseReader(
+  "/api/integrations/gitlab/browse",
+  "Не удалось прочитать GitLab",
+);
 
 export const readRepository = (repository: string, ref = "", signal?: AbortSignal) =>
   readGitlab<GitlabRepository>("repository", { repository, ref }, signal);

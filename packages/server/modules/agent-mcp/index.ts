@@ -1,6 +1,7 @@
-import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
-import { dirname, join } from "node:path";
+import { readFile, rm } from "node:fs/promises";
+import { join } from "node:path";
 import { dataDir } from "@ai-projector/core/modules/app-paths/index.ts";
+import { writeFileAtomic } from "../atomic-files/index.ts";
 
 /** An MCP server the agent can use: a process it starts, or a remote one. */
 export type McpServerConfig =
@@ -98,22 +99,6 @@ export function mcpConfigsForNames(
   return configs.filter((config) => wanted.has(config.name));
 }
 
-/** The shape Claude Code's SDK takes in `mcpServers` for an explicit server. */
-export function processMcpConfig(config: McpServerConfig) {
-  if ("command" in config)
-    return {
-      type: "stdio" as const,
-      command: config.command,
-      args: config.args,
-      env: config.env,
-    };
-  return {
-    type: config.sse ? ("sse" as const) : ("http" as const),
-    url: config.url,
-    headers: config.headers,
-  };
-}
-
 /** The user's server list as written, for the settings page; empty when there is none yet. */
 export async function readUserMcp(): Promise<string> {
   try {
@@ -139,8 +124,5 @@ export async function writeUserMcp(text: string): Promise<void> {
   const servers = (data as { mcpServers?: unknown } | null)?.mcpServers;
   if (!servers || typeof servers !== "object" || Array.isArray(servers))
     throw new Error('Нужен объект вида { "mcpServers": { "имя": { … } } }');
-  await mkdir(dirname(path), { recursive: true });
-  const temporary = `${path}.${process.pid}.tmp`;
-  await writeFile(temporary, text.trim() + "\n", { mode: 0o600 });
-  await rename(temporary, path);
+  await writeFileAtomic(path, text.trim() + "\n");
 }

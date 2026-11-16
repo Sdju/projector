@@ -1,8 +1,12 @@
 import { afterEach, expect, test, vi } from "vite-plus/test";
-import { readFile, stat, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { bindHub, configureHub, hubStatus } from "../modules/hub/index.ts";
+import { bindHub, configureHub, hubStatus, requestHubLoginLink } from "../modules/hub/index.ts";
+import { noteHubActivity, resetHubPresence, setHubDevices } from "../modules/hub/presence.ts";
+import { routes } from "../routes/api/hub.ts";
 import { dataDir } from "../../core/modules/app-paths/index.ts";
+import { createHub } from "../../hub/modules/gateway/index.ts";
 
 const lifecycle = vi.hoisted(() => ({ events: [] }));
 vi.mock("../modules/hub/connector.ts", () => ({
@@ -13,6 +17,7 @@ vi.mock("../modules/hub/connector.ts", () => ({
 }));
 afterEach(() => {
   configureHub(null);
+  resetHubPresence();
   lifecycle.events.length = 0;
 });
 test("local settings retain a hidden credential only for the same Hub and remove it on disconnect", async () => {
@@ -105,6 +110,47 @@ function secondWithoutToken({ url, deviceId }) {
   return { url, deviceId };
 }
 
+test("the local machine mints a Hub login link with the saved device token", async () => {
+  const root = await mkdtemp(join(tmpdir(), "projector-hub-link-"));
+  await writeFile(join(root, "index.html"), "<title>hub</title>");
+  await writeFile(join(root, "hub.html"), "<title>hub</title>");
+  const placeholder = createHub({
+    origin: "http://localhost:1",
+    password: "browser-secret",
+    deviceToken: "device-secret",
+    staticRoot: root,
+    dataDir: root,
+  });
+  await new Promise((resolve) => placeholder.server.listen(0, "127.0.0.1", resolve));
+  const port = placeholder.server.address().port;
+  placeholder.close();
+  const origin = `http://localhost:${port}`;
+  const hub = createHub({
+    origin,
+    password: "browser-secret",
+    deviceToken: "device-secret",
+    staticRoot: root,
+    dataDir: root,
+  });
+  await new Promise((resolve) => hub.server.listen(port, "127.0.0.1", resolve));
+  try {
+    await expect(requestHubLoginLink()).rejects.toMatchObject({
+      status: 409,
+      message: "Сначала подключите Hub",
+    });
+    configureHub({ url: origin, deviceId: "desk", token: "wrong-token" });
+    await expect(requestHubLoginLink()).rejects.toMatchObject({ status: 401 });
+    configureHub({ url: origin, deviceId: "desk", token: "device-secret" });
+    const link = await requestHubLoginLink();
+    expect(link.ttl).toBe(60);
+    expect(link.url.startsWith(`${origin}/login?code=`)).toBe(true);
+  } finally {
+    configureHub(null);
+    hub.close();
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("loads legacy single-Hub settings and persists the migrated list on save", async () => {
   configureHub(null);
   await writeFile(
@@ -133,4 +179,67 @@ test("loads legacy single-Hub settings and persists the migrated list on save", 
   } finally {
     stopReloaded();
   }
+});
+
+test("local pages read the connector roster and remote activity", () => {
+  const route = routes.find((item) => item.method === "GET" && item.path === "/api/hub/devices");
+  const response = {
+    statusCode: 0,
+    headers: {},
+    body: "",
+    setHeader(name, value) {
+      this.headers[name] = value;
+    },
+    end(body) {
+      this.body = body;
+    },
+  };
+  const request = (origin) => ({
+    socket: { remoteAddress: "127.0.0.1" },
+    headers: { host: "localhost:4177", ...(origin ? { origin } : {}) },
+    url: "/api/hub/devices",
+  });
+  setHubDevices([
+    { id: "desk", name: "Desk", protocol: 1, online: true },
+    { id: "laptop", name: "Laptop", protocol: 1, online: true },
+  ]);
+  noteHubActivity("laptop", 42);
+  void route.handler({
+    req: request(),
+    res: response,
+    url: new URL("http://localhost/api/hub/devices"),
+    method: "GET",
+    path: "/api/hub/devices",
+    params: {},
+  });
+  expect(response.statusCode).toBe(200);
+  expect(response.headers["Cache-Control"]).toBe("no-store");
+  expect(JSON.parse(response.body)).toMatchObject({
+    devices: [
+      { id: "desk", name: "Desk", protocol: 1, online: true },
+      { id: "laptop", name: "Laptop", protocol: 1, online: true },
+    ],
+    activity: { laptop: 42 },
+  });
+  // A page's same-origin GET has no Origin; a present origin still has to match.
+  void route.handler({
+    req: request("http://localhost:4177"),
+    res: response,
+    url: new URL("http://localhost/api/hub/devices"),
+    method: "GET",
+    path: "/api/hub/devices",
+    params: {},
+  });
+  expect(response.statusCode).toBe(200);
+  expect(
+    () =>
+      void route.handler({
+        req: request("https://evil.example"),
+        res: response,
+        url: new URL("http://localhost/api/hub/devices"),
+        method: "GET",
+        path: "/api/hub/devices",
+        params: {},
+      }),
+  ).toThrow("Projector");
 });

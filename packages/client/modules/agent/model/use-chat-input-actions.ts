@@ -14,6 +14,8 @@ export function useChatInputActions(options: {
   toBottom: () => Promise<void>;
   resetAway: () => void;
   focus: () => void;
+  /** A suggestion and a new chat close a starter preset form before the text field returns. */
+  closeForm?: () => void;
 }) {
   async function submit() {
     if (!options.draft.value.trim()) return;
@@ -34,11 +36,13 @@ export function useChatInputActions(options: {
     await options.send("продолжай");
   }
   async function suggest(text: string) {
+    options.closeForm?.();
     options.draft.value = text;
     await nextTick();
     options.focus();
   }
   async function newChat() {
+    options.closeForm?.();
     options.side.reset();
     await options.clear();
     options.resetAway();

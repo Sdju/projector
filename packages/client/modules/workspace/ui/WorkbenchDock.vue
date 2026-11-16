@@ -16,6 +16,7 @@ import type { OpenFile } from "../open-file.ts";
 import { useTabHost, useWorkspaceTabs } from "../lib/tab-views.ts";
 import FilePanel from "./FilePanel.vue";
 import NewSessionMenu from "./NewSessionMenu.vue";
+import SessionTiles from "./SessionTiles.vue";
 import PanelHost from "./PanelHost.vue";
 import TabReadoutScope from "../../../common/ui/TabReadoutScope.vue";
 import IconDiff from "~icons/lucide/file-diff";
@@ -26,6 +27,7 @@ const props = defineProps<{
   projectId: string;
   mobile?: boolean;
   mobileSurface?: "editor" | "files" | "terminal";
+  zen?: boolean;
   workbench: ReturnType<typeof useWorkbenchLayout>;
   files: ReturnType<typeof useOpenFiles>;
   tabActions: (id: string) => ContextMenuItem[];
@@ -51,6 +53,7 @@ const hostOf = (key: string) => props.panelHosts.hosts[key] ?? null;
     v-model:layout="workbench.layout.value"
     :mobile="mobile"
     :mobile-surface="mobileSurface"
+    :zen="zen"
     :terminal-panel="(id) => terminalPanels.has(id) || id.startsWith('terminal:')"
     :describe="workbench.describePanel"
     :project-id="projectId"
@@ -164,9 +167,12 @@ const hostOf = (key: string) => props.panelHosts.hosts[key] ?? null;
       <UiLoader v-else-if="group.role === 'terminal' && !terminals.loaded.value" align="center"
         >Загружаю сессии…</UiLoader
       >
-      <UiEmpty v-else-if="group.role === 'terminal'">
-        Нет терминалов. Создайте сессию кнопками на панели выше
-      </UiEmpty>
+      <SessionTiles
+        v-else-if="group.role === 'terminal'"
+        :busy="terminalsBusy"
+        :agent="agent"
+        @command="(id, args) => emit('command', id, args)"
+      />
       <UiEmpty v-else>Перетащите сюда вкладку</UiEmpty>
     </template>
   </DockView>

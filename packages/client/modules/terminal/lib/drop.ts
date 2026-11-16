@@ -1,9 +1,12 @@
-import { isFileDrag, pathsFromDataTransfer } from "../../path-drop/index.ts";
-
-const treeDragType = "application/x-projector-tree-entry";
+import {
+  isFileDrag,
+  isProjectorDrag,
+  pathsFromDataTransfer,
+  readProjectorDrag,
+} from "../../path-drop/index.ts";
 
 export function isTerminalFileDrag(data: DataTransfer | null): boolean {
-  return isFileDrag(data) || !!data?.types.includes(treeDragType);
+  return isFileDrag(data) || isProjectorDrag(data);
 }
 
 export function terminalTextForPaths(paths: string[]): string {
@@ -26,13 +29,9 @@ export async function droppedTerminalPaths(
   upload: (file: File) => Promise<string>,
   resolveTreePath: (projectId: string, path: string) => Promise<string>,
 ): Promise<string[]> {
-  const treeEntry = data?.getData(treeDragType);
-  if (treeEntry) {
-    const entry = JSON.parse(treeEntry) as { projectId?: unknown; path?: unknown };
-    if (typeof entry.projectId !== "string" || typeof entry.path !== "string" || !entry.path)
-      throw new Error("Не удалось прочитать путь файла из дерева");
-    return [await resolveTreePath(entry.projectId, entry.path)];
-  }
+  const entry = readProjectorDrag(data);
+  if (entry) return [await resolveTreePath(entry.projectId, entry.path)];
+  if (isProjectorDrag(data)) throw new Error("Не удалось прочитать путь файла из дерева");
   const paths = pathsFromDataTransfer(data);
   if (paths.length || !data) return paths;
   const files = [...data.files];

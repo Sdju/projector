@@ -3,7 +3,6 @@ import UiHint from "../../../../../common/ui/UiHint.vue";
 import UiStatusDot from "../../../../../common/ui/UiStatusDot.vue";
 import { computed } from "vue";
 import type {
-  PullRequestDetail,
   PullRequestFile,
   PullRequestReview,
 } from "@ai-projector/core/modules/workspace/index.ts";
@@ -48,7 +47,7 @@ const emit = defineEmits<{
   open: [path: string];
   openPipeline: [pipeline: { id: number; title?: string }];
 }>();
-const { detail, loading, error, reload } = useTrackerDetail<PullRequestDetail>(
+const { detail, loading, error, reload } = useTrackerDetail(
   () => props.projectId,
   () => props.number,
   "pull",

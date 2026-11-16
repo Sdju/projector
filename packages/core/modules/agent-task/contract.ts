@@ -11,8 +11,15 @@ export const agentTaskSchema = z.object({
   status: z.enum(["running", "done", "error", "stopped"]),
   /** Runs without blocking the answer. */
   background: z.boolean(),
+  /**
+   * When `false`, the answer stream may close while this task still runs (soft keep-alive).
+   * Absent or `true` means the live run must stay open for permissions / completion.
+   */
+  hold: z.boolean().optional(),
   /** Kind of the subagent (`Explore`, `general-purpose`, ...). */
   subagent: z.string().optional(),
+  /** The model that answers the task, as the agent names it, when the agent knows it. */
+  model: z.string().optional(),
   /** The agent's own session of the subagent: its whole conversation can be read from there. */
   session: z.string().optional(),
   /** What it was asked to do, as the agent gave it. */

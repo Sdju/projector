@@ -141,6 +141,18 @@ registry.queued ??= new Set();
 for (const state of registry.sessions.values()) state.capabilities ??= {};
 export const { releases, viewers, sessions, loads, saves, queued } = registry;
 
+/** Removes an answered or stale request from every open chat session on the page. */
+export function clearPendingRequest(id: string): void {
+  for (const state of sessions.values()) {
+    if (state.permissions.some((item) => item.id === id))
+      state.permissions = state.permissions.filter((item) => item.id !== id);
+    if (state.questions.some((item) => item.id === id))
+      state.questions = state.questions.filter((item) => item.id !== id);
+    if (state.secrets.some((item) => item.id === id))
+      state.secrets = state.secrets.filter((item) => item.id !== id);
+  }
+}
+
 /** A chat view starts showing this chat, and stops when it goes away (see `RELEASE_DELAY_MS`). */
 export function chatPresence(key: string, abort: () => void) {
   return {

@@ -29,12 +29,13 @@ export interface PluginAgentContribution {
   icon?: string;
   program?: string;
   terminal?: PluginAgentTerminal;
-  command: string;
+  command?: string;
   args?: string[];
   binary?: string;
   clientCapabilities?: Record<string, unknown>;
   usage?: PluginAgentUsageCommand | { kind: "none" };
   usageReporting?: string;
+  defaultFeatures?: string[];
 }
 
 const agentIdPattern = /^[a-z0-9][a-z0-9._-]*$/;
@@ -43,7 +44,7 @@ const usageReportingPattern = /^[a-z0-9][a-z0-9/_-]*$/;
 const forbiddenJsonKeys = ["__proto__", "constructor", "prototype"] as const;
 const maxClientCapabilitiesLength = 20000;
 const agentFields =
-  "id title caption icon program terminal command args binary clientCapabilities usage usageReporting".split(
+  "id title caption icon program terminal command args binary clientCapabilities usage usageReporting defaultFeatures".split(
     " ",
   );
 
@@ -151,7 +152,21 @@ function validateAgentTerminal(value: unknown): void {
   if (value.title !== undefined) assertText(value.title, "Название терминала агента", 200);
 }
 
-export function validateAgentContribution(value: unknown, ids: Set<string>): void {
+function validateDefaultFeatures(value: unknown): void {
+  const pattern = /^[a-z0-9][a-z0-9._-]*$/;
+  if (
+    !Array.isArray(value) ||
+    value.length > 20 ||
+    value.some((item) => typeof item !== "string" || item.length > 64 || !pattern.test(item))
+  )
+    throw new Error("Некорректный defaultFeatures агента");
+}
+
+export function validateAgentContribution(
+  value: unknown,
+  ids: Set<string>,
+  options: { hasServer?: boolean } = {},
+): void {
   assertRecord(value, "Агент плагина");
   assertAllowedKeys(value, agentFields, "Агент плагина");
   if (typeof value.id !== "string" || !agentIdPattern.test(value.id))
@@ -169,7 +184,8 @@ export function validateAgentContribution(value: unknown, ids: Set<string>): voi
     if (typeof value.program !== "string" || !agentIdPattern.test(value.program))
       throw new Error("Некорректная программа агента");
   }
-  assertSafeText(value.command, "Команда агента");
+  if (!options.hasServer) assertSafeText(value.command, "Команда агента");
+  else if (value.command !== undefined) assertSafeText(value.command, "Команда агента");
   validateAgentArgs(value.args, "Аргументы агента");
   if (value.binary !== undefined) assertSafeText(value.binary, "Бинарник агента");
   if (value.terminal !== undefined) validateAgentTerminal(value.terminal);
@@ -178,4 +194,5 @@ export function validateAgentContribution(value: unknown, ids: Set<string>): voi
   if (value.usage !== undefined) validateAgentUsage(value.usage);
   if (value.usageReporting !== undefined)
     assertPattern(value.usageReporting, usageReportingPattern, 100, "Некорректный usageReporting");
+  if (value.defaultFeatures !== undefined) validateDefaultFeatures(value.defaultFeatures);
 }

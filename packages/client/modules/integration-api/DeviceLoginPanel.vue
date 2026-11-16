@@ -9,10 +9,8 @@ const emit = defineEmits<{ cancel: [] }>();
 </script>
 
 <template>
-  <div class="device" role="status">
-    <p>
-      Введите код <strong>{{ device.userCode }}</strong> на странице {{ host }}.
-    </p>
+  <div class="device">
+    <p>Введите код <strong>{{ device.userCode }}</strong> на странице {{ host }}.</p>
     <a :href="device.verificationUri" target="_blank" rel="noopener noreferrer"
       >открыть {{ host }} для входа ↗</a
     >

@@ -14,10 +14,11 @@ export {
   createProjectRole,
   deleteProjectRole,
   projectRoleState,
+  projectRoleTrustDescriptor,
   projectRolesRelativeFile,
   projectRolesTrustFile,
   readProjectAgentRole,
   saveProjectRole,
   setProjectRoleTrust,
 } from "./project.ts";
-export { roleContext, rolePromptText, selectedNames } from "./runtime.ts";
+export { roleContext, rolePromptText, roleTemplateTitle, selectedNames } from "./runtime.ts";

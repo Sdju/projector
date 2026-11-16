@@ -56,7 +56,7 @@ export { createReplay } from "./replay.ts";
 export { injectMessage, registerInjector } from "./injection.ts";
 export { agentEnv, assertHostProject, attachedImages, promptWithHistory } from "./agent-host.ts";
 export { attachHosted, startHosted } from "./hosted-process.ts";
-export { driveRun, isRunDriven, joinRun, type RunViewer } from "./run-hub.ts";
+export { driveRun, isRunDriven, joinRun, type RunPending, type RunViewer } from "./run-hub.ts";
 export { handleAgentRun } from "./run-request.ts";
 export { runHostedAgent } from "./hosted-run.ts";
 export { runHostedRunner } from "./hosted-runner.ts";
@@ -76,6 +76,14 @@ export {
   type AgentRunRecord,
   type LiveRun,
 } from "./agent-runs.ts";
+export {
+  clearRecentRunForChat,
+  listRecentRuns,
+  RECENT_RUN_TTL_MS,
+  recordRecentRun,
+  type RecentRun,
+} from "./recent-runs.ts";
+export { runsChanged } from "./change-events.ts";
 export {
   completeCommandRequest,
   createApprovalBridge,
@@ -105,6 +113,12 @@ export {
 } from "./secret-show.ts";
 export { readAttachment, saveAttachment } from "./attachments.ts";
 export { readAgentHistory, writeAgentHistory } from "./history.ts";
+export {
+  isHarnessOnly,
+  lostBackgroundAgents,
+  sanitizeHarnessTurns,
+  withoutHarness,
+} from "./harness-turns.ts";
 export { readAgentUsage, type AgentUsageRecord } from "./usage-history.ts";
 export {
   chatMetaOf,

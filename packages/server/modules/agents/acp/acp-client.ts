@@ -36,7 +36,8 @@ const STDERR_LIMIT = 4000;
 
 /**
  * The client half of the Agent Client Protocol: JSON-RPC 2.0 over newline-delimited JSON on a
- * child process's stdio. One connection lives for a single chat turn and is then closed.
+ * child process's stdio. One connection covers a chat turn and any tracked background work that
+ * outlives `end_turn`; it is closed when that work ends or the run is cancelled.
  * The request timeout (per request, `NO_TIMEOUT` to disable) is idle-based: every incoming message postpones it, so a streaming turn or
  * a pending permission prompt is not cut off while the agent is still working.
  */
@@ -176,10 +177,18 @@ export function createAcpConnection(child: AcpProcess, handlers: AcpConnectionHa
     notify: (method: string, params: unknown) => write({ jsonrpc: "2.0", method, params }),
     respond,
     respondError,
-    /** Stops the whole agent tree (when the OS adapter provides it) and waits for exit. */
-    async close() {
+    /**
+     * Drops the JSON-RPC link. By default stops the agent tree; `{ stop: false }` only detaches a
+     * hosted run so background work can outlive this turn (see `keep-alive` in agent-host).
+     */
+    async close(options?: { stop?: boolean }) {
       fail(new Error("Соединение закрыто"));
       child.stdin.end();
+      const detach = (child as { detach?: () => void }).detach;
+      if (options?.stop === false && typeof detach === "function") {
+        detach();
+        return;
+      }
       if (child.terminate) await child.terminate();
       else child.kill();
     },

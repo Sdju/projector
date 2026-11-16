@@ -5,7 +5,7 @@ export interface RoleSkill {
   name: string;
   description: string;
   kind: "skill" | "command";
-  source: "user" | "project";
+  source: "user" | "project" | "system";
 }
 
 /** An MCP server a role may connect to: the user's list plus the project's `.mcp.json`. */

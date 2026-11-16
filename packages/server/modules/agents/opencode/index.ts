@@ -32,3 +32,4 @@ export const opencodeBackend: AgentBackend = {
   usageLog: opencodeUsageLog,
 };
 export { opencodeUsageLog };
+export { settleOpenCodeHistoryTasks } from "./history-tasks.ts";

@@ -1,11 +1,13 @@
 import { commandArgs } from "../../../common/utilities/commands.ts";
 import { fetchRecentChats } from "../../agent-core/index.ts";
 import { chatTabCommand } from "../../agent-core/index.ts";
-import type { RegisterCommand } from "../../agent-core/index.ts";
+import type { ChatBranch, ChatRef, RegisterCommand } from "../../agent-core/index.ts";
 import type { ForkMode } from "../../agent-core/index.ts";
 import { chatsOf, resolveChat } from "../../agent-core/index.ts";
 
 const CHAT = "Ключ чата из ide.agent.chats.list; без него — чат, с которым работали последним";
+/** Branching: the only thing this group of commands needs from a chat. */
+type BranchChat = ChatRef & ChatBranch;
 
 function text(args: Record<string, unknown>, key: string): string {
   const value = args[key];
@@ -16,7 +18,7 @@ function text(args: Record<string, unknown>, key: string): string {
 /** Branches of a chat and the list of chats a closed tab can be brought back from. */
 export function registerBranchCommands(register: RegisterCommand, projectId: string): void {
   const anyChat = () => chatsOf(projectId).length > 0;
-  const find = (args: unknown) => resolveChat(projectId, commandArgs(args).chat);
+  const find = (args: unknown): BranchChat => resolveChat(projectId, commandArgs(args).chat);
 
   register(
     "ide.agent.chats.recent",

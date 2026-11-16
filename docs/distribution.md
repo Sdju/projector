@@ -30,7 +30,7 @@ projector-hub
 
 IDE работает в `prod` и не требует Vite+ на целевой машине. `projector mode dev` доступен только из checkout; переключение на `prod` в установленном пакете не запускает сборку. Checkout сохраняет прежние `vp dev`, `./bin/projector` и режимы `dev`/`prod`.
 
-Hub по умолчанию слушает `127.0.0.1:4180`; `PROJECTOR_HUB_HOST`, `PROJECTOR_HUB_PORT` и `PROJECTOR_HUB_ORIGIN` задают адрес. Для удалённого origin нужен HTTPS от reverse proxy, который сохраняет Host и поддерживает WebSocket и SSE. Устройство подключается в **Настройки → Hub** локального Projector. Подробности — в [docs/hub.md](hub.md).
+Hub по умолчанию слушает `127.0.0.1:4180`; `PROJECTOR_HUB_HOST`, `PROJECTOR_HUB_PORT` и `PROJECTOR_HUB_ORIGIN` задают адрес, `PROJECTOR_HUB_DATA` — каталог с хешами refresh. Для удалённого origin нужен HTTPS от reverse proxy, который сохраняет Host и поддерживает WebSocket и SSE. Устройство подключается в **Настройки → Hub** локального Projector. Подробности — в [docs/hub.md](hub.md).
 
 Чтобы добавить пункт меню и команду `projector` после npm-установки:
 
@@ -51,13 +51,13 @@ pnpm -C packages/ide pack --pack-destination ../../artifacts
 pnpm -C packages/native pack --pack-destination ../../artifacts
 pnpm -C packages/hub pack --pack-destination ../../artifacts
 
-npm install -g ./artifacts/projector-ai-ide-0.11.0.tgz
+npm install -g ./artifacts/projector-ai-ide-0.13.0.tgz
 projector --browser
 
-npm install -g ./artifacts/projector-ai-native-0.11.0.tgz
+npm install -g ./artifacts/projector-ai-native-0.13.0.tgz
 projector --native
 
-npm install -g ./artifacts/projector-ai-hub-0.11.0.tgz
+npm install -g ./artifacts/projector-ai-hub-0.13.0.tgz
 projector-hub
 ```
 
@@ -104,7 +104,7 @@ Workflow `.github/workflows/publish.yml` запускается на `release: p
 - Проверяет, что тег `vX.Y.Z` совпадает с `version` в корневом `package.json`.
 - Собирает и проверяет все три пакета.
 - Публикует `pnpm publish` из `packages/ide`, затем `packages/native` и `packages/hub`.
-- Пропускает уже опубликованную версию, поэтому повторный запуск безопасен.
+- Пропускает уже опубликованную версию, поэтому повторный запуск безопасен. Если реестр уже принял версию, но чтение её ещё не отдаёт, повторная публикация получает отказ «cannot publish over the previously published versions»; workflow считает это успехом.
 - Требует `permissions: id-token: write`; provenance создаётся автоматически.
 
 Релиз создаётся из тега, который указывает на коммит с той же версией. Существующий тег `v0.10.0` уже занят, поэтому для первого npm-выпуска нужен новый тег после изменения `version`.
@@ -129,7 +129,7 @@ Hub не содержит локального API Projector и не требу�
 - **Native** — обычный пакет со своим `dist/`: `Palette.vue` компилируется, общие модули берутся из `@ai-projector/ide/core/*`. В `dependencies` он держит только `@ai-projector/ide` (через `workspace:*`, pnpm сам подставит версию релиза), `@zede/vio` и `node-gtk`. `@ai-projector/core` нужен лишь для исходников и объявлен в `devDependencies`, поэтому не попадает в установку потребителя. Сервер разрешает entrypoint по package exports, загрузчик GI — относительно самого дополнения.
 - **Hub** собирается отдельным пакетом со своей копией `core` и общего `dist`, поэтому публичный `projector-hub` работает без установленного IDE. Остальные части `core` не загружаются: Hub импортирует только протокол туннеля. Импорты между workspace-пакетами в собранном виде заменяются на относительные пути или на публичный entrypoint IDE.
 
-Версии внешних runtime-зависимостей заданы в манифестах протоколом `catalog:` и разворачиваются в диапазоны из `pnpm-workspace.yaml` при `pnpm publish`; `workspace:*` превращается в точную версию релиза. `node-gyp` объявлен явно: без него чистая npm-установка может выбрать старую транзитивную версию при сборке `node-pty`. Claude Agent SDK остаётся обычной зависимостью IDE; это разделение не уменьшает его размер и не поставляет собственные prebuilt-бинарники.
+Версии внешних runtime-зависимостей заданы в манифестах протоколом `catalog:` и разворачиваются в диапазоны из `pnpm-workspace.yaml` при `pnpm publish`; `workspace:*` превращается в точную версию релиза. `node-gyp` объявлен явно: без него чистая npm-установка может выбрать старую транзитивную версию при сборке `node-pty`. Зависимости конкретных плагинов (например, `@anthropic-ai/claude-agent-sdk`) в состав `@ai-projector/ide` не входят и ставятся в каталог самого плагина при подтверждении доверия.
 
 Версии трёх манифестов должны совпадать с корневой: это проверяет самопроверка `build:distribution`, поэтому при выпуске меняйте `version` в корне и в трёх пакетах.
 
@@ -141,9 +141,11 @@ node packages/native/scripts/build.mjs
 
 ## Проверки
 
-Проверки исходников: `vp run check` и `vp run test:gtk`. `tests/desktop-optional.test.mjs` проверяет отсутствие native/GTK при импорте, команду запуска JS-сервера и передачу команд резиденту на приватной D-Bus-шине без дисплея. Для проверки поставки устанавливайте tarball в отдельный prefix и используйте отдельные `XDG_DATA_HOME`, порт и D-Bus-сессию; пользовательский сервер перезапускать не требуется.
+Проверки исходников: `vp run check` и `vp run test:gtk`. `packages/server/tests/desktop-optional.test.mjs` проверяет отсутствие native/GTK при импорте, команду запуска JS-сервера и передачу команд резиденту на приватной D-Bus-шине без дисплея. Для проверки поставки устанавливайте tarball в отдельный prefix и используйте отдельные `XDG_DATA_HOME`, порт и D-Bus-сессию; пользовательский сервер перезапускать не требуется.
 
 ## Известные ограничения установки
 
 - npm 12 по умолчанию не запускает install-скрипты. Для IDE разрешите `node-pty`, для native — ещё и `node-gtk`: `npm install -g --allow-scripts=node-pty @ai-projector/ide` и `npm install -g --allow-scripts=node-pty,node-gtk @ai-projector/native`. Hub не требует install-скриптов.
 - Глобальная установка `@ai-projector/native` на npm 11/12 может упасть в install-скрипте `node-gtk` (`npx node-pre-gyp`). Если это произошло, установите native с `--ignore-scripts` и соберите `node-gtk` вручную из его каталога через `@mapbox/node-pre-gyp install --fallback-to-build`; установка native в проект вместо глобальной также обходит это ограничение.
+- `engines` допускает Node `>=24.11.0 <25`. На Node 26 npm выдаёт `EBADENGINE`; расширять диапазон можно после проверки PTY и сервера на новой версии.
+- Глобальная установка из npm проверялась на Linux. На Windows и macOS для `node-pty` и `node-gtk` нужны собственные build tools; Projector не поставляет prebuilt-бинарники, сборка идёт при установке.

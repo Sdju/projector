@@ -25,11 +25,13 @@ import {
 import { PipelinesPanel } from "../modules/pipelines/index.ts";
 import { ReleasesPanel } from "../modules/releases/index.ts";
 import { DockerSidebar } from "../../docker/index.ts";
-import { AgentInbox, inboxAttention } from "../../agent/index.ts";
+import { inboxRemoteAttention } from "../../agent/index.ts";
+import HubPanel from "../ui/HubPanel.vue";
 import SearchPanel from "../ui/SearchPanel.vue";
 import FilesSection from "../ui/FilesSection.vue";
 import CompareTreeSection from "../ui/CompareTreeSection.vue";
 import { ScopeTreeSection } from "../modules/tree/index.ts";
+import { TrashPanel, trashCount } from "../modules/trash/index.ts";
 import type { OpenFile, OpenFileOptions } from "../open-file.ts";
 import type { useGitChangeSync } from "./git-change-sync.ts";
 import type { useOpenFiles } from "./open-files.ts";
@@ -37,13 +39,14 @@ import IconFiles from "~icons/lucide/files";
 import IconSearch from "~icons/lucide/search";
 import IconGit from "~icons/devicon/git";
 import IconDocker from "~icons/lucide/container";
-import IconBell from "~icons/lucide/bell";
+import IconHub from "~icons/lucide/network";
 import IconIssues from "~icons/lucide/circle-dot";
 import IconPulls from "~icons/lucide/git-pull-request";
 import IconMerge from "~icons/lucide/git-merge";
 import IconDiscussions from "~icons/lucide/messages-square";
 import IconPipelines from "~icons/lucide/workflow";
 import IconReleases from "~icons/lucide/tag";
+import IconTrash from "~icons/lucide/trash-2";
 
 /** Sections every workspace has; profiles add their own through `profile.sidebar`. */
 export const baseSidebarTypes: SidebarType[] = [
@@ -52,21 +55,16 @@ export const baseSidebarTypes: SidebarType[] = [
   { id: "git", title: "Git", requires: "git" },
 ];
 
+/**
+ * Sections of the left rail: the project ones first, the service ones (`profile.utility`: Hub,
+ * trash) last. Utility sections are marked so the rail draws them in its bottom group.
+ */
 export const sidebarSections = (profile: WorkspaceProfile, capabilities: WorkspaceCapabilities) =>
   createSidebarRegistry(
     (capability) => capabilities[capability as keyof WorkspaceCapabilities],
     baseSidebarTypes,
     profile.sidebar,
-  );
-
-/**
- * Sections of the right rail. The base workspace has none: the owner adds them through
- * `profile.aside` and supplies their views with `asideViews`.
- */
-export const asideSections = (profile: WorkspaceProfile, capabilities: WorkspaceCapabilities) =>
-  createSidebarRegistry(
-    (capability) => capabilities[capability as keyof WorkspaceCapabilities],
-    profile.aside,
+    profile.utility?.map((type) => ({ ...type, utility: true })),
   );
 
 /** What a section may ask of the workspace that shows it. */
@@ -92,6 +90,8 @@ export interface SidebarHost {
   openSearch(scope: FileScope): void;
   openPullFile(number: number, path: string, head?: string, pinned?: boolean): void;
   command(id: string, args?: unknown): void;
+  /** Awaits a command of the editor scope; plugin panels get its real result and errors. */
+  executeCommand?(id: string, args?: unknown): Promise<unknown>;
   refreshWorkspace(): void;
   changed(): void;
   deleted(path: string): void;
@@ -111,15 +111,22 @@ export interface SidebarView {
   activate?(host: SidebarHost): void;
   /** Refresh button; the default reloads the whole workspace. */
   refresh?(host: SidebarHost, panel: { refresh?: () => unknown } | undefined): unknown;
+  /**
+   * The panel draws the refresh button in its toolbar. Files and GitHub/GitLab lists leave
+   * this unset — the host overlay sits in an empty corner.
+   */
+  refreshGutter?: boolean;
 }
 export type SidebarViews = Record<string, SidebarView>;
 
 export const baseSidebarViews: SidebarViews = {
-  inbox: {
-    icon: IconBell,
-    component: AgentInbox,
+  hub: {
+    icon: IconHub,
+    component: HubPanel,
     props: () => ({}),
-    badge: () => inboxAttention(),
+    badge: () => inboxRemoteAttention(),
+    refreshGutter: true,
+    refresh: (_, panel) => panel?.refresh?.(),
   },
   files: {
     icon: IconFiles,
@@ -134,13 +141,25 @@ export const baseSidebarViews: SidebarViews = {
       onDeleted: host.deleted,
       onOpen: (path: string, pinned?: boolean) =>
         host.openFile(path, undefined, undefined, undefined, { preview: !pinned }),
+      onInfo: (entry: { path: string; directory: boolean }) =>
+        host.openTab(
+          "entry-info",
+          { path: entry.path, directory: entry.directory },
+          { preview: false },
+        ),
       onMoved: host.moved,
     }),
   },
   search: {
     icon: IconSearch,
     component: SearchPanel,
-    props: (host) => ({ projectId: host.projectId, onOpen: host.openFile }),
+    props: (host) => ({
+      projectId: host.projectId,
+      onOpen: host.openFile,
+      onReveal: (path: string) => host.command("ide.workbench.tree.reveal", { path }),
+    }),
+    refreshGutter: true,
+    refresh: (_, panel) => panel?.refresh?.(),
   },
   "search-scope": {
     icon: IconSearch,
@@ -155,6 +174,7 @@ export const baseSidebarViews: SidebarViews = {
           host.openFile(path, line, column, undefined, { scope, preview: false }),
       };
     },
+    refreshGutter: true,
     refresh: (_, panel) => panel?.refresh?.(),
   },
   git: {
@@ -179,6 +199,21 @@ export const baseSidebarViews: SidebarViews = {
     }),
     badge: (host) => host.overview.git.value.changes.length,
     activate: (host) => void host.overview.load(),
+    refreshGutter: true,
+    refresh: (_, panel) => panel?.refresh?.(),
+  },
+  // Service section from `workspaceUtility`: it is drawn in the bottom group of the rail.
+  trash: {
+    icon: IconTrash,
+    component: TrashPanel,
+    props: (host, selected) => ({
+      projectId: host.projectId,
+      revision: host.revision,
+      active: selected,
+      onChanged: () => host.changed(),
+    }),
+    badge: (host) => trashCount(host.projectId),
+    refreshGutter: true,
     refresh: (_, panel) => panel?.refresh?.(),
   },
   tree: {
@@ -321,6 +356,7 @@ export const baseSidebarViews: SidebarViews = {
     icon: IconDocker,
     component: DockerSidebar,
     props: () => ({}),
-    refresh: (host) => host.command("ide.docker.refresh"),
+    refreshGutter: true,
+    refresh: (host, panel) => panel?.refresh?.() ?? host.command("ide.docker.refresh"),
   },
 };

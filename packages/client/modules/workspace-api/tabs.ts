@@ -112,10 +112,29 @@ export const singletonTab = (
   extra: Pick<TabType, "subtitle" | "command"> = {},
 ) => defineTab({ id, key: () => key, path: () => path, title: () => title, ...extra });
 
+/** The work inbox of all agents and devices; the bell of the header opens it. */
+export const inboxTab = singletonTab(
+  "inbox",
+  "inbox:works",
+  "Работы",
+  "Работы и уведомления агентов",
+  {
+    subtitle: "фоновые задания и запросы",
+    command: {
+      id: "ide.workbench.inbox.open",
+      title: "Открыть работы и уведомления во вкладке",
+      description:
+        "Открывает вкладку «Работы»: фоновые задания, живые ходы, завершения и запросы агентов всех проектов и устройств Hub. Повторный вызов фокусирует вкладку.",
+    },
+  },
+);
+
 export interface TabRegistry {
   has(id: string): boolean;
   get(id: string): TabType | undefined;
   list(): TabType[];
+  /** Adds a runtime kind (a plugin contribution); returns a detaching function. */
+  register(type: TabType): () => void;
   /** Key of a parameterless tab; for panels that live outside the dock. */
   keyOf(id: string): string;
   /** Attaches host behavior to a kind; returns a function that detaches it. */
@@ -132,6 +151,13 @@ export function createTabRegistry(...groups: ReadonlyArray<readonly TabType[] | 
     has: (id) => types.has(id),
     get: (id) => types.get(id),
     list: () => [...types.values()],
+    register(type) {
+      if (types.has(type.id)) throw new Error(`Тип вкладки ${type.id} уже зарегистрирован`);
+      types.set(type.id, type);
+      return () => {
+        if (types.get(type.id) === type) types.delete(type.id);
+      };
+    },
     keyOf(id) {
       const type = types.get(id);
       if (!type) throw new Error(`Неизвестный тип вкладки: ${id}`);

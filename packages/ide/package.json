@@ -1,6 +1,6 @@
 {
   "name": "@ai-projector/ide",
-  "version": "0.11.0",
+  "version": "0.13.0",
   "description": "Projector web IDE, terminals and agents without GTK",
   "keywords": [
     "agents",
@@ -44,7 +44,6 @@
   },
   "dependencies": {
     "@ai-sdk/openai-compatible": "catalog:",
-    "@anthropic-ai/claude-agent-sdk": "catalog:",
     "@devcontainers/cli": "catalog:",
     "@modelcontextprotocol/sdk": "catalog:",
     "@xterm/addon-serialize": "catalog:",

@@ -120,6 +120,7 @@ describe("agent roles", () => {
       agent: "claude-code",
       selection: { model: "claude" },
       prompt: "Сначала читай diff.",
+      template: true,
       skills: ["review"],
       mcp: ["github"],
     });
@@ -130,6 +131,7 @@ describe("agent roles", () => {
       agent: "claude-code",
       selection: { model: "claude" },
       prompt: "Сначала читай diff.",
+      template: true,
       skills: ["review"],
       mcp: ["github"],
       inherited: false,
@@ -152,6 +154,7 @@ describe("agent roles", () => {
       mcp: [],
     });
     expect(saved.roles.find((item) => item.id === role.id)?.prompt).toBeUndefined();
+    expect(saved.roles.find((item) => item.id === role.id)?.template).toBeUndefined();
     expect(await readAgentRole(role.id)).toMatchObject({ name: "Старший ревьюер" });
 
     const removed = await deleteChatRole(role.id);
@@ -173,6 +176,7 @@ describe("agent roles", () => {
       selection: { model: "claude" },
       permissionMode: "default",
       prompt: "Ищи регрессии.",
+      template: true,
       skills: ["review"],
       mcp: ["github"],
     };
@@ -240,6 +244,7 @@ describe("agent roles", () => {
       selection: { model: "claude" },
       permissionMode: "default",
       prompt: "Ищи регрессии.",
+      template: true,
       skills: [],
       mcp: ["github"],
     };
@@ -272,6 +277,48 @@ describe("agent roles", () => {
     expect(serviceRoleInheritsModel({ selection: { provider: "test:model" } })).toBe(false);
   });
 
+  it("renders a templated role as the Projector system prompt", async () => {
+    const { projectorSystem } = await import("../modules/agents/projector/projector-system.ts");
+    const context = {
+      projectWidgets: [],
+      skills: [],
+      mcp: { servers: [], problems: [], tools: {}, close: async () => {} },
+      summary: "",
+    };
+    const options = { message: "привет", features: [] };
+    const full = await projectorSystem(
+      {
+        ...options,
+        role: {
+          roleId: "r",
+          name: "Ревьюер",
+          selection: {},
+          prompt: "{role}\n\n{system}",
+          template: true,
+        },
+      },
+      context,
+    );
+    expect(full).toContain("Роль «Ревьюер»");
+    expect(full).toContain("Ты помощник по управлению Projector");
+
+    const bare = await projectorSystem(
+      {
+        ...options,
+        role: {
+          roleId: "r",
+          name: "Ревьюер",
+          selection: {},
+          prompt: "Только роль: {role}",
+          template: true,
+        },
+      },
+      context,
+    );
+    expect(bare).toBe("Только роль: Роль «Ревьюер»");
+    expect(bare).not.toContain("Ты помощник по управлению Projector");
+  });
+
   it("builds role context for external agents from its prompt and skills", async () => {
     await mkdir(join(directory, "projector", "agent", "skills", "review"), { recursive: true });
     await writeFile(
@@ -293,8 +340,31 @@ describe("agent roles", () => {
     expect(context).toContain("missing");
     expect(rolePromptText(role)).toContain("Ищи регрессии.");
     expect(rolePromptText({ name: "Пустая", selection: {} })).toBe("");
+    expect(
+      rolePromptText(
+        { name: "Шаблон", template: true, prompt: "{system}|{widgets}|{unknown}" },
+        { system: "S", widgets: "W" },
+      ),
+    ).toBe("S|W|{unknown}");
+    const templated = await roleContext(
+      {
+        ...role,
+        template: true,
+        prompt: "Роль: {role}\n\n{skills}\n\nПроект: {project}",
+      },
+      "",
+    );
+    expect(templated).toContain("Роль «Ревьюер»");
+    expect(templated.replaceAll("\\", "/")).toContain("skills/review/SKILL.md");
+    expect(templated).toContain("missing");
+    expect(templated).not.toContain("дополнительные инструкции");
     expect(await roleContext({ ...role, skills: [] })).toContain("отключены");
     expect(await roleContext({ roleId: "r", name: "Без навыков", selection: {} })).toBe("");
+    const builtin = await roleContext(
+      { roleId: "r", name: "Встроенный", selection: {}, skills: ["add-projects"] },
+      "",
+    );
+    expect(builtin.replaceAll("\\", "/")).toContain("system-skills/add-projects/SKILL.md");
   });
 
   it("passes a role snapshot from the chat request to the backend", async () => {
@@ -322,6 +392,7 @@ describe("agent roles", () => {
         selection: { model: "claude" },
         permissionMode: "default",
         prompt: "  Проверяй края.  ",
+        template: true,
         skills: [" review ", "review", ""],
         mcp: [],
       }),
@@ -333,6 +404,7 @@ describe("agent roles", () => {
       selection: { model: "claude" },
       permissionMode: "default",
       prompt: "Проверяй края.",
+      template: true,
       skills: ["review"],
       mcp: [],
     });
@@ -343,6 +415,7 @@ describe("agent roles", () => {
       agent: "claude-code",
       selection: { model: "claude" },
       prompt: "Проверяй края.",
+      template: true,
       skills: ["review"],
       mcp: [],
     });
@@ -351,9 +424,19 @@ describe("agent roles", () => {
       name: "Ревьюер",
       selection: { model: "claude" },
       prompt: "Проверяй края.",
+      template: true,
       skills: ["review"],
       mcp: [],
     });
+    expect(
+      normalizeAgentRole({
+        id: "doctor",
+        name: "Доктор",
+        kind: "service",
+        agent: "projector",
+        template: true,
+      })?.template,
+    ).toBeUndefined();
     expect(
       normalizeAgentRole({
         id: "reviewer",

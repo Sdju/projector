@@ -29,7 +29,26 @@ test.concurrent(
     expect(await summary()).toContain("Выполняется в фоне: 2");
     expect(await summary()).toContain("ошибок: 1");
     expect(await rows(".task-bar > .scroll > .list")).toBe(3);
+    // The row names the model that works inside the task.
+    expect(
+      await browser.evaluate(
+        '[...document.querySelectorAll(".task-bar .list .note")].some((node) => node.textContent.includes("модель: test-model"))',
+      ),
+    ).toBe(true);
     expect(await browser.evaluate('document.querySelector(".finished").open')).toBe(false);
+
+    // Opening the task shows who worked on it: its agent, its model and its calls.
+    await browser.evaluate("window.fixture.showProjectorTask()");
+    await settle();
+    expect(
+      await browser.evaluate('document.querySelector(".task-view .meta").textContent'),
+    ).toContain("Projector task · модель: test-model");
+    // The call itself names the task, its agent and its model in the work block.
+    await browser.click(".work-summary");
+    await settle();
+    expect(
+      await browser.evaluate('document.querySelector(".activity .tool-hint").textContent'),
+    ).toContain("Projector task · модель: test-model");
 
     // Even fully opened, the list is capped and scrolls instead of covering the conversation.
     await browser.click(".finished-summary");

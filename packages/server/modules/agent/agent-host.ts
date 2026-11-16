@@ -1,3 +1,4 @@
+import { PARENT_SESSION_ENV } from "@ai-projector/core/modules/os/index.ts";
 import { devcontainerForPath } from "../devcontainer/index.ts";
 import { environmentForPath } from "../environments/index.ts";
 import type { AgentHistoryTurn } from "../providers/index.ts";
@@ -16,6 +17,7 @@ const PRIVATE_ENV = [
 export function agentEnv(): Record<string, string | undefined> {
   const env = { ...process.env };
   for (const name of PRIVATE_ENV) delete env[name];
+  for (const name of PARENT_SESSION_ENV) delete env[name];
   return env;
 }
 

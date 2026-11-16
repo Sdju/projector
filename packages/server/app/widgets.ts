@@ -14,6 +14,7 @@ import { inlineIconWidget } from "@ai-projector/core/modules/agent-widgets/inlin
 import { inputWidget } from "@ai-projector/core/modules/agent-widgets/input/index.ts";
 import { intelligentFormWidget } from "@ai-projector/core/modules/agent-widgets/intelligent-form/index.ts";
 import { lineWidget } from "@ai-projector/core/modules/agent-widgets/line/index.ts";
+import { mediaWidget } from "@ai-projector/core/modules/agent-widgets/media/index.ts";
 import { rowWidget } from "@ai-projector/core/modules/agent-widgets/row/index.ts";
 import { safeSecretShowWidget } from "@ai-projector/core/modules/agent-widgets/safe-secret-show/index.ts";
 import { sliderWidget } from "@ai-projector/core/modules/agent-widgets/slider/index.ts";
@@ -43,6 +44,7 @@ export function registerBuiltinWidgetDefinitions(): void {
     inputWidget,
     intelligentFormWidget,
     lineWidget,
+    mediaWidget,
     rowWidget,
     safeSecretShowWidget,
     sliderWidget,

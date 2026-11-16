@@ -28,6 +28,35 @@ export function settleAnswerTasks(turns: readonly AgentTurn[], at: number): void
       }
 }
 
+/** Tracked background work that still needs the live run (permissions / notify after `done`). */
+export function holdsAnswerRun(turn: AgentTurn): boolean {
+  return (turn.tasks ?? []).some(
+    (task) =>
+      task.status === "running" &&
+      task.background === true &&
+      task.untracked !== true &&
+      // Soft keep-alive (`hold: false`) does not need the answer stream after end_turn.
+      task.hold !== false,
+  );
+}
+
+/**
+ * The saved answer looks like it was cut off, so a live host for this chat should be rejoined
+ * even if `run` was dropped (a remount or reload aborted the stream and used to clear it).
+ * A finished answer with only soft-held background tasks is left alone: attaching would wipe it.
+ */
+export function answerLooksOpen(turn: AgentTurn): boolean {
+  if (turn.failure) return false;
+  if (turn.tools.some((tool) => tool.status === "running")) return true;
+  if (
+    (turn.tasks ?? []).some(
+      (task) => task.status === "running" && task.background !== true && task.untracked !== true,
+    )
+  )
+    return true;
+  return !turn.text.trim();
+}
+
 /**
  * The stream of an answer is over: its calls cannot still run, and without a live run behind
  * the turn, the tasks left open are closed too (a stop or a broken stream sends no `done`).
@@ -61,6 +90,9 @@ function timesOf(assistant: AgentTurn): Map<string, ToolTimes> {
 /** Instructions already shown in each answer: a replayed event must not add its note twice. */
 const shownInputs = new WeakMap<AgentTurn, Set<string>>();
 
+/** `done` already arrived; `run` may still be kept for hard-held background work. */
+const answerEnded = new WeakSet<AgentTurn>();
+
 function inputsOf(assistant: AgentTurn): Set<string> {
   const known = shownInputs.get(assistant);
   if (known) return known;
@@ -69,11 +101,36 @@ function inputsOf(assistant: AgentTurn): Set<string> {
   return ids;
 }
 
+/** A copy of the visible answer: a failed rejoin puts this back instead of saving an empty turn. */
+export type AnswerSnapshot = {
+  text: string;
+  tools: AgentTurn["tools"];
+  parts?: AgentPart[];
+  tasks?: AgentTurn["tasks"];
+};
+
+export function snapshotAnswer(assistant: AgentTurn): AnswerSnapshot {
+  return {
+    text: assistant.text,
+    tools: assistant.tools.map((tool) => ({ ...tool })),
+    ...(assistant.parts ? { parts: assistant.parts.map((part) => ({ ...part })) } : {}),
+    ...(assistant.tasks ? { tasks: assistant.tasks.map((task) => ({ ...task })) } : {}),
+  };
+}
+
+export function restoreAnswer(assistant: AgentTurn, snapshot: AnswerSnapshot): void {
+  assistant.text = snapshot.text;
+  assistant.tools.splice(0, assistant.tools.length, ...snapshot.tools);
+  assistant.parts = snapshot.parts;
+  if (snapshot.tasks) assistant.tasks = snapshot.tasks;
+}
+
 /** Keeps the times of the calls already seen, then empties the answer for its replay. */
 export function resetAnswer(assistant: AgentTurn) {
   const times = timesOf(assistant);
   // The answer is replayed from scratch, so its notes have to be added again.
   shownInputs.delete(assistant);
+  answerEnded.delete(assistant);
   for (const tool of assistant.tools)
     if (tool.startedAt !== undefined || tool.endedAt !== undefined)
       times.set(tool.id, { startedAt: tool.startedAt, endedAt: tool.endedAt });
@@ -214,6 +271,9 @@ export function applyAgentEvent(
         if (again.status === "running") again.detail = summarize(event.data.input);
         again.input = summarize(event.data.input);
         if (event.data.kind) again.kind = event.data.kind;
+        if (event.data.label) again.label = event.data.label;
+        if (Array.isArray(event.data.paths) && event.data.paths.length)
+          again.paths = event.data.paths;
         return false;
       }
       if (assistant.text.trim() && !assistant.text.endsWith("\n\n")) assistant.text += "\n\n";
@@ -228,6 +288,10 @@ export function applyAgentEvent(
         input: summarize(event.data.input),
         detail: summarize(event.data.input),
         ...(event.data.kind ? { kind: event.data.kind } : {}),
+        ...(event.data.label ? { label: event.data.label } : {}),
+        ...(Array.isArray(event.data.paths) && event.data.paths.length
+          ? { paths: event.data.paths }
+          : {}),
         startedAt: known?.startedAt ?? at,
         ...(known?.endedAt !== undefined ? { endedAt: known.endedAt } : {}),
         ...(event.data.parent ? { parent: event.data.parent } : {}),
@@ -288,6 +352,10 @@ export function applyAgentEvent(
         task.startedAt ??= at;
         task.endedAt = undefined;
       } else if (task.startedAt !== undefined && task.endedAt === undefined) task.endedAt = at;
+      // Answer text may already be done while ACP still holds for children; drop `run` only when
+      // nothing left needs the same stream for permissions or completion.
+      if (assistant.run && answerEnded.has(assistant) && !holdsAnswerRun(assistant))
+        assistant.run = undefined;
       return false;
     }
     case "project":
@@ -299,12 +367,14 @@ export function applyAgentEvent(
       assistant.run = undefined;
       return false;
     case "done":
-      assistant.run = undefined;
       assistant.stopped = event.data.stopped;
+      answerEnded.add(assistant);
       // A foreground task cannot outlive the answer; a background one may and reports later,
       // unless the agent never reports (then its state is unknown once the answer is over).
       // Settle every turn: an earlier interrupted answer leaves rows this one must close.
       settleAnswerTasks([assistant, ...state.turns], at);
+      // Keep `run` while hard-held background work still needs this stream (permissions / notify).
+      if (!holdsAnswerRun(assistant)) assistant.run = undefined;
       return false;
     default:
       return false;

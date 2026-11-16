@@ -2,21 +2,12 @@
 export type ToolVisual = "read" | "write" | "edit" | "bash" | "search" | "web" | "task" | "other";
 
 const KINDS: Record<Exclude<ToolVisual, "other">, readonly string[]> = {
-  read: [
-    "read",
-    "read_file",
-    "readfile",
-    "read_file_content",
-    "readmediafile",
-    "read_media_file",
-    "view_image",
-    "viewimage",
-  ],
+  read: ["read", "read_file", "readfile", "read_file_content", "read_media_file", "view_image"],
   write: ["write", "write_file", "writefile", "create_file"],
-  edit: ["edit", "multiedit", "edit_file", "apply_patch", "patch"],
+  edit: ["edit", "edit_file", "apply_patch", "patch"],
   bash: ["bash", "shell", "terminal", "run", "run_command", "execute", "command", "sh"],
   search: ["grep", "glob", "rg", "search", "find", "list_directory", "ls", "list_files"],
-  web: ["webfetch", "web_fetch", "websearch", "web_search", "fetch", "fetch_url"],
+  web: ["web_fetch", "web_search", "fetch", "fetch_url"],
   task: ["task", "agent", "subagent", "delegate"],
 };
 

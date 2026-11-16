@@ -54,10 +54,8 @@ test("agent discovers live commands, requires description, checks args and exclu
   const commands = agentCommandHandler(sdk, "a");
   const tools = createAgentTools({ onProject: () => {}, commands, guard: { trusting: true } });
   const call = (name, input) => tools[name].execute(input, { toolCallId: "test", messages: [] });
-  expect((await call("describe_widget", { name: "GitInfo" })).description).toContain(
-    "branch: string",
-  );
-  expect((await call("describe_widget", { name: "Card" })).description).toContain("Card — рамка");
+  expect(tools.list_widgets).toBeUndefined();
+  expect(tools.describe_widget).toBeUndefined();
   expect((await call("list_commands", {})).commands.map((c) => c.id)).toStrictEqual([
     "ide.fileTree.file.rename",
   ]);
@@ -405,7 +403,7 @@ test("approval bridge resolves only an explicit allow and cancels with the reque
 
 test("Claude Code messages become the shared chat events", async () => {
   const { createClaudeEventMapper } =
-    await import("../modules/agents/claude-code/claude-code-events.ts");
+    await import("../../../plugins/claude-code/src/claude-code-events.ts");
   const events = [];
   const mapper = createClaudeEventMapper((event, data) => events.push([event, data]));
   const stream = (event, parent = null) => ({
@@ -484,7 +482,13 @@ test("Claude Code messages become the shared chat events", async () => {
     cacheWrite: 0,
     first: { input: 5, output: 0, cacheRead: 90, cacheWrite: 5 },
   });
-  expect(events[3][1]).toStrictEqual({ id: "t1", name: "Read", input: { file_path: "x" } });
+  expect(events[3][1]).toStrictEqual({
+    id: "t1",
+    name: "Read",
+    input: { file_path: "x" },
+    kind: "read",
+    label: "Чтение файла",
+  });
   expect(events[4][1]).toStrictEqual({ id: "t1", name: "Read", output: "{}" });
   expect(events[5][1]).toMatchObject({ id: "t2", error: "boom" });
   expect(
@@ -1182,18 +1186,18 @@ test("agent session modes default to the terminal and persist only a GUI choice"
   process.env.XDG_DATA_HOME = directory;
   try {
     expect((await preferences()).agentModes).toStrictEqual({});
-    await setAgentMode("claude", "gui");
-    expect((await preferences()).agentModes).toStrictEqual({ claude: "gui" });
+    await setAgentMode("opencode", "gui");
+    expect((await preferences()).agentModes).toStrictEqual({ opencode: "gui" });
     await setAgentMode("codex", "gui");
-    expect((await preferences()).agentModes).toStrictEqual({ claude: "gui", codex: "gui" });
+    expect((await preferences()).agentModes).toStrictEqual({ opencode: "gui", codex: "gui" });
     await setAgentMode("kimi", "gui");
     expect((await preferences()).agentModes).toStrictEqual({
-      claude: "gui",
+      opencode: "gui",
       codex: "gui",
       kimi: "gui",
     });
     await expect(setAgentMode("shell", "gui")).rejects.toThrow(/графическ/);
-    await setAgentMode("claude", "tui");
+    await setAgentMode("opencode", "tui");
     expect((await preferences()).agentModes).toStrictEqual({ codex: "gui", kimi: "gui" });
     await setAgentMode("kimi", "tui");
     expect((await preferences()).agentModes).toStrictEqual({ codex: "gui" });

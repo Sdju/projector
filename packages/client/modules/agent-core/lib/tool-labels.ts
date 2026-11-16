@@ -1,10 +1,10 @@
+import { clientAgentByBackend } from "../../agents-integration/catalog/index.ts";
 import { parseToolInput } from "./tool-input.ts";
 
 export const toolLabels: Record<string, string> = {
   list_commands: "Поиск команд",
   describe_command: "Описание команды",
   execute_command: "Вызов команды",
-  describe_widget: "Описание виджета",
   use_skill: "Загрузка навыка",
   Skill: "Загрузка навыка",
   skill: "Загрузка навыка",
@@ -20,39 +20,23 @@ export const toolLabels: Record<string, string> = {
   add_project: "Добавление проекта",
   add_projects: "Добавление проектов",
   list_projects: "Список проектов",
-  // Claude Code built-in tools
-  Read: "Чтение файла",
   read: "Чтение файла",
   read_file: "Чтение файла",
-  ReadMediaFile: "Чтение изображения",
   read_media_file: "Чтение изображения",
   view_image: "Чтение изображения",
-  viewimage: "Чтение изображения",
-  Edit: "Правка файла",
   edit: "Правка файла",
   edit_file: "Правка файла",
-  MultiEdit: "Правка файла",
-  multiedit: "Правка файла",
   apply_patch: "Правка файла",
-  Write: "Запись файла",
   write: "Запись файла",
   write_file: "Запись файла",
-  Grep: "Поиск в файлах",
   grep: "Поиск в файлах",
-  Glob: "Поиск файлов",
   glob: "Поиск файлов",
-  WebFetch: "Загрузка страницы",
-  webfetch: "Загрузка страницы",
   web_fetch: "Загрузка страницы",
-  WebSearch: "Поиск в сети",
-  websearch: "Поиск в сети",
   web_search: "Поиск в сети",
-  Task: "Субагент",
   task: "Субагент",
   agent: "Субагент",
   subagent: "Субагент",
   TodoWrite: "План задач",
-  todowrite: "План задач",
   TodoList: "План задач",
 };
 
@@ -82,10 +66,23 @@ export function skillCallName(name: string, input = ""): string {
   return "";
 }
 
-export const toolLabel = (name: string, input = "") => {
+export const toolLabel = (
+  name: string,
+  input = "",
+  options?: { label?: string; backend?: string; kind?: string },
+) => {
+  if (options?.label) return options.label;
   if (isSkillCall(name)) {
     const skill = skillCallName(name, input);
     return skill ? `Загрузка навыка: ${skill}` : "Загрузка навыка";
+  }
+  if (options?.backend) {
+    const custom = clientAgentByBackend(options.backend)?.toolLabel?.({
+      name,
+      input,
+      kind: options.kind,
+    });
+    if (typeof custom === "string" && custom) return custom;
   }
   return /^reading media\b/i.test(name)
     ? "Чтение изображения"

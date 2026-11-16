@@ -2,21 +2,50 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, provide, ref } from "vue";
 import { widgetReplyKey } from "../../widget-runtime/index.ts";
 import { useIdeCommands } from "../../ide/index.ts";
+import { commandArgs, useCommandScope } from "../../../common/utilities/commands.ts";
 import { workspaceRequest } from "../../workspace-api/index.ts";
 import { AgentFeaturesIsland } from "../../agent-features/index.ts";
 import { AgentJudgeIsland } from "../modules/settings/index.ts";
-import { agentCommandHandler } from "../../agent-core/index.ts";
-import { agentLabel, isBuiltinAgent } from "../../agent-core/index.ts";
+import {
+  activateChat,
+  agentCommandHandler,
+  agentLabel,
+  chatsOf,
+  isBuiltinAgent,
+  provideChatContext,
+  registerChat,
+  shownPlan,
+  useAgent,
+  type AgentBackendId,
+  type ChatUsage,
+} from "../../agent-core/index.ts";
 import { openAgentChat } from "../model/open-agent.ts";
 import { chatDropHandlers } from "../lib/chat-drop.ts";
 import { useChatBranch } from "../model/chat-branch.ts";
+import { createChatController } from "../model/chat-controller.ts";
 import { useChatReadout } from "../model/chat-readout.ts";
-import { useAgent } from "../../agent-core/index.ts";
-import { useChatJobs } from "../modules/jobs/index.ts";
-import { lensActions, useAgentLens } from "../../agent-turns/index.ts";
-import { useSideQuestion } from "../modules/panels/index.ts";
+import { AgentActivityDock, AgentJobRequests, useChatJobs } from "../modules/jobs/index.ts";
+import {
+  AgentPermissions,
+  AgentQuestions,
+  AgentSecrets,
+  AgentTaskView,
+  AgentTurn,
+  useAgentLens,
+  useChatTaskView,
+} from "../../agent-turns/index.ts";
+import {
+  AgentRewind,
+  AgentSideQuestion,
+  AgentWorktree,
+  useMcpServers,
+  useRewindPanel,
+  useSideQuestion,
+  useWorktreePanel,
+} from "../modules/panels/index.ts";
 import { useAutoCompact } from "../model/use-auto-compact.ts";
 import { useChatInputActions, useChatRetry } from "../model/use-chat-input-actions.ts";
+import { useStartPreset } from "../model/start-preset.ts";
 import { useAnswerForm } from "../model/answer-form.ts";
 import { useAnswerDoctor } from "../model/answer-doctor.ts";
 import UiPanel from "../../../common/ui/UiPanel.vue";
@@ -25,47 +54,23 @@ import UiBadge from "../../../common/ui/UiBadge.vue";
 import UiButton from "../../../common/ui/UiButton.vue";
 import UiLoader from "../../../common/ui/UiLoader.vue";
 import AgentWelcome from "./AgentWelcome.vue";
-import { AgentTurn } from "../../agent-turns/index.ts";
-import { AgentComposer } from "../modules/composer/index.ts";
-import { AgentActivityDock } from "../modules/jobs/index.ts";
-import { AgentJobRequests } from "../modules/jobs/index.ts";
-import { AgentQuestions } from "../../agent-turns/index.ts";
-import AgentSecrets from "./AgentSecrets.vue";
-import { AgentPermissions } from "../../agent-turns/index.ts";
+import AgentChatTimeline from "./AgentChatTimeline.vue";
+import { AgentComposer, AgentControls } from "../modules/composer/index.ts";
 import AgentContextMeter from "./AgentContextMeter.vue";
 import AgentChipPreview from "./AgentChipPreview.vue";
 import ImageModal from "../../../common/ui/ImageModal.vue";
-import { AgentControls } from "../modules/composer/index.ts";
 import AgentSessions from "./AgentSessions.vue";
-import { AgentSideQuestion } from "../modules/panels/index.ts";
-import { AgentTaskView } from "../../agent-turns/index.ts";
 import AgentChatMenu from "./AgentChatMenu.vue";
-import { chatTasks } from "../../agent-core/index.ts";
-import { useChatTaskView } from "../../agent-turns/index.ts";
 import { useChipActions } from "../model/use-chip-actions.ts";
-import { provideChatContext } from "../../agent-core/index.ts";
-import { AgentRewind } from "../modules/panels/index.ts";
-import { AgentWorktree } from "../modules/panels/index.ts";
-import { exportChat, downloadChat as saveChatMarkdown } from "../lib/export.ts";
-import { copyText } from "../lib/clipboard.ts";
-import { shownPlan } from "../../agent-core/index.ts";
+import { downloadChat as saveChatMarkdown } from "../lib/export.ts";
 import { previousUser } from "../lib/previous-user.ts";
-import { fetchMcpServers } from "../../agent-core/index.ts";
-import { useMcpServers } from "../modules/panels/index.ts";
-import {
-  activateChat,
-  chatsOf,
-  registerChat,
-  type ChatController,
-} from "../../agent-core/index.ts";
 import { AgentSecretShow, useSecretShows } from "../../agent-secret-show/index.ts";
 import { useChatScroll } from "../model/chat-scroll.ts";
 import { useChatWindow } from "../model/chat-window.ts";
+import { useChatZenFocus } from "../model/chat-zen.ts";
+import { useChatCopy } from "../model/use-chat-copy.ts";
 import { useAgentChatTabTitle } from "../model/chat-titles.ts";
-import { useRewindPanel } from "../modules/panels/index.ts";
-import { useWorktreePanel } from "../modules/panels/index.ts";
 import { chatUsageByTurn } from "../model/chat-usage.ts";
-import type { AgentBackendId, ChatUsage, RewindScope } from "../../agent-core/index.ts";
 import type { AgentRoleSnapshot } from "@ai-projector/core/modules/agent-role/index.ts";
 import IconArrowDown from "~icons/lucide/arrow-down";
 import IconSquarePen from "~icons/lucide/square-pen";
@@ -85,6 +90,15 @@ const { api } = useIdeCommands();
 const chatMenu = ref<InstanceType<typeof AgentChatMenu>>();
 const featuresIsland = ref<InstanceType<typeof AgentFeaturesIsland>>();
 const judgeIsland = ref<InstanceType<typeof AgentJudgeIsland>>();
+const agent = useAgent(
+  props.projectId,
+  plain.value ? undefined : agentCommandHandler(api, props.projectId),
+  {
+    backend: props.backend,
+    chatId: props.chatId,
+    role: props.role,
+  },
+);
 const {
   key: chatKey,
   turns,
@@ -135,7 +149,6 @@ const {
   setFeatureOverrides,
   judgeOverride,
   setJudgeOverride,
-  worktreeId,
   worktreeInfo,
   mergeCopy,
   discardCopy,
@@ -146,11 +159,7 @@ const {
   decide,
   answer,
   answerSecret,
-} = useAgent(props.projectId, plain.value ? undefined : agentCommandHandler(api, props.projectId), {
-  backend: props.backend,
-  chatId: props.chatId,
-  role: props.role,
-});
+} = agent;
 const emit = defineEmits<{ title: [title: string] }>();
 const { shows: secretShows, dismiss: dismissSecretShow } = useSecretShows(
   props.projectId,
@@ -254,7 +263,7 @@ const chatDrop = chatDropHandlers(() => composer.value);
 const panel = ref<InstanceType<typeof UiPanel>>();
 const root = computed(() => panel.value?.element);
 let rememberScroll = () => {};
-const { PRELOAD_PX, firstShown, shown, hidden, loadEarlier, topUp } = useChatWindow(
+const { PRELOAD_PX, firstShown, shown, hidden, loadEarlier, topUp, reveal } = useChatWindow(
   turns,
   log,
   () => rememberScroll(),
@@ -289,9 +298,58 @@ const {
   },
 });
 rememberScroll = rememberChatScroll;
+const navigation = useCommandScope(`chat-navigation:${chatKey}`, () => ({
+  surface: "agent-chat",
+  project: props.projectId,
+  chat: chatKey,
+}));
+const showTimeline = computed(
+  () =>
+    !loading.value &&
+    !viewed.value &&
+    turns.value.filter((turn) => turn.role === "assistant").length >= 3,
+);
+async function goToRequest(id: string) {
+  const wasAway = away.value;
+  away.value = true;
+  if (!(await reveal(id))) {
+    away.value = wasAway;
+    throw new Error("Запрос не найден");
+  }
+  const element = log.value?.querySelector<HTMLElement>(`[data-request-id="${CSS.escape(id)}"]`);
+  if (!element || !log.value) return;
+  log.value.scrollTo({
+    top:
+      log.value.scrollTop +
+      element.getBoundingClientRect().top -
+      log.value.getBoundingClientRect().top -
+      12,
+    behavior: "instant",
+  });
+  rememberChatScroll();
+}
+navigation.scope.registerCommand({
+  id: "ide.agent.chat.request.go",
+  title: "Перейти к запросу в чате",
+  description:
+    "Прокручивает открытый чат к указанному сообщению пользователя, подгружая раннюю историю при необходимости.",
+  arguments: { turnId: "Идентификатор запроса из ide.agent.turns.list" },
+  run: (value) => {
+    const { turnId } = commandArgs(value);
+    if (typeof turnId !== "string") throw new Error("Укажите turnId запроса");
+    return goToRequest(turnId);
+  },
+});
+const zenMode = useChatZenFocus({
+  projectId: props.projectId,
+  chatKey,
+  viewed: viewingTask,
+  root,
+  focusComposer: () => composer.value?.focus(),
+});
 // The project folder: edited files and dropped paths are shown relative to it.
 const projectRoot = ref("");
-void workspaceRequest<{ root: string }>(props.projectId, "root")
+void workspaceRequest(props.projectId, "root")
   .then((data) => {
     projectRoot.value = data.root;
   })
@@ -317,6 +375,20 @@ const { pendingForm, answerFormFor, submitComposerForm, submitTurnForm } = useAn
   send,
   edit,
   projectId: props.projectId,
+});
+/** The form the composer shows: a starter preset wins over the last answer's form. */
+const {
+  form: composerForm,
+  open: openPresetForm,
+  close: closePresetForm,
+  submit: submitComposerPreset,
+} = useStartPreset({
+  turns,
+  chat: () => chatKey,
+  pendingForm,
+  send,
+  submitAnswerForm: submitComposerForm,
+  toBottom,
 });
 const {
   progress: doctorProgress,
@@ -376,74 +448,32 @@ const { compact } = useAutoCompact({
   toBottom,
 });
 // The chat publishes itself to the workspace's commands (see `registerAgentCommands`).
-const controller: ChatController = {
-  key: chatKey,
+const controller = createChatController({
   projectId: props.projectId,
   backend: props.backend,
   label: agentName.value,
-  busy: () => busy.value,
+  chat: agent,
   visible: () => !!root.value && root.value.getClientRects().length > 0,
-  turns: () => turns.value,
-  tasks: () => chatTasks(turns.value),
-  queue: () => queue.value,
-  controls: () => controls.value,
-  selection: () => selection.value,
-  capabilities: () => capabilities.value,
-  setControl,
-  loadSessions,
-  resumeSession,
-  removeSession,
-  toggleControlsMenu: () => controlsMenu.value?.toggle(),
-  send: (text) => send(text),
-  attach: async (chips) => composer.value?.attach(chips),
-  appendText: async (text) => composer.value?.appendText(text),
-  pendingForm: () => pendingForm.value,
-  showForm: () => composer.value?.showForm(),
-  hideForm: () => composer.value?.hideForm(),
-  inject: async (text) => {
-    await send(text);
-    const item = queue.value.findLast((entry) => entry.text === text.trim());
-    if (!item) return false;
-    return injectQueued(item.id);
-  },
-  stop,
-  edit,
-  retry,
+  composer: () => composer.value,
+  controls: () => controlsMenu.value,
+  pendingForm: () => composerForm.value,
   fork,
-  rewind: async (id, scope) => {
-    const result = await rewindTo(id, scope);
-    return result ?? { ok: true, files: [] };
-  },
-  showVersion,
-  removeQueued,
-  exportMarkdown: () => exportChat(turns.value, agentName.value),
   compact,
-  status: () => side.status(),
-  openSide: () => side.openPanel(),
-  askSide: (text) => side.ask(text),
-  clearSide: () => side.clear(),
-  ...lensActions(lens),
-  mcpServers: () => fetchMcpServers(props.backend, props.projectId),
-  worktree: async () => (worktreeId() ? worktreeInfo() : undefined),
-  mergeWorktree: mergeCopy,
-  discardWorktree: discardCopy,
-  setIsolate: (on) => {
-    isolate.value = on;
-  },
-};
+  rewindTo,
+  lens,
+  side,
+});
 onBeforeUnmount(registerChat(controller));
 // A file chip opens its file in the editor; an image chip opens the picture in the chat viewer.
 const { open: openChip, image: chipPreview } = useChipActions(props.projectId, api, (message) => {
   error.value = message;
 });
-const copied = ref("");
-const copyError = ref("");
+const { copied, copyError, copyMessage } = useChatCopy();
 function dismissError() {
   error.value = "";
   copyError.value = "";
 }
 const { retryableError, retryFailed } = useChatRetry(turns, busy, error, copyError, retryMessage);
-let copyTimer: ReturnType<typeof setTimeout> | undefined;
 // Components in the answers write back into this chat; a busy agent queues the message.
 provide(widgetReplyKey, (text) => {
   void toBottom();
@@ -461,29 +491,16 @@ const { submit, continueTurn, suggest, newChat } = useChatInputActions({
     away.value = false;
   },
   focus: () => composer.value?.focus(),
+  closeForm: closePresetForm,
 });
-async function copyMessage(id: string, text: string) {
-  if (!(await copyText(text))) {
-    copyError.value = "Не удалось скопировать ответ";
-    return;
-  }
-  copied.value = id;
-  copyError.value = "";
-  clearTimeout(copyTimer);
-  copyTimer = setTimeout(() => {
-    copied.value = "";
-  }, 2000);
-}
-onBeforeUnmount(() => {
-  release();
-  clearTimeout(copyTimer);
-});
+onBeforeUnmount(() => release());
 </script>
 
 <template>
   <UiPanel
     ref="panel"
     class="agent-chat"
+    :class="{ zen: zenMode }"
     aria-label="Чат с агентом"
     @focusin="activateChat(controller)"
     @pointerdown.capture="activateChat(controller)"
@@ -492,7 +509,14 @@ onBeforeUnmount(() => {
     @dragleave="chatDrop.dragleave"
     @drop="chatDrop.drop"
   >
-    <UiInline class="chat-tools" :gap="1" align="normal" justify="end">
+    <UiInline
+      v-show="!zenMode"
+      :inert="zenMode"
+      class="chat-tools"
+      :gap="1"
+      align="normal"
+      justify="end"
+    >
       <UiBadge
         v-if="roleSnapshot"
         tone="info"
@@ -560,62 +584,72 @@ onBeforeUnmount(() => {
       :disabled="loading"
       @update:override="setJudgeOverride"
     />
-    <div v-show="!viewed" ref="log" class="chat-log" @scroll.passive="trackScroll">
-      <div v-if="loading" class="chat-loading">
-        <UiLoader label="Загружаю чат…" align="center" />
-      </div>
-      <AgentWelcome
-        v-else-if="!turns.length"
-        :plain="plain"
-        :agent-name="agentName"
-        :role-name="roleSnapshot?.name"
-        @suggest="suggest"
-        @open="openAgent"
-      />
-      <div
-        v-else
-        class="conversation"
-        role="log"
-        aria-label="Сообщения"
-        aria-live="polite"
-        aria-relevant="additions text"
-      >
-        <button v-if="hidden" type="button" class="earlier" @click="loadEarlier">
-          Показать ранние запросы · скрыто {{ hidden }}
-        </button>
-        <AgentTurn
-          v-for="(turn, offset) in shown"
-          :key="turn.id"
-          :turn="turn"
-          :chat-usage="chatUsage.get(turn.id)"
-          :root="projectRoot"
-          :promoted-form="answerFormFor(turn).promotedForm"
-          :lens="turn.role === 'assistant' && turn.id === turns.at(-1)?.id ? lens : undefined"
-          :doctor="answerDoctorReport(turn)"
-          :doctor-live="doctorProgress.get(turn.id)"
-          :flags="{
-            busy,
-            last: firstShown + offset === turns.length - 1,
-            copied: copied === turn.id,
-            faded: editFrom >= 0 && firstShown + offset >= editFrom,
-            canRevert: canRevert(turn.id),
-            formAnswered: answerFormFor(turn).formAnswered,
-            phase: turn.role === 'assistant' && turn.id === turns.at(-1)?.id ? phase : undefined,
-          }"
-          @copy="copyMessage"
-          @open="openChip"
-          @edit="editMessage"
-          @form-submit="submitTurnForm"
-          @rewind="askRewind"
-          @retry="retryMessage"
-          @fork="forkMessage"
-          @continue="continueTurn"
-          @version="showVersion"
-          @open-file="(path) => openChip({ type: 'file', path })"
-          @revert="(id) => askRewind(precedingUser(id), 'files')"
-          @doctor-retry="retryDoctor"
+    <div class="chat-area" v-show="!viewed">
+      <div ref="log" class="chat-log" @scroll.passive="trackScroll">
+        <div v-if="loading" class="chat-loading">
+          <UiLoader label="Загружаю чат…" align="center" />
+        </div>
+        <AgentWelcome
+          v-else-if="!turns.length"
+          :plain="plain"
+          :agent-name="agentName"
+          :role-name="roleSnapshot?.name"
+          :project-id="projectId"
+          @suggest="suggest"
+          @open="openAgent"
+          @form="openPresetForm"
         />
+        <div
+          v-else
+          class="conversation"
+          role="log"
+          aria-label="Сообщения"
+          aria-live="polite"
+          aria-relevant="additions text"
+        >
+          <button v-if="hidden" type="button" class="earlier" @click="loadEarlier">
+            Показать ранние запросы · скрыто {{ hidden }}
+          </button>
+          <AgentTurn
+            v-for="(turn, offset) in shown"
+            :key="turn.id"
+            :data-request-id="turn.role === 'user' ? turn.id : undefined"
+            :turn="turn"
+            :chat-usage="chatUsage.get(turn.id)"
+            :root="projectRoot"
+            :promoted-form="answerFormFor(turn).promotedForm"
+            :lens="turn.role === 'assistant' && turn.id === turns.at(-1)?.id ? lens : undefined"
+            :doctor="answerDoctorReport(turn)"
+            :doctor-live="doctorProgress.get(turn.id)"
+            :flags="{
+              busy,
+              last: firstShown + offset === turns.length - 1,
+              copied: copied === turn.id,
+              faded: editFrom >= 0 && firstShown + offset >= editFrom,
+              canRevert: canRevert(turn.id),
+              formAnswered: answerFormFor(turn).formAnswered,
+              phase: turn.role === 'assistant' && turn.id === turns.at(-1)?.id ? phase : undefined,
+            }"
+            @copy="copyMessage"
+            @open="openChip"
+            @edit="editMessage"
+            @form-submit="submitTurnForm"
+            @rewind="askRewind"
+            @retry="retryMessage"
+            @fork="forkMessage"
+            @continue="continueTurn"
+            @version="showVersion"
+            @open-file="(path) => openChip({ type: 'file', path })"
+            @revert="(id) => askRewind(precedingUser(id), 'files')"
+            @doctor-retry="retryDoctor"
+          />
+        </div>
       </div>
+      <AgentChatTimeline
+        v-if="showTimeline"
+        :turns="turns"
+        @select="(id) => navigation.run('ide.agent.chat.request.go', { turnId: id })"
+      />
     </div>
     <AgentTaskView
       v-if="viewed"
@@ -628,7 +662,7 @@ onBeforeUnmount(() => {
       @tab="taskInTab(viewed.task.id)"
     />
     <div class="dock">
-      <p v-if="editing" class="edit-hint" role="status">
+      <p v-if="editing && !zenMode" class="edit-hint" role="status">
         Правка сообщения: новое заменит выделенное и всё после него, старый вариант останется
         версией.
         <button type="button" @click="cancelEdit">Отмена</button>
@@ -644,7 +678,7 @@ onBeforeUnmount(() => {
         <AgentJobRequests v-if="!plain" :jobs="jobsState.jobs" @answered="jobsState.refresh" />
       </div>
       <AgentRewind
-        v-if="rewinding"
+        v-if="rewinding && !zenMode"
         :key="rewinding.id"
         :can-files="canRewindFiles(rewinding.id)"
         :preview="rewindPreview"
@@ -658,7 +692,7 @@ onBeforeUnmount(() => {
         @cancel="closeRewind"
       />
       <AgentWorktree
-        v-if="copy"
+        v-if="copy && !zenMode"
         :branch="copy.branch"
         :info="copyInfo"
         :working="copyWorking || busy"
@@ -666,9 +700,11 @@ onBeforeUnmount(() => {
         @merge="endCopy(mergeCopy)"
         @discard="endCopy(discardCopy)"
       />
-      <AgentSideQuestion v-if="side.state.open" :side="side" />
+      <AgentSideQuestion v-if="side.state.open && !zenMode" :side="side" />
       <p
-        v-if="capabilities.compact && contextShare >= capabilities.compact.hintAt && !busy"
+        v-if="
+          capabilities.compact && contextShare >= capabilities.compact.hintAt && !busy && !zenMode
+        "
         class="compact-hint"
         :class="{ urgent: contextShare >= capabilities.compact.autoAt }"
         role="status"
@@ -681,6 +717,7 @@ onBeforeUnmount(() => {
         <button type="button" @click="compact">Сжать сейчас</button>
       </p>
       <AgentActivityDock
+        v-if="!zenMode"
         :jobs="jobsState.jobs"
         :chat="chatKey"
         :tasks="tasks"
@@ -701,7 +738,7 @@ onBeforeUnmount(() => {
       />
     </div>
     <AgentComposer
-      v-show="!viewed"
+      v-show="!viewed && !zenMode"
       ref="composer"
       v-model="draft"
       v-model:parts="draftParts"
@@ -712,12 +749,12 @@ onBeforeUnmount(() => {
       :started-at="turns.findLast((turn) => turn.role === 'assistant')?.at"
       :error="error || copyError"
       :copied="!!copied"
-      :form="pendingForm"
+      :form="composerForm"
       :editing="!!editing"
       :retryable="retryableError"
       :dropping="chatDrop.over.value"
       @submit="submit"
-      @form-submit="submitComposerForm"
+      @form-submit="submitComposerPreset"
       @open="openChip"
       @fail="(message) => (error = message)"
       @dismiss="dismissError"
@@ -769,6 +806,12 @@ onBeforeUnmount(() => {
   max-width: calc(var(--chat-width) + 56px);
   margin: 0 auto;
   padding: var(--sp-2) var(--sp-5) 0;
+}
+.chat-area {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
 }
 .chat-log {
   flex: 1;
@@ -867,6 +910,12 @@ onBeforeUnmount(() => {
   width: 100%;
   max-width: var(--chat-width);
   margin: auto;
+}
+.agent-chat.zen .chat-log {
+  padding-bottom: var(--sp-6);
+}
+.agent-chat.zen .dock:has(.requests) {
+  padding-bottom: var(--sp-4);
 }
 @container (max-width: 500px) {
   .chat-log {

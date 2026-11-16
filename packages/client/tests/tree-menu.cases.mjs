@@ -11,13 +11,27 @@ test("file tree offers reveal for files, folders and the project root", () => {
   });
   expect(file.map(({ id }) => id)).toContain("entry.reveal");
   expect(file[0].id).toBe("file.open");
+  expect(file.find(({ id }) => id === "entry.info").args).toEqual({
+    path: "docs/note.md",
+    kind: "file",
+  });
   const directory = treeMenuItems({
     ...expand,
     entry: { path: "docs", name: "docs", directory: true },
   });
   expect(directory.map(({ id }) => id)).toContain("entry.reveal");
+  expect(directory.map(({ id }) => id)).toContain("entry.info");
+  expect(directory.find(({ id }) => id === "entry.info").args).toEqual({
+    path: "docs",
+    kind: "directory",
+  });
   const root = treeMenuItems(expand);
   expect(root.map(({ id }) => id)).toContain("entry.reveal");
+  expect(root.map(({ id }) => id)).toContain("entry.info");
+  expect(root.find(({ id }) => id === "entry.info").args).toEqual({
+    path: "",
+    kind: "directory",
+  });
 });
 
 test("reveal is hidden where the workspace has no file manager", () => {

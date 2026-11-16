@@ -24,7 +24,7 @@ export function usePullPipeline(projectId: () => string, id: () => number) {
       loading.value = !detail.value;
       error.value = "";
       try {
-        const data = await workspaceRequest<PipelineDetail>(
+        const data = await workspaceRequest(
           currentProject,
           "pipeline",
           { id: String(currentId) },

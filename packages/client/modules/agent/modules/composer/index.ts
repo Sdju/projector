@@ -1,5 +1,6 @@
 export * from "./lib/chat-quote.ts";
 export * from "./lib/drop.ts";
+export * from "./model/chat-composer.ts";
 export * from "./lib/editing.ts";
 export * from "./lib/suggestions.ts";
 export { default as AgentComposer } from "./ui/AgentComposer.vue";

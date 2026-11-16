@@ -43,6 +43,8 @@ export const workspaceSessionSchema = z.object({
   treeWidth: z.number().finite().positive().optional(),
   agentWidth: z.number().finite().positive().optional(),
   sidebarHidden: z.boolean().optional(),
+  /** Последняя запущенная сессия: основная часть split-кнопки шапки повторяет её. */
+  launcher: z.string().optional(),
   /** Раскладка блоков; читается через `parseDockLayout`, который сам отбрасывает повреждённые данные. */
   layout: z.unknown().optional(),
 });

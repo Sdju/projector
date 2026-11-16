@@ -66,7 +66,98 @@ test("only absolute links are routed through the proxy", () => {
   expect(html).not.toMatch(/integrity=|Content-Security-Policy/i);
   expect(html).toContain(`url('${origin("cdn.test.s")}/bg.png')`);
   expect(html).toContain("projectorBrowser");
-  expect(html).toContain('T="https://example.com"');
+  expect(html).toContain('var pageOrigin = "https://example.com"');
+});
+
+test("single quotes, uppercase markup and spaced meta CSP are handled", () => {
+  const context = { page: new URL("https://example.com/page/index.html"), suffix };
+  const html = rewriteHtml(
+    `<HTML><HEAD><META HTTP-EQUIV = "Content-Security-Policy" content="default-src 'none'">
+      <meta  http-equiv=set-cookie  content="sid=1"><meta name="description" content="x"></HEAD>
+      <BODY><IMG SRC='https://cdn.test/a.png'>
+      <A HREF = '//other.org/x'>x</A><FORM ACTION='https://forms.test/send'></FORM></BODY></HTML>`,
+    context,
+  );
+  expect(html).toContain(`SRC='${origin("cdn.test.s")}/a.png'`);
+  expect(html).toContain(`HREF = '${origin("other.org.s")}/x'`);
+  expect(html).toContain(`ACTION='${origin("forms.test.s")}/send'`);
+  expect(html).not.toMatch(/content-security-policy|set-cookie/i);
+  expect(html).toContain('<meta name="description" content="x">');
+  // Скрипт страницы вставляется в <HEAD>, написанный в верхнем регистре.
+  expect(html).toMatch(/<HEAD><script>/i);
+});
+
+test("srcset is split by commas, so data: URIs inside it are documented breakage", () => {
+  const context = { page: new URL("https://example.com/page/index.html"), suffix };
+  const html = rewriteHtml(
+    `<img srcset="data:image/png;base64,AAAA 1x, https://cdn.test/b.png 2x" src="data:image/gif;base64,R0lGOD">`,
+    context,
+  );
+  // Атрибут src с data: остаётся как есть; srcset разбит по запятым — это ограничение regex-подхода.
+  expect(html).toContain('src="data:image/gif;base64,R0lGOD"');
+  expect(html).toContain(
+    `srcset="data:image/png;base64, AAAA 1x, ${origin("cdn.test.s")}/b.png 2x"`,
+  );
+});
+
+test("<style> blocks, style attributes and quoted CSS url() are rewritten", () => {
+  const context = { page: new URL("https://example.com/page/index.html"), suffix };
+  const html = rewriteHtml(
+    `<style>@import 'https://x.test/a.css'; b{background:url( "https://y.test/i.png" )}
+      c{background:url('https://z.test/i(1).png')}</style>
+      <div style='background-image:url("https://cdn.test/bg.png")'></div>`,
+    context,
+  );
+  expect(html).toContain(`@import '${origin("x.test.s")}/a.css'`);
+  expect(html).toContain(`url("${origin("y.test.s")}/i.png")`);
+  // Скобки внутри url() и экранирование в CSS regex не разбирает — адрес остаётся настоящим.
+  expect(html).toContain("url('https://z.test/i(1).png')");
+  expect(html).toContain(`style='background-image:url("${origin("cdn.test.s")}/bg.png")'`);
+});
+
+test("JSON-LD and inline scripts are left alone", () => {
+  const context = { page: new URL("https://example.com/page/index.html"), suffix };
+  const html = rewriteHtml(
+    `<head><script type="application/ld+json">{"image":"https://cdn.test/i.png","note":"<\\/script>"}</script>
+      <script>var api = "https://api.test/x";</script></head>`,
+    context,
+  );
+  expect(html).toContain('"image":"https://cdn.test/i.png"');
+  expect(html).toContain("<\\/script>");
+  expect(html).toContain('var api = "https://api.test/x"');
+});
+
+test("relative, anchor and non-http addresses are not rewritten", () => {
+  const context = { page: new URL("https://example.com/page/index.html"), suffix };
+  const html = rewriteHtml(
+    `<a href="/root">a</a><a href="rel.html">b</a><a href="#top">c</a><a href="?q=1">d</a>
+      <a href="mailto:a@b.test">e</a><a href="tel:+100">f</a><a href="javascript:void 0">g</a>
+      <form action="ftp://files.test/up"></form><img src="data:image/png;base64,AA">`,
+    context,
+  );
+  for (const value of [
+    'href="/root"',
+    'href="rel.html"',
+    'href="#top"',
+    'href="?q=1"',
+    'href="mailto:a@b.test"',
+    'href="tel:+100"',
+    'href="javascript:void 0"',
+    'action="ftp://files.test/up"',
+    'src="data:image/png;base64,AA"',
+  ])
+    expect(html).toContain(value);
+});
+
+test("attributes without quotes are documented as not rewritten", () => {
+  const context = { page: new URL("https://example.com/page/index.html"), suffix };
+  const html = rewriteHtml(
+    `<img src=https://cdn.test/u.png><a href=https://other.org/x>x</a><source srcset=https://cdn.test/s.png>`,
+    context,
+  );
+  expect(html).toContain("src=https://cdn.test/u.png");
+  expect(html).toContain("href=https://other.org/x");
+  expect(html).toContain("srcset=https://cdn.test/s.png");
 });
 
 test("CSS url() and @import are rewritten, relative ones are kept", () => {

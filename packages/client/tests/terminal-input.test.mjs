@@ -131,12 +131,18 @@ test(
       await readFile(new URL("../modules/path-drop/drop-paths.ts", import.meta.url), "utf8"),
       { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 } },
     ).outputText;
+    const projectorDrag = ts.transpileModule(
+      await readFile(new URL("../modules/path-drop/projector-drag.ts", import.meta.url), "utf8"),
+      { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 } },
+    ).outputText;
+    // Один вход path-drop для тестового браузера: внешние пути и внутренний drag Projector.
+    const pathDrop = 'export * from "/drop-paths.js";\nexport * from "/projector-drag.js";';
     const drop = ts
       .transpileModule(
         await readFile(new URL("../modules/terminal/lib/drop.ts", import.meta.url), "utf8"),
         { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 } },
       )
-      .outputText.replace("../../path-drop/index.ts", "/drop-paths.js");
+      .outputText.replace("../../path-drop/index.ts", "/path-drop.js");
     const html = `<!doctype html><style>${css}</style><div id="terminal"></div><pre id="result">WAITING</pre>
     <script src="/xterm.js"></script><script type="module">
     import { deferTerminalText } from '/keyboard.js';
@@ -314,9 +320,13 @@ test(
                 ? links
                 : req.url === "/drop-paths.js"
                   ? dropPaths
-                  : req.url === "/drop.js"
-                    ? drop
-                    : html,
+                  : req.url === "/projector-drag.js"
+                    ? projectorDrag
+                    : req.url === "/path-drop.js"
+                      ? pathDrop
+                      : req.url === "/drop.js"
+                        ? drop
+                        : html,
       );
     });
     let browser;

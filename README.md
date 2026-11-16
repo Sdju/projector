@@ -91,7 +91,8 @@ Claude Code, Codex, OpenCode, Cursor и Kimi Code открываются не т
 прошлые сессии и переключатель TUI/GUI. Разрешения оценивает Судья Projector по шкале
 риска 1–5; фоновые задания можно проверить по diff и логу, продолжить, влить или
 удалить вместе с копией. Для проектов в Docker и Dev Container агенты работают через
-терминал.
+терминал. Codex, OpenCode и Kimi встроены, а Claude Code и Cursor приходят локальными
+плагинами: установите их в **Настройки → Плагины** и подтвердите доверие к коду.
 
 ### Телефон, LAN и PWA
 
@@ -111,7 +112,7 @@ Claude Code, Codex, OpenCode, Cursor и Kimi Code открываются не т
 
 ## Установка
 
-Projector можно установить из npm (готовые пакеты) или из исходников. Проверенное окружение — KDE Plasma с X11; Windows и macOS поддерживаются через адаптеры ОС и проверяются в CI.
+Projector можно установить из npm (готовые пакеты) или из исходников. Проверенное окружение — KDE Plasma на X11 и Wayland; Windows и macOS поддерживаются через адаптеры ОС и проверяются в CI.
 
 ### Из npm
 
@@ -156,12 +157,12 @@ projector-install-desktop
 - GTK4 и GObject Introspection, включая typelib GioUnix. На macOS: Xcode Command Line Tools (Swift-помощник меню и хоткея) и `brew install gtk4 gobject-introspection pkg-config` (его пробует выполнить `vp run desktop`); без GTK4 нативная палитра недоступна. На Windows GTK4 входит в поставку `node-gtk`.
 - Python 3, `make` и компилятор C++ для сборки зависимостей; Python 3 также читает архивы.
 - `git`, `rg` (ripgrep) и GNU `mv` для работы с проектами.
-- Linux: `xdg-open` для открытия браузера; для режима отдельного веб-окна — Chromium, `xdotool` и `xprop` (X11).
+- Linux: `xdg-open` для открытия браузера; для режима отдельного веб-окна — Chromium, а управление окном использует `xdotool` и `xprop`.
 
 Скачайте выпуск и установите зависимости:
 
 ```bash
-git clone --branch v0.10.0 https://github.com/Sdju/projector.git
+git clone --branch v0.13.0 https://github.com/Sdju/projector.git
 cd projector
 vp install --frozen-lockfile
 vp run build
@@ -171,7 +172,7 @@ vp run build
 Исходники также доступны в [GitHub Releases](https://github.com/Sdju/projector/releases).
 Сборка проверяет код и создаёт веб-ресурсы. По умолчанию сервер работает на `vp dev`
 из этой папки; `projector mode prod` переключает его на собственный Node-сервер по
-собранному `dist`. Отдельного бинарного установщика в версии 0.10.0 нет.
+собранному `dist`. Отдельного бинарного установщика в версии 0.13.0 нет.
 
 Откроется окно поиска приложений и проектов. Чтобы использовать Projector в обычном браузере:
 
@@ -243,7 +244,7 @@ projector-install-desktop     # пункт меню и команда из npm-�
 
 Настройки, избранное и список проектов сохраняются в `~/.local/share/projector` или `$XDG_DATA_HOME/projector`, если эта переменная задана.
 
-Подробнее: [поведение и ограничения](docs/usage.md) и [интеграции](docs/integrations.md). Инструкции для разработки находятся в [AGENTS.md](AGENTS.md).
+Подробнее: [поведение и ограничения](docs/usage.md), [интеграции](docs/integrations.md) и [медиа-модели](docs/media.md). Инструкции для разработки находятся в [AGENTS.md](AGENTS.md).
 
 ## Разработка и лицензия
 

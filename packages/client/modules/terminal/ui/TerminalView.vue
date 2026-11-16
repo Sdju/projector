@@ -22,6 +22,7 @@ import type {
   TerminalServerMessage,
   TerminalSession,
 } from "@ai-projector/core/modules/terminal/index.ts";
+import { appearanceFonts, loadAppearanceFonts } from "../../appearance/index.ts";
 
 function terminalTheme() {
   const styles = getComputedStyle(document.documentElement);
@@ -341,12 +342,21 @@ watch(
     if (focused && ready) focusTerminal();
   },
 );
+watch(
+  () => appearanceFonts.value.terminal,
+  (fontSize) => {
+    if (!terminal) return;
+    terminal.options.fontSize = fontSize;
+    scheduleFit();
+  },
+);
 
 onMounted(() => {
+  void loadAppearanceFonts().catch(() => undefined);
   terminal = new Terminal({
     cursorBlink: true,
     fontFamily: '"DejaVu Sans Mono", monospace',
-    fontSize: 13,
+    fontSize: appearanceFonts.value.terminal,
     scrollback: 5000,
     allowProposedApi: false,
     linkHandler: {

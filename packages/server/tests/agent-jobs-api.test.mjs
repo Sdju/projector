@@ -90,7 +90,7 @@ test("the agent catalog and chat programs come from the backend registry", async
   expect(backends.find((item) => item.id === "projector").builtin).toBe(true);
 
   const modes = await (await request("/api/agent/modes")).json();
-  expect(modes.programs).toContain("claude");
+  expect(modes.programs).toContain("codex");
   expect(modes.programs).toContain("kimi");
   expect(modes.programs).not.toContain("shell");
 });

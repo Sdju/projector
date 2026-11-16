@@ -108,6 +108,7 @@ const NAMES: Record<string, string> = {
 export function defaultThinkingStyle(kind: ProviderKind): ThinkingStyle {
   if (kind === "qwencloud") return "qwen";
   if (kind === "deepseek") return "deepseek";
+  if (kind === "openrouter") return "openrouter";
   if (kind === "local") return "ollama";
   return "none";
 }

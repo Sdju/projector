@@ -17,3 +17,4 @@ export const kimiBackend: AgentBackend = {
   usageLog: kimiUsageLog,
 };
 export { kimiUsageLog };
+export { hydrateKimiHistoryTasks } from "./history-tasks.ts";

@@ -1,4 +1,5 @@
 import { ref, type InjectionKey } from "vue";
+import { projectorDragType } from "../../../../path-drop/index.ts";
 
 export function createTreeDrag() {
   const source = ref("");
@@ -27,7 +28,7 @@ export function createTreeDrag() {
   return { source, target, busy, error, message, expanded, hint, progress, hover, clear };
 }
 export const treeDragKey: InjectionKey<ReturnType<typeof createTreeDrag>> = Symbol("tree-drag");
-export const treeDragType = "application/x-projector-tree-entry";
+export const treeDragType = projectorDragType;
 
 /** Ближайший предок, который прокручивается по вертикали. */
 function scrollParent(element: HTMLElement | null) {

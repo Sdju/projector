@@ -17,13 +17,16 @@ defineProps<{
   loading: boolean;
 }>();
 const index = defineModel<number>("index", { required: true });
-defineEmits<{ launch: [action: LaunchAction] }>();
+defineEmits<{ launch: [action: LaunchAction]; back: [] }>();
 </script>
 
 <template>
   <div class="actions-panel" role="listbox" :aria-label="`Действия: ${item.name}`">
     <div class="panel-title">
-      <span class="back" aria-hidden="true">←</span> {{ item.name }}
+      <button class="back" type="button" aria-label="Назад к результатам" @click="$emit('back')">
+        ←
+      </button>
+      {{ item.name }}
       <UiSpinner v-if="loading" label="Загрузка" />
     </div>
     <div v-if="info" class="info-card">
@@ -74,14 +77,22 @@ defineEmits<{ launch: [action: LaunchAction] }>();
 .actions-panel {
   padding: var(--sp-2);
   border-top: 1px solid var(--line);
+  min-height: 0;
+  overflow-y: auto;
 }
 .panel-title {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
   padding: var(--sp-1) var(--sp-3);
   color: var(--muted);
   font-size: var(--fs-xs);
 }
 .back {
   color: var(--muted);
+  min-width: 44px;
+  min-height: 44px;
+  font-size: var(--fs-lg);
 }
 .name {
   font-size: var(--fs-md);
@@ -133,5 +144,13 @@ defineEmits<{ launch: [action: LaunchAction] }>();
   margin-top: var(--sp-2);
   color: var(--muted);
   font-size: var(--fs-xs);
+}
+@media (max-width: 600px) {
+  .enter {
+    display: none;
+  }
+  .result {
+    min-height: 48px;
+  }
 }
 </style>

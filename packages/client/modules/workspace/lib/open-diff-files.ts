@@ -1,8 +1,4 @@
 import type { Ref } from "vue";
-import type {
-  CommitComparison,
-  PullRequestComparison,
-} from "@ai-projector/core/modules/workspace/index.ts";
 import { workspaceRequest } from "../../workspace-api/index.ts";
 import type { OpenFile } from "../open-file.ts";
 
@@ -35,7 +31,7 @@ export function createDiffOpeners(ctx: DiffOpenersContext) {
     }
     const generation = ctx.begin();
     try {
-      const data = await workspaceRequest<CommitComparison>(ctx.projectId(), "commit-diff", {
+      const data = await workspaceRequest(ctx.projectId(), "commit-diff", {
         hash,
         path,
       });
@@ -77,7 +73,7 @@ export function createDiffOpeners(ctx: DiffOpenersContext) {
     }
     const generation = ctx.begin();
     try {
-      const data = await workspaceRequest<PullRequestComparison>(ctx.projectId(), "pull-diff", {
+      const data = await workspaceRequest(ctx.projectId(), "pull-diff", {
         number: String(number),
         path,
       });

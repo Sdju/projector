@@ -42,6 +42,7 @@ const notice = computed(() => state.value.notice);
 const inputControl = ref<UiControlHandle>();
 const input = computed(() => inputControl.value?.element as HTMLInputElement | undefined);
 const webWindow = isLauncherWindow;
+const shouldFocusSearch = () => webWindow || !window.matchMedia("(max-width: 600px)").matches;
 const activeId = computed(() =>
   items.value.length ? `launch-option-${selected.value}` : undefined,
 );
@@ -50,7 +51,7 @@ async function hide() {
   if (webWindow) await client.hide();
   else {
     model.setQuery("");
-    input.value?.focus();
+    if (shouldFocusSearch()) input.value?.focus();
   }
 }
 const focus = computed(() => state.value.focus);
@@ -60,8 +61,8 @@ const info = computed(() => state.value.detail?.info);
 const detailIndex = ref(0);
 const scope = computed(() => parseLaunchQuery(state.value.query).scope);
 watch(focus, () => (detailIndex.value = 0));
-async function enter() {
-  if (await model.enter()) await nextTick();
+async function enter(item?: (typeof items.value)[number]) {
+  if (await model.enter(item)) await nextTick();
 }
 async function launch(item = items.value[selected.value], action?: LaunchAction) {
   const chosen = action ?? item?.actions?.[0];
@@ -87,7 +88,7 @@ async function launch(item = items.value[selected.value], action?: LaunchAction)
     }
   }
   await nextTick();
-  input.value?.focus();
+  if (shouldFocusSearch()) input.value?.focus();
 }
 let pinPending = false;
 async function toggleFavorite(item = focus.value ?? items.value[selected.value]) {
@@ -161,21 +162,27 @@ function focusSearch() {
   input.value?.focus();
   if (!busy.value) void model.search(items.value.length > 0 && !loading.value);
 }
+function refreshOnFocus() {
+  if (window.matchMedia("(max-width: 600px)").matches && !webWindow) {
+    if (!busy.value) void model.search(items.value.length > 0 && !loading.value);
+  } else focusSearch();
+}
 function showSearch() {
   if (!webWindow) return;
   model.setQuery("");
   focusSearch();
 }
 onMounted(() => {
-  focusSearch();
+  if (window.matchMedia("(max-width: 600px)").matches && !webWindow) void model.search();
+  else focusSearch();
   model.live(true);
-  window.addEventListener("focus", focusSearch);
+  window.addEventListener("focus", refreshOnFocus);
   window.addEventListener("projector:show", showSearch);
 });
 onUnmounted(() => {
   unsubscribe();
   model.dispose();
-  window.removeEventListener("focus", focusSearch);
+  window.removeEventListener("focus", refreshOnFocus);
   window.removeEventListener("projector:show", showSearch);
 });
 </script>
@@ -210,11 +217,20 @@ onUnmounted(() => {
           :aria-activedescendant="activeId"
           autocomplete="off"
           spellcheck="false"
-          placeholder="Поиск приложений и проектов… (/ проекты, gh/ GitHub)"
+          placeholder="Поиск приложений и проектов"
           :disabled="busy"
           @keydown="key"
         />
         <UiSpinner v-if="loading || busy" class="activity" label="Загрузка" />
+        <button
+          v-else-if="query"
+          class="clear-search"
+          type="button"
+          aria-label="Очистить поиск"
+          @click="query = ''"
+        >
+          ×
+        </button>
       </UiInline>
       <div
         v-show="!focus"
@@ -232,43 +248,54 @@ onUnmounted(() => {
           >
             {{ launchSectionTitles[item.section] }}
           </div>
-          <UiActionRow
-            interaction="selection"
-            padding="var(--sp-3)"
-            :id="`launch-option-${index}`"
-            role="option"
-            :aria-selected="index === selected"
-            class="result"
-            :class="{ selected: index === selected }"
-            :disabled="busy || loading"
-            tabindex="-1"
-            @mousemove="selected = index"
-            @click="launch(item)"
-          >
-            <img v-if="item.icon" :src="deviceUrl(item.icon)" alt="" width="36" height="36" />
-            <span class="result-copy"
-              ><span class="name"
-                ><span v-if="item.favorite" class="star" title="В избранном" aria-hidden="true"
-                  >★</span
-                ><UiStatusDot
-                  v-if="item.status"
-                  class="status-dot"
-                  :size="8"
-                  inline
-                  shrink
-                  :tone="launcherStatusTone(item.status.state)"
-                  :title="item.status.label"
-                  aria-hidden="true"
-                />{{ item.name }}</span
-              ><span class="description u-truncate">{{ item.description }}</span></span
+          <div class="result-wrap">
+            <UiActionRow
+              interaction="selection"
+              padding="var(--sp-3)"
+              :id="`launch-option-${index}`"
+              role="option"
+              :aria-selected="index === selected"
+              class="result"
+              :class="{ selected: index === selected }"
+              :disabled="busy || loading"
+              tabindex="-1"
+              @mousemove="selected = index"
+              @click="launch(item)"
             >
-            <span v-if="index === selected" class="enter" aria-hidden="true"
-              >↵ {{ item.actions?.[0]?.title
-              }}<template v-if="item.actions?.[1]">
-                · Ctrl+↵ {{ item.actions[1].title }}</template
-              ></span
+              <img v-if="item.icon" :src="deviceUrl(item.icon)" alt="" width="36" height="36" />
+              <span class="result-copy"
+                ><span class="name"
+                  ><span v-if="item.favorite" class="star" title="В избранном" aria-hidden="true"
+                    >★</span
+                  ><UiStatusDot
+                    v-if="item.status"
+                    class="status-dot"
+                    :size="8"
+                    inline
+                    shrink
+                    :tone="launcherStatusTone(item.status.state)"
+                    :title="item.status.label"
+                    aria-hidden="true"
+                  />{{ item.name }}</span
+                ><span class="description u-truncate">{{ item.description }}</span></span
+              >
+              <span v-if="index === selected" class="enter" aria-hidden="true"
+                >↵ {{ item.actions?.[0]?.title
+                }}<template v-if="item.actions?.[1]">
+                  · Ctrl+↵ {{ item.actions[1].title }}</template
+                ></span
+              >
+            </UiActionRow>
+            <button
+              class="result-actions"
+              type="button"
+              :aria-label="`Действия: ${item.name}`"
+              :disabled="busy || loading"
+              @click="enter(item)"
             >
-          </UiActionRow>
+              <span aria-hidden="true">⋯</span>
+            </button>
+          </div>
         </template>
       </div>
       <LaunchDetailPanel
@@ -280,6 +307,7 @@ onUnmounted(() => {
         :failure="failure"
         :loading="state.detailLoading"
         @launch="(action) => launch(focus!, action)"
+        @back="model.leave()"
       />
       <p v-if="!loading && !items.length && !error" class="empty">Ничего не найдено</p>
       <p v-if="error || warning || notice" class="message" :class="{ error }" role="status">
@@ -356,6 +384,12 @@ onUnmounted(() => {
 .activity {
   font-size: var(--fs-lg);
 }
+.clear-search {
+  flex: 0 0 44px;
+  height: 44px;
+  color: var(--muted);
+  font-size: 24px;
+}
 .results {
   padding: var(--sp-2);
   max-height: 440px;
@@ -367,6 +401,16 @@ onUnmounted(() => {
 .result:disabled {
   cursor: wait;
   opacity: 0.65;
+}
+.result-wrap {
+  display: flex;
+  align-items: center;
+}
+.result-wrap .result {
+  min-width: 0;
+}
+.result-actions {
+  display: none;
 }
 .result img {
   object-fit: contain;
@@ -435,12 +479,56 @@ onUnmounted(() => {
 a:hover {
   color: var(--text);
 }
-@media (max-width: 500px) {
+@media (max-width: 600px) {
+  .launcher {
+    width: 100%;
+    margin: 0;
+    padding: var(--sp-3);
+  }
+  .launcher-heading {
+    min-height: 44px;
+    margin-bottom: var(--sp-3);
+    gap: var(--sp-2);
+  }
+  .palette {
+    display: flex;
+    flex-direction: column;
+    max-height: calc(100dvh - 80px);
+  }
   .search-line input {
-    font-size: var(--fs-md);
+    font-size: 16px;
   }
   .search-line {
     padding: var(--sp-4);
+    flex-shrink: 0;
+  }
+  .results {
+    max-height: none;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+  .result {
+    min-height: 64px;
+  }
+  .result .name {
+    overflow-wrap: anywhere;
+  }
+  .result .enter,
+  .palette-footer {
+    display: none;
+  }
+  .result-actions {
+    display: grid;
+    place-items: center;
+    flex: 0 0 44px;
+    height: 44px;
+    color: var(--muted);
+    font-size: 24px;
+    border-radius: var(--r-md);
+  }
+  .result-actions:active {
+    background: var(--active);
   }
 }
 </style>

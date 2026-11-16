@@ -8,10 +8,8 @@
 // and lines on stdin are either
 //   {"id": id, "result": {output|error}}           the user's answer to such a question
 //   {"method": "inject", "params": {...}}          a message the user added while the answer runs
-import { readFile } from "node:fs/promises";
-import { join } from "node:path";
 import { createInterface } from "node:readline";
-import type { AgentRunRecord } from "./agent-runs.ts";
+import { requireRunRecord } from "./run-record.ts";
 import type { AgentEmitter, AgentRunOptions } from "./backend.ts";
 import {
   completeCommandRequest,
@@ -62,7 +60,7 @@ export function runHostedRunner(answer: (options: AgentRunOptions) => Promise<vo
 async function main(answer: (options: AgentRunOptions) => Promise<void>): Promise<void> {
   const dir = process.argv[2];
   if (!dir) throw new Error("Usage: <runner> <run directory>");
-  const record = JSON.parse(await readFile(join(dir, "run.json"), "utf8")) as AgentRunRecord;
+  const record = await requireRunRecord(dir);
   const controller = new AbortController();
   const signal = controller.signal;
   // The host signals the group and then the runner itself: a second SIGTERM must not hit the

@@ -2,19 +2,34 @@ import { newId } from "../../../common/utilities/new-id.ts";
 import { computed, reactive } from "vue";
 import {
   fetchProviderBalance,
+  fetchProviderBalances,
   fetchProviderModels,
   fetchProviders,
+  fetchProviderUsage,
   saveProviders,
   setActiveProvider,
 } from "../api/client.ts";
-import { PROVIDER_PRESETS } from "./presets.ts";
-import type { ModelPrice, OpenAIProviderPublic, ProviderBalance, ProviderKind } from "./types.ts";
+import { BUILTIN_PROVIDER_KINDS, providerPreset, PROVIDER_PRESETS } from "./presets.ts";
+import type {
+  ModelPrice,
+  OpenAIProviderPublic,
+  ProviderBalance,
+  ProviderKind,
+  ProviderKindInfo,
+  ProviderUsage,
+} from "./types.ts";
 
 const state = reactive({
   providers: [] as OpenAIProviderPublic[],
   activeProviderId: null as string | null,
+  /** Provider kinds contributed by enabled balance plugins. */
+  balanceKinds: [] as ProviderKindInfo[],
+  usageKinds: [] as ProviderKindInfo[],
   keyDrafts: {} as Record<string, string>,
+  balanceKeyDrafts: {} as Record<string, string>,
   balances: {} as Record<string, ProviderBalance | undefined>,
+  usage: {} as Record<string, ProviderUsage | undefined>,
+  usageBusy: {} as Record<string, boolean | undefined>,
   /** Ids the provider offers upstream, per provider; not saved, only offered for registering. */
   remoteModels: {} as Record<string, string[] | undefined>,
   fetchingModels: {} as Record<string, boolean | undefined>,
@@ -39,11 +54,38 @@ export function useProviders() {
   const saving = computed(() => state.saving);
   const error = computed(() => state.error);
   const ready = computed(() => Boolean(activeProvider.value?.url));
+  const balanceKinds = computed(() => state.balanceKinds);
+  const kindOptions = computed<ProviderKindInfo[]>(() => [
+    ...BUILTIN_PROVIDER_KINDS.map((kind) => ({
+      kind,
+      title: PROVIDER_PRESETS[kind].label,
+      ...(PROVIDER_PRESETS[kind].hint ? { description: PROVIDER_PRESETS[kind].hint } : {}),
+      ...(PROVIDER_PRESETS[kind].url ? { url: PROVIDER_PRESETS[kind].url } : {}),
+      ...(PROVIDER_PRESETS[kind].model ? { model: PROVIDER_PRESETS[kind].model } : {}),
+    })),
+    ...state.balanceKinds,
+  ]);
+  const kindInfoOf = (kind: string): ProviderKindInfo | undefined =>
+    kindOptions.value.find((item) => item.kind === kind);
+  const presetFor = (kind: string) => providerPreset(kind, kindInfoOf(kind));
+  const hasBalance = (kind: string): boolean =>
+    kind === "deepseek" ||
+    kind === "openrouter" ||
+    state.balanceKinds.some((item) => item.kind === kind);
+  const hasUsage = (kind: string): boolean => state.usageKinds.some((item) => item.kind === kind);
 
-  function apply(payload: { activeProviderId: string | null; providers: OpenAIProviderPublic[] }) {
+  function apply(payload: {
+    activeProviderId: string | null;
+    providers: OpenAIProviderPublic[];
+    balanceKinds?: ProviderKindInfo[];
+    usageKinds?: ProviderKindInfo[];
+  }) {
     state.providers = payload.providers;
     state.activeProviderId = payload.activeProviderId;
+    state.balanceKinds = payload.balanceKinds ?? [];
+    state.usageKinds = payload.usageKinds ?? [];
     state.keyDrafts = {};
+    state.balanceKeyDrafts = {};
     state.revision++;
   }
 
@@ -55,12 +97,39 @@ export function useProviders() {
     }
   }
 
-  function loadBalances(): Promise<unknown> {
-    return Promise.all(
-      state.providers
-        .filter((item) => item.kind === "deepseek")
-        .map((item) => loadBalance(item.id)),
-    );
+  /** One request for every enabled wallet; the server skips kinds without a balance reader. */
+  async function loadBalances(): Promise<void> {
+    try {
+      const { wallets } = await fetchProviderBalances();
+      const next: Record<string, ProviderBalance> = {};
+      for (const wallet of wallets) if (wallet.providerId) next[wallet.providerId] = wallet;
+      state.balances = next;
+    } catch {
+      // A balance outage must not erase the balances the settings already show.
+    }
+  }
+
+  /** Расход провайдера зависит от внешнего читателя, поэтому запрос явный и с индикатором. */
+  async function loadUsage(id: string): Promise<void> {
+    if (state.usageBusy[id]) return;
+    state.usageBusy[id] = true;
+    try {
+      state.usage[id] = await fetchProviderUsage(id);
+    } catch (error) {
+      state.usage[id] = {
+        status: "unavailable",
+        period: null,
+        currency: null,
+        spend: null,
+        quotas: [],
+        plan: null,
+        credits: null,
+        checkedAt: Date.now(),
+        message: error instanceof Error ? error.message : "Не удалось прочитать расход",
+      };
+    } finally {
+      state.usageBusy[id] = false;
+    }
   }
 
   async function load(): Promise<void> {
@@ -85,6 +154,7 @@ export function useProviders() {
           providers: state.providers.map((item) => ({
             ...item,
             apiKey: state.keyDrafts[item.id],
+            balanceApiKey: state.balanceKeyDrafts[item.id],
           })),
         }),
       );
@@ -106,7 +176,7 @@ export function useProviders() {
 
   function addProvider(kind: ProviderKind = "custom"): string {
     const id = `p${newId().slice(0, 8)}`;
-    const preset = PROVIDER_PRESETS[kind];
+    const preset = presetFor(kind);
     state.providers.push({
       id,
       kind,
@@ -124,6 +194,7 @@ export function useProviders() {
   function removeProvider(id: string): void {
     state.providers = state.providers.filter((item) => item.id !== id);
     delete state.keyDrafts[id];
+    delete state.balanceKeyDrafts[id];
     if (state.activeProviderId === id) {
       state.activeProviderId = state.providers[0]?.id ?? null;
     }
@@ -132,6 +203,10 @@ export function useProviders() {
 
   function setKeyDraft(id: string, value: string): void {
     state.keyDrafts[id] = value;
+  }
+
+  function setBalanceKeyDraft(id: string, value: string): void {
+    state.balanceKeyDrafts[id] = value;
   }
 
   function patchProvider(id: string, patch: Partial<OpenAIProviderPublic>): void {
@@ -218,17 +293,29 @@ export function useProviders() {
     saving,
     error,
     ready,
+    balanceKinds,
+    usageKinds: computed(() => state.usageKinds),
+    kindOptions,
+    kindInfoOf,
+    presetFor,
+    hasBalance,
+    hasUsage,
     revision: computed(() => state.revision),
     balances: computed(() => state.balances),
+    usage: computed(() => state.usage),
+    usageBusy: computed(() => state.usageBusy),
     loadBalance,
     loadBalances,
+    loadUsage,
     keyDrafts: computed(() => state.keyDrafts),
+    balanceKeyDrafts: computed(() => state.balanceKeyDrafts),
     load,
     save,
     setActive,
     addProvider,
     removeProvider,
     setKeyDraft,
+    setBalanceKeyDraft,
     patchProvider,
   };
 }

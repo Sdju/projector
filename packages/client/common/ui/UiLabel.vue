@@ -6,7 +6,7 @@ const props = defineProps<{
   inline?: boolean;
   size?: "2xs" | "xs" | "sm";
   tone?: "muted" | "secondary";
-  spaceBefore?: 4;
+  spaceBefore?: 3 | 4;
   spaceAfter?: 2;
 }>();
 </script>

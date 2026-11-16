@@ -26,7 +26,7 @@ const require = createRequire(join(ROOT, "package.json"));
 function catalogVersion() {
   const workspace = readFileSync(join(ROOT, "pnpm-workspace.yaml"), "utf8");
   const match = workspace.match(/vite:\s*npm:@voidzero-dev\/vite-plus-core@([^\s]+)/);
-  return match?.[1] ?? "1.4.0";
+  return match?.[1] ?? "1.6.0";
 }
 
 function tarballUrl() {

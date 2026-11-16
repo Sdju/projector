@@ -8,7 +8,6 @@ import type { TerminalSession } from "@ai-projector/core/modules/terminal/index.
 import { commandArgs, useCommandScope } from "../../common/utilities/commands.ts";
 import { openExternalLink } from "../../common/utilities/open-external-link.ts";
 import { dockerRequest } from "./client.ts";
-
 export function useDocker(
   projectId: string,
   hooks: {
@@ -22,6 +21,7 @@ export function useDocker(
   const error = ref("");
   const busy = ref(false);
   const starting = ref(false);
+  const refreshPending = ref(false);
   const all = ref(false);
   const selected = ref("");
   const context = ref("");
@@ -45,9 +45,10 @@ export function useDocker(
     all.value ? (snapshot.value?.containers ?? []) : projectContainers.value,
   );
   const current = computed(() => containers.value.find((item) => item.id === selected.value));
-  async function refresh() {
+  async function refresh(options?: { quiet?: boolean }) {
     if (refreshing) return snapshot.value;
     refreshing = true;
+    if (!options?.quiet || !snapshot.value) refreshPending.value = true;
     const version = ++generation;
     try {
       const result = await dockerRequest<DockerSnapshot>(
@@ -71,6 +72,7 @@ export function useDocker(
       throw err;
     } finally {
       refreshing = false;
+      refreshPending.value = false;
     }
   }
   const ready = () => !!snapshot.value?.connected && !busy.value;
@@ -359,11 +361,7 @@ export function useDocker(
   );
   async function tick() {
     if (!disposed && !document.hidden && !busy.value)
-      try {
-        await refresh();
-      } catch {
-        /* Visible error, retry next tick. */
-      }
+      await refresh({ quiet: true }).catch(() => {});
     if (!disposed) timer = setTimeout(tick, snapshot.value?.enabled ? 5000 : 15000);
   }
   onMounted(() => {
@@ -385,6 +383,8 @@ export function useDocker(
     containers,
     current,
     commands,
+    refresh,
+    refreshPending,
   };
   provide(dockerKey, state);
   return state;

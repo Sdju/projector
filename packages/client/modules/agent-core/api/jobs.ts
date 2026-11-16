@@ -1,3 +1,4 @@
+import type { JudgeVerdict } from "@ai-projector/core/modules/agent-judge/index.ts";
 import type { AgentBackendId } from "../model/types.ts";
 import type { AgentRoleSnapshot } from "@ai-projector/core/modules/agent-role/index.ts";
 import { deviceUrl } from "../../../common/utilities/device-url.ts";
@@ -12,6 +13,7 @@ export interface AgentJobPending {
   tool?: string;
   detail?: string;
   persistent?: boolean;
+  judge?: JudgeVerdict;
   questions?: {
     id: string;
     question: string;

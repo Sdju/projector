@@ -20,12 +20,15 @@ const IDE_INTRO =
  */
 export function registerBuiltinAgentFeatures(): void {
   const backends = listAgentBackends();
-  replaceFeatureAgents(backends.map(({ id, label }) => ({ id, label })));
+  replaceFeatureAgents(backends.map(({ id, label, builtin }) => ({ id, label, builtin })));
   registerAgentFeature({
     id: "widgets",
     title: "Виджеты в ответах",
     summary: "Графики, показатели, вкладки и формы прямо в markdown-ответе.",
-    defaults: backends.filter(({ builtin }) => builtin).map(({ id }) => id),
+    allowPluginDefault: true,
+    defaults: backends
+      .filter(({ builtin, defaultFeatures }) => builtin || defaultFeatures?.includes("widgets"))
+      .map(({ id }) => id),
     instruction: () => `Виджеты в ответах. ${WIDGETS_INTRO}\n\n${widgetCatalog.guide()}`,
   });
   registerAgentFeature({

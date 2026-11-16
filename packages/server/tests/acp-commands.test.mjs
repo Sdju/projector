@@ -96,10 +96,12 @@ test("deleteSessions follows the advertised session/delete capability", async ()
   expect(acpAdvertisedDelete(id)).toBe(true);
 });
 
-test("sessions that never received a prompt are hidden, including OpenCode's placeholder", async () => {
+test("session history hides empty titles and sessions from another folder", async () => {
   const cwd = await mkdtemp(join(tmpdir(), "projector-acp-sessions-"));
   dirs.push(cwd);
   expect(await acpSessions(probe("sessions"), cwd)).toStrictEqual([
+    { id: "ses_here", title: "This folder", updatedAt: "2026-11-12T07:00:00.000Z" },
+    { id: "ses_slash", title: "Same folder slash", updatedAt: "2026-11-12T06:30:00.000Z" },
     { id: "ses_real", title: "Fix the parser", updatedAt: "2026-11-12T06:00:00.000Z" },
   ]);
 });

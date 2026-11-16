@@ -1,13 +1,13 @@
-import { expect, test, vi } from "vite-plus/test";
+import { expect, test } from "vite-plus/test";
+import { createReplay, SESSION_LIST_LIMIT } from "../modules/agent/index.ts";
 
-const transcript = vi.hoisted(() => []);
-vi.mock("@anthropic-ai/claude-agent-sdk", () => ({
-  getSessionMessages: async () => transcript,
-}));
-
-// The setup already loaded the real SDK through the registered agents.
-vi.resetModules();
-const { claudeLoadSession } = await import("../modules/agents/claude-code/claude-code-sessions.ts");
+const transcript = [];
+const deps = {
+  api: { host: { createReplay, sessionListLimit: SESSION_LIST_LIMIT } },
+  sdk: { getSessionMessages: async () => transcript },
+};
+const { claudeLoadSession } =
+  await import("../../../plugins/claude-code/src/claude-code-sessions.ts");
 
 const user = (content) => ({ type: "user", message: { content }, parent_tool_use_id: null });
 const assistant = (content) => ({
@@ -47,7 +47,7 @@ test("a reopened Claude Code chat keeps the order and hides the traces of comman
     user("<local-command-stdout>Compacted </local-command-stdout>"),
     user("This session is being continued from a previous conversation that ran out of context."),
   );
-  const turns = await claudeLoadSession("/tmp", "s1");
+  const turns = await claudeLoadSession("/tmp", "s1", deps);
 
   // No turn made of command traces or reports; the compact summary is a note.
   expect(turns.map((turn) => turn.role)).toStrictEqual(["user", "assistant"]);
@@ -76,6 +76,6 @@ test("a background task without a report is left in a known state", async () => 
       { type: "tool_use", id: "b", name: "Bash", input: { command: "x", run_in_background: true } },
     ]),
   );
-  const [, answer] = await claudeLoadSession("/tmp", "s2");
+  const [, answer] = await claudeLoadSession("/tmp", "s2", deps);
   expect(answer.tasks[0]).toMatchObject({ status: "stopped" });
 });

@@ -1,7 +1,7 @@
 import { expect, test } from "vite-plus/test";
 import { applyAgentEvent } from "../modules/agent-core/model/turn-events.ts";
 import { isImageFile, skillName } from "../modules/agent-core/lib/tool-file.ts";
-import { inputHint } from "../modules/agent-core/lib/tool-input.ts";
+import { inputHint, isEditTool } from "../modules/agent-core/lib/tool-input.ts";
 import { skillCallName, toolLabel } from "../modules/agent-core/lib/tool-labels.ts";
 import { toolVisual } from "../modules/agent-core/lib/tool-visual.ts";
 import { stripReadLineNumbers } from "../../core/modules/agent-read/index.ts";
@@ -9,19 +9,23 @@ import { codeLanguage } from "../modules/agent-turns/lib/code-language.ts";
 
 test("a call is shaped by what it does, not only by its name", () => {
   expect(toolVisual("Read")).toBe("read");
-  expect(toolVisual("ReadMediaFile")).toBe("read");
+  expect(toolVisual("ReadMediaFile", "read")).toBe("read");
   expect(toolVisual("Reading media: /tmp/shot.png", "other")).toBe("read");
   expect(toolVisual("write_file")).toBe("write");
-  expect(toolVisual("MultiEdit")).toBe("edit");
+  expect(toolVisual("MultiEdit", "edit")).toBe("edit");
   expect(toolVisual("Bash")).toBe("bash");
   expect(toolVisual("grep")).toBe("search");
-  expect(toolVisual("WebFetch")).toBe("web");
+  expect(toolVisual("WebFetch", "fetch")).toBe("web");
   expect(toolVisual("Task")).toBe("task");
   // ACP names the action in `kind`, while the title is whatever the agent wrote.
   expect(toolVisual("ls -la", "execute")).toBe("bash");
   expect(toolVisual("cat src/app.ts", "read")).toBe("read");
   expect(toolVisual("Собрать проект", "edit")).toBe("edit");
   expect(toolVisual("mcp__server__tool")).toBe("other");
+  expect(isEditTool("edit_file")).toBe(true);
+  expect(isEditTool("CustomEdit", "edit")).toBe(true);
+  expect(isEditTool("MultiEdit")).toBe(false);
+  expect(isEditTool("MultiEdit", "edit")).toBe(true);
 });
 
 test("a read picture is known by its name and a skill by its folder", () => {
@@ -31,7 +35,12 @@ test("a read picture is known by its name and a skill by its folder", () => {
   expect(skillName("/home/u/.claude/skills/release/SKILL.md")).toBe("release");
   expect(skillName("skills\\lint\\SKILL.md")).toBe("lint");
   expect(skillName("src/SKILL.ts")).toBe("");
-  expect(toolLabel("ReadMediaFile")).toBe("Чтение изображения");
+  expect(toolLabel("ReadMediaFile", "", { label: "Чтение изображения" })).toBe(
+    "Чтение изображения",
+  );
+  expect(toolLabel("read_media_file")).toBe("Чтение изображения");
+  expect(toolLabel("WebFetch", "", { label: "Загрузка страницы" })).toBe("Загрузка страницы");
+  expect(toolLabel("Read")).toBe("Чтение файла");
   expect(toolLabel("Reading media: /tmp/shot.png")).toBe("Чтение изображения");
   expect(toolLabel("use_skill")).toBe("Загрузка навыка");
   expect(toolLabel("Invoke skill release")).toBe("Загрузка навыка: release");
@@ -71,8 +80,20 @@ test("streamed output lives while the call runs and gives way to its result", ()
   const event = (name, data, at = 1_000) =>
     applyAgentEvent(state, assistant, { event: name, data }, () => {}, at);
 
-  event("tool", { id: "t", name: "bash", input: { command: "make" }, kind: "execute" });
-  expect(assistant.tools[0]).toMatchObject({ status: "running", kind: "execute" });
+  event("tool", {
+    id: "t",
+    name: "bash",
+    input: { command: "make" },
+    kind: "execute",
+    label: "Сборка",
+    paths: ["Makefile"],
+  });
+  expect(assistant.tools[0]).toMatchObject({
+    status: "running",
+    kind: "execute",
+    label: "Сборка",
+    paths: ["Makefile"],
+  });
   event("tool-output", { id: "t", chunk: "line one\n" });
   event("tool-output", { id: "t", chunk: "line two\n" });
   expect(assistant.tools[0].output).toBe("line one\nline two\n");

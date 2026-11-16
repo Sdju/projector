@@ -11,19 +11,20 @@ import IconBell from "~icons/lucide/bell";
 /** The one counter of work that waits for the user on every project and connected device. */
 const props = withDefaults(defineProps<{ scopeId?: string }>(), { scopeId: "inbox" });
 const emit = defineEmits<{ open: [] }>();
-const { attention, working } = useAgentInbox();
+const { attention, unread, badgeCount, working, noticeUnread } = useAgentInbox();
 const compact = useCompactViewport();
 const dialog = ref<InstanceType<typeof UiDialog>>();
 const open = ref(false);
 const commands = useCommandScope(props.scopeId, () => ({
   surface: "inbox",
   attention: attention.value,
+  unread: unread.value,
 }));
 commands.scope.registerCommand({
   id: "ide.inbox.open",
   title: "Открыть работы и уведомления",
   description:
-    "Открывает панель с фоновыми заданиями, живыми ходами и запросами агентов всех проектов и подключённых устройств Hub.",
+    "Открывает панель с фоновыми заданиями, живыми ходами, завершениями и запросами агентов всех проектов и подключённых устройств Hub.",
   run: () => {
     if (compact.value) {
       open.value = true;
@@ -39,16 +40,22 @@ function close() {
   dialog.value?.close();
 }
 const summary = () => {
-  if (attention.value) return `${attention.value} работ ждут вашего ответа; открыть центр работ`;
-  if (working.value) return `${working.value} работ идут; открыть центр работ`;
-  return "Работы агентов: ничего не ждёт ответа";
+  const parts: string[] = [];
+  const waiting = Math.max(0, attention.value - noticeUnread.value);
+  if (waiting) parts.push(`${waiting} ждут вашего ответа`);
+  if (noticeUnread.value) parts.push(`${noticeUnread.value} по доверию`);
+  if (unread.value) parts.push(`${unread.value} завершили работу`);
+  if (working.value) parts.push(`${working.value} работают`);
+  return parts.length
+    ? `${parts.join(", ")}; открыть центр работ`
+    : "Работы агентов: ничего не ждёт ответа";
 };
 </script>
 
 <template>
   <UiButton
     class="bell"
-    :class="{ alert: attention }"
+    :class="{ alert: attention, fresh: !attention && unread }"
     shape="icon"
     size="sm"
     :title="summary()"
@@ -57,7 +64,9 @@ const summary = () => {
     @click="commands.run('ide.inbox.open')"
   >
     <IconBell aria-hidden="true" />
-    <span v-if="attention" class="count" aria-hidden="true">{{ attention }}</span>
+    <span v-if="badgeCount" class="count" :class="{ info: !attention }" aria-hidden="true">{{
+      badgeCount
+    }}</span>
     <span v-else-if="working" class="dot" aria-hidden="true" />
   </UiButton>
   <UiDialog
@@ -81,6 +90,9 @@ const summary = () => {
 .bell.alert {
   color: var(--warn);
 }
+.bell.fresh {
+  color: var(--run);
+}
 .count {
   position: absolute;
   top: -3px;
@@ -96,6 +108,9 @@ const summary = () => {
   font-variant-numeric: tabular-nums;
   line-height: 14px;
   text-align: center;
+}
+.count.info {
+  background: var(--run);
 }
 .dot {
   position: absolute;

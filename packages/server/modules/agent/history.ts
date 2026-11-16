@@ -78,6 +78,9 @@ const turnSchema: z.ZodType<StoredTurn> = z.lazy(() =>
         input: z.string().optional(),
         detail: z.string(),
         parent: z.string().optional(),
+        kind: z.string().optional(),
+        label: z.string().optional(),
+        paths: z.array(z.string()).optional(),
         /** When the call started and ended (ms since the epoch), for showing how long it took. */
         startedAt: z.number().optional(),
         endedAt: z.number().optional(),

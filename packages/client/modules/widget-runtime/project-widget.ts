@@ -13,6 +13,7 @@ import {
   type PropType,
 } from "vue";
 import type { ProjectWidgetDefinition } from "@ai-projector/core/modules/widget-catalog/index.ts";
+import UiLoader from "../../common/ui/UiLoader.vue";
 import { useWidgetReply } from "./bridge.ts";
 import {
   compileScript,
@@ -267,9 +268,9 @@ export function createProjectWidget(
         if (failure.value)
           return h("div", { class: "project-widget-failure", role: "alert" }, failure.value);
         if (dataLoading.value)
-          return h("div", { class: "project-widget-loading" }, "Читаю данные…");
+          return h(UiLoader, { size: "sm" }, { default: () => "Читаю данные…" });
         if (!scriptReady.value)
-          return h("div", { class: "project-widget-loading" }, "Запускаю скрипт…");
+          return h(UiLoader, { size: "sm" }, { default: () => "Запускаю скрипт…" });
         try {
           return h("div", { class: `project-widget ${scope}` }, [
             render.value ? render.value(context, cache) : null,

@@ -19,6 +19,7 @@ import {
   AgentJudgeSettings,
 } from "../agent/index.ts";
 import { AgentRoleSettings } from "../agent-roles/index.ts";
+import { AgentPresetsSettings } from "../agent-presets/index.ts";
 import { type SettingsSection } from "../settings/index.ts";
 
 export const settingsSections: SettingsSection[] = [
@@ -26,9 +27,9 @@ export const settingsSections: SettingsSection[] = [
     id: "interface",
     title: "Интерфейс",
     group: "Среда",
-    description: "Режим запуска, системная горячая клавиша и цветовая схема.",
+    description: "Режим запуска, системная горячая клавиша, цветовая схема и размер текста.",
     keywords:
-      "окно браузер GTK трей хоткей shortcut запуск цвет тема схема светлая тёмная appearance",
+      "окно браузер GTK трей хоткей shortcut запуск цвет тема схема светлая тёмная appearance шрифт размер текст чат терминал font",
     component: InterfaceSettings,
   },
   {
@@ -62,8 +63,8 @@ export const settingsSections: SettingsSection[] = [
     id: "editor",
     title: "Редактор",
     group: "Среда",
-    description: "Тема кода и сравнения изменений во всех проектах.",
-    keywords: "цвет тема подсветка код diff",
+    description: "Тема и размер шрифта кода во всех проектах.",
+    keywords: "цвет тема подсветка код diff шрифт размер font size appearance",
     component: EditorSettings,
     props: { embedded: true },
   },
@@ -99,7 +100,7 @@ export const settingsSections: SettingsSection[] = [
     title: "Hub",
     group: "Подключения",
     description: "Подключение этой машины к общему веб-интерфейсу Projector.",
-    keywords: "hub устройства удалённый доступ туннель токен сервер",
+    keywords: "hub устройства удалённый доступ туннель токен сервер QR телефон вход",
     component: HubSettings,
   },
   {
@@ -160,6 +161,16 @@ export const settingsSections: SettingsSection[] = [
     keywords:
       "роли agent roles doctor lens judge доктор линза судья модель служебные внутренние вызовы chat роль чата пресет preset",
     component: AgentRoleSettings,
+  },
+  {
+    id: "agent-presets",
+    title: "Пресеты агента",
+    group: "Агент",
+    description:
+      "Готовые первые запросы для любого агента: обычный текст или форма, которую агент написал.",
+    keywords:
+      "пресеты preset старт стартовые чипы chips запросы prompt форма form подсказки suggestions",
+    component: AgentPresetsSettings,
   },
   {
     id: "agent-judge",

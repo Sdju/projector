@@ -2,6 +2,7 @@ import { routes as hubRoutes } from "../routes/api/hub.ts";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { HttpError } from "../modules/http/index.ts";
 import { createRouteDispatcher, json } from "../modules/transport/index.ts";
+import { handlePluginRoute } from "../modules/plugin-routes/index.ts";
 import { localOrigin } from "../middlewares/local-origin.ts";
 import { routes as integrationsActionsRoutes } from "../routes/api/integrations/[...action].ts";
 import { routes as githubBrowseRoutes } from "../routes/api/integrations/github-browse.ts";
@@ -23,6 +24,7 @@ import { routes as providersRoutes } from "../routes/api/providers.ts";
 import { routes as providersActiveRoutes } from "../routes/api/providers/active.ts";
 import { routes as providersBalanceRoutes } from "../routes/api/providers/balance.ts";
 import { routes as providersModelsRoutes } from "../routes/api/providers/models.ts";
+import { routes as providersUsageRoutes } from "../routes/api/providers/usage.ts";
 import { routes as agentRoutes } from "../routes/api/agent.ts";
 import { routes as agentUsageRoutes } from "../routes/api/agent-usage.ts";
 import { routes as agentFormRepairRoutes } from "../routes/api/agent-form-repair.ts";
@@ -32,6 +34,7 @@ import { routes as agentLensRoutes } from "../routes/api/agent-lens.ts";
 import { routes as agentSideRoutes } from "../routes/api/agent-side.ts";
 import { routes as agentSkillsRoutes } from "../routes/api/agent-skills.ts";
 import { routes as agentFeaturesRoutes } from "../routes/api/agent-features.ts";
+import { routes as agentPresetsRoutes } from "../routes/api/agent-presets.ts";
 import { routes as agentJudgeRoutes } from "../routes/api/agent-judge.ts";
 import { routes as agentRolesRoutes } from "../routes/api/agent-roles.ts";
 import { routes as agentProjectRolesRoutes } from "../routes/api/agent-project-roles.ts";
@@ -52,26 +55,31 @@ import { routes as projectWorkspaceReadRoutes } from "../routes/api/projects/[id
 import { routes as projectSiteRoutes } from "../routes/api/projects/[id]/site.ts";
 import { routes as projectTerminalsRoutes } from "../routes/api/projects/[id]/terminals.ts";
 import { routes as projectActionsRoutes } from "../routes/api/projects/[id]/index.ts";
+import { routes as projectAppearanceRoutes } from "../routes/api/projects/[id]/appearance.ts";
 import { routes as ideKeybindingsRoutes } from "../routes/api/ide/keybindings.ts";
 import { routes as ideCommandsRoutes } from "../routes/api/ide/commands.ts";
 import { routes as editorSettingsRoutes } from "../routes/api/ide/editor.ts";
 import { routes as appearanceRoutes } from "../routes/api/appearance.ts";
+import { routes as hiddenActionsRoutes } from "../routes/api/ide/hidden-actions.ts";
+import { routes as trustNoticesRoutes } from "../routes/api/trust-notices.ts";
 import { routes as pluginsRoutes } from "../routes/api/plugins.ts";
 import { routes as filesExcludeRoutes } from "../routes/api/ide/files-exclude.ts";
 import { routes as dockerRoutes } from "../routes/api/docker.ts";
 import { routes as codexRoutes } from "../routes/api/codex.ts";
 import { routes as openCodeRoutes } from "../routes/api/opencode.ts";
 import { routes as kimiRoutes } from "../routes/api/kimi.ts";
-import { routes as claudeRoutes } from "../routes/api/claude.ts";
 import { routes as analyticsRoutes } from "../routes/api/analytics.ts";
+import { routes as mediaRoutes } from "../routes/api/media.ts";
+import "./media-adapters.ts";
+import "./provider-usage.ts";
 import { routes as openAiRoutes } from "../routes/api/openai.ts";
 import { routes as browserRoutes } from "../routes/api/browser.ts";
 import { ensureAgentsReady } from "./agents.ts";
 const dispatch = createRouteDispatcher([
   ...hubRoutes,
   ...openAiRoutes,
+  ...mediaRoutes,
   ...browserRoutes,
-  ...claudeRoutes,
   ...analyticsRoutes,
   ...kimiRoutes,
   ...openCodeRoutes,
@@ -80,7 +88,9 @@ const dispatch = createRouteDispatcher([
   ...filesExcludeRoutes,
   ...editorSettingsRoutes,
   ...appearanceRoutes,
+  ...hiddenActionsRoutes,
   ...pluginsRoutes,
+  ...trustNoticesRoutes,
   ...ideKeybindingsRoutes,
   ...ideCommandsRoutes,
   ...githubBrowseRoutes,
@@ -103,12 +113,14 @@ const dispatch = createRouteDispatcher([
   ...providersActiveRoutes,
   ...providersBalanceRoutes,
   ...providersModelsRoutes,
+  ...providersUsageRoutes,
   ...agentMemoryRoutes,
   ...agentMcpRoutes,
   ...agentHooksRoutes,
   ...agentWebRoutes,
   ...agentSkillsRoutes,
   ...agentFeaturesRoutes,
+  ...agentPresetsRoutes,
   ...agentJudgeRoutes,
   ...agentRolesRoutes,
   ...agentProjectRolesRoutes,
@@ -131,9 +143,9 @@ const dispatch = createRouteDispatcher([
   ...projectWorkspaceRoutes,
   ...projectWorkspaceReadRoutes,
   ...projectTerminalsRoutes,
+  ...projectAppearanceRoutes,
   ...projectActionsRoutes,
 ]);
-
 export async function handleApi(req: IncomingMessage, res: ServerResponse): Promise<boolean> {
   // Plugin agents are discovered asynchronously; the first request sees the whole catalog.
   await ensureAgentsReady();
@@ -151,6 +163,7 @@ export async function handleApi(req: IncomingMessage, res: ServerResponse): Prom
   try {
     if (!localOrigin(context)) return true;
     if (await dispatch(context)) return true;
+    if (await handlePluginRoute(context)) return true;
     json(res, 404, { error: "Не найден" });
   } catch (error) {
     json(res, error instanceof HttpError ? error.status : 400, {

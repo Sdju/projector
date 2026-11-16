@@ -12,7 +12,6 @@ import {useDocker} from '/packages/client/modules/docker/model.ts';
 import DockerSidebar from '/packages/client/modules/docker/ui/DockerSidebar.vue';
 import DockerPanel from '/packages/client/modules/docker/ui/DockerPanel.vue';
 import CodexUsageIndicator from '/packages/client/modules/agents-integration/codex/ui/CodexUsageIndicator.vue';
-import ClaudeUsageIndicator from '/packages/client/modules/agents-integration/claude/ui/ClaudeUsageIndicator.vue';
 import OpenCodeUsageIndicator from '/packages/client/modules/agents-integration/opencode/ui/OpenCodeUsageIndicator.vue';
 import PluginUsageIndicator from '/packages/client/modules/agents-integration/usage/PluginUsageIndicator.vue';
 import {agentUsageSummary} from '/packages/client/modules/agents-integration/_/usage-summary.ts';
@@ -72,7 +71,7 @@ let trackerApp,dockerApp,usageApp,state;
  let scenario='ready';
  const quota=(usedPercent,seconds,limited=false)=>({usedPercent,resetsAt:Date.now()/1000+seconds,limited});
  window.fetch=async(input,options)=>{
-  const usageEndpoint=input==='/api/agent/usage/plugin'||['codex','claude','opencode'].some(provider=>input==='/api/'+provider+'/usage');
+  const usageEndpoint=input==='/api/agent/usage/plugin'||['codex','opencode'].some(provider=>input==='/api/'+provider+'/usage');
   if(!usageEndpoint)return originalFetch(input,options);
   requests.push(input);
   await originalFetch('/__tick');
@@ -85,12 +84,12 @@ let trackerApp,dockerApp,usageApp,state;
  const pluginWindows=[{name:'total',label:'Всего',shortLabel:'вс',periodSeconds:30*86400},{name:'auto',label:'Авто',shortLabel:'авт',periodSeconds:30*86400},{name:'api',label:'API',shortLabel:'API',periodSeconds:30*86400}];
  const pluginIcon=iconFromSvg('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M1 1h22v22H1z"/></svg>');
  const pluginProps={usageUrl:'/api/agent/usage/plugin',title:'Plugin',agentId:'plugin',windows:pluginWindows,icon:pluginIcon};
- const adapters=[['codex',CodexUsageIndicator,1,null,70],['claude',ClaudeUsageIndicator,2,'rolling',60],['plugin',PluginUsageIndicator,3,'auto',80],['opencode',OpenCodeUsageIndicator,3,'monthly',60]];
+ const adapters=[['codex',CodexUsageIndicator,1,null,70],['plugin',PluginUsageIndicator,3,'auto',80],['opencode',OpenCodeUsageIndicator,3,'monthly',60]];
  for(const [provider,Component,rowCount,nextWindow,remaining] of adapters){
   const endpoint=provider==='plugin'?'/api/agent/usage/plugin':'/api/'+provider+'/usage';
   const commandId=provider==='plugin'?'ide.plugin.plugin.usage.window.cycle':'ide.'+provider+'.usage.window.cycle';
   // Shared failure presentation needs one adapter; retain each provider's ready mapping.
-  for(scenario of ['ready',...(provider==='claude'?['unavailable','failed','partial']:[])]){
+  for(scenario of ['ready',...(provider==='plugin'?['unavailable','failed']:[])]){
    usageApp=createApp(Component,provider==='plugin'?pluginProps:{});usageApp.provide(commandHostKey,host);usageApp.mount('#usage');
    const indicator=document.querySelector('#usage .usage-indicator');
    const tooltip=indicator.querySelector('[role="tooltip"]');
@@ -112,7 +111,7 @@ let trackerApp,dockerApp,usageApp,state;
      const command=commands.get(commandId);
      check(command.title&&command.description,provider+' command descriptions');
      indicator.click();await nextTick();
-     check(indicator.getAttribute('aria-label').includes(provider==='claude'?'5 часов':provider==='plugin'?'Авто':'Месяц'),provider+' click cycles correct window');
+     check(indicator.getAttribute('aria-label').includes(provider==='plugin'?'Авто':'Месяц'),provider+' click cycles correct window');
      check(requests.length===before,provider+' cycle does not refetch');
      if(provider==='plugin'){
      check(meter().classList.contains('tone-over')&&tooltip.querySelector('.exhausted'),provider+' exhausted window');
@@ -123,10 +122,6 @@ let trackerApp,dockerApp,usageApp,state;
      check(requests.length===before&&meter().getAttribute('aria-valuenow')==='70','Codex never cycles');
      check(meter().classList.contains('tone-over'),'Codex uses API window duration for pace');
     }
-   }else if(scenario==='partial'){
-    check(meter().getAttribute('aria-valuenow')==='80'&&tooltip.querySelectorAll('.quota-row').length===1,'Claude falls back to available window');
-    indicator.click();await nextTick();
-    check(meter().getAttribute('aria-valuenow')==='80','Claude keeps the only available window');
    }else{
     check(!meter().hasAttribute('aria-valuenow')&&tooltip.querySelectorAll('.quota-row').length===0,provider+' unavailable meter');
     check(tooltip.textContent.includes(scenario==='failed'?'не удалось':'Fixture unavailable')||tooltip.textContent.includes('Не удалось'),provider+' failure text');

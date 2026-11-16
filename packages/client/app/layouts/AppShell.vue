@@ -4,6 +4,7 @@ import { ActivityIsland } from "../../modules/agent/index.ts";
 import { useCommandScope, commandArgs } from "../../common/utilities/commands.ts";
 import { useCompactViewport } from "../../common/utilities/compact-viewport.ts";
 import { computed, ref } from "vue";
+import { zenMode } from "../../common/utilities/zen-mode.ts";
 import { githubProjectRoute } from "@ai-projector/core/modules/github/index.ts";
 import { useRoute, useRouter } from "vue-router";
 import {
@@ -16,7 +17,7 @@ import { fetchIntegrations } from "../../modules/integration-api/index.ts";
 import { ProjectSwitcher, MobileProjectPicker } from "../../modules/catalog/index.ts";
 import { isFileDrag, pathsFromDataTransfer } from "../../modules/path-drop/index.ts";
 
-defineProps<{ currentProject?: ProjectLocation }>();
+const props = defineProps<{ currentProject?: ProjectLocation }>();
 const { openPath } = useProjects();
 const route = useRoute();
 const router = useRouter();
@@ -114,6 +115,7 @@ async function drop(event: DragEvent) {
 }
 const navigatePath = (path: string) =>
   commands.scope.executeCommand<void>("ide.project.path.open", { path });
+const zen = computed(() => zenMode.value && !!props.currentProject);
 </script>
 
 <template>
@@ -125,6 +127,7 @@ const navigatePath = (path: string) =>
         route.name === 'github-project' ||
         route.name === 'gitlab-project',
       settings: route.name === 'settings',
+      zen,
     }"
     @dragenter="dragEnter"
     @dragover.prevent
@@ -132,7 +135,7 @@ const navigatePath = (path: string) =>
     @drop.prevent="drop"
   >
     <div v-if="dragging" class="drop-hint">Бросьте папку — откроем проект</div>
-    <header class="top" :class="{ 'has-project': currentProject }">
+    <header v-show="!zen" :inert="zen" class="top" :class="{ 'has-project': currentProject }">
       <MobileProjectPicker
         v-if="currentProject"
         :key="currentProject.id"
@@ -368,5 +371,8 @@ const navigatePath = (path: string) =>
     display: flex;
     flex-direction: column;
   }
+}
+.shell.workspace.zen {
+  padding: 0;
 }
 </style>

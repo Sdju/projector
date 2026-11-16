@@ -1,6 +1,6 @@
 import { moveWorkspaceEntry, workspaceCapabilities } from "../../../../workspace-api/index.ts";
-import { readDrop } from "../../../../path-drop/index.ts";
-import { autoScrollDuringDrag, treeDragType } from "./tree-drag.ts";
+import { isProjectorDrag, readDrop, setProjectorDrag } from "../../../../path-drop/index.ts";
+import { autoScrollDuringDrag } from "./tree-drag.ts";
 import type { useTreeImport } from "./tree-import.ts";
 import { topLevelTreePaths } from "./tree-selection.ts";
 import {
@@ -10,7 +10,7 @@ import {
   relocatedPath,
   type FileEntry,
 } from "@ai-projector/core/modules/workspace/index.ts";
-import type { TreeContext } from "./tree-operations.ts";
+import type { TreeContext } from "./tree-context.ts";
 
 /** Перетаскивание записей дерева: выбор цели, подсветка и перенос. */
 export function useTreeDragDrop(
@@ -28,14 +28,11 @@ export function useTreeDragDrop(
     selection.dragged.value = topLevelTreePaths(selection.paths.value);
     source.value = entry.path;
     event.dataTransfer.effectAllowed = canWrite() ? "copyMove" : "copy";
-    event.dataTransfer.setData(
-      treeDragType,
-      JSON.stringify({
-        projectId: props.projectId,
-        path: entry.path,
-        paths: selection.dragged.value,
-      }),
-    );
+    setProjectorDrag(event.dataTransfer, {
+      projectId: props.projectId,
+      path: entry.path,
+      paths: selection.dragged.value,
+    });
   }
   function destinationFor(entry?: FileEntry) {
     return entry ? (entry.directory ? entry.path : parentPath(entry.path)) : props.path;
@@ -55,11 +52,11 @@ export function useTreeDragDrop(
       aim(event, entry, "Копировать");
       return;
     }
-    if (!source.value || busy.value || !event.dataTransfer?.types.includes(treeDragType)) return;
+    if (!source.value || busy.value || !isProjectorDrag(event.dataTransfer)) return;
     event.preventDefault();
     const directory = destinationFor(entry);
     const valid = selection.dragged.value.every((path) => !!moveDestination(path, directory));
-    event.dataTransfer.dropEffect = valid ? "move" : "none";
+    event.dataTransfer!.dropEffect = valid ? "move" : "none";
     aim(event, entry, "Перенести", valid);
   }
   function dragLeave(event: DragEvent) {
@@ -81,7 +78,7 @@ export function useTreeDragDrop(
       await importer.importInto(directory, dropped, "ask");
       return;
     }
-    if (!source.value || busy.value || !event.dataTransfer?.types.includes(treeDragType)) return;
+    if (!source.value || busy.value || !isProjectorDrag(event.dataTransfer)) return;
     event.preventDefault();
     const directory = destinationFor(entry);
     const paths = [...selection.dragged.value];

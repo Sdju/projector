@@ -1,20 +1,20 @@
 <script setup lang="ts">
+import UiLoader from "../../../common/ui/UiLoader.vue";
 import UiSkeleton from "../../../common/ui/UiSkeleton.vue";
-import UiSpinner from "../../../common/ui/UiSpinner.vue";
 
 /** Каркас рабочей области, пока проект открывается: раскладка не прыгает, когда приходят данные. */
 const rows = ["62%", "48%", "70%", "54%", "66%", "44%", "58%"];
 </script>
 
 <template>
-  <section class="opening" role="status" aria-live="polite">
+  <section class="opening">
     <div class="rail"><UiSkeleton v-for="n in 6" :key="n" width="18px" height="18px" /></div>
     <div class="side">
       <UiSkeleton v-for="width in rows" :key="width" :width="width" height="10px" />
     </div>
     <div class="editor" />
     <div class="terminal" />
-    <p class="label"><UiSpinner /> Открываю проект…</p>
+    <UiLoader class="label">Открываю проект…</UiLoader>
   </section>
 </template>
 
@@ -58,10 +58,6 @@ const rows = ["62%", "48%", "70%", "54%", "66%", "44%", "58%"];
   color: var(--muted);
   font-size: var(--fs-xs);
   pointer-events: none;
-}
-.label svg {
-  width: 14px;
-  height: 14px;
 }
 @media (max-width: 700px) {
   .opening {

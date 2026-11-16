@@ -55,6 +55,7 @@ const emit = defineEmits<{
   moved: [source: string, destination: string];
   changed: [];
   deleted: [path: string];
+  info: [entry: FileEntry];
 }>();
 const paging = props.depth === 0 ? createTreePaging() : inject(treePagingKey)!;
 if (props.depth === 0) provide(treePagingKey, paging);

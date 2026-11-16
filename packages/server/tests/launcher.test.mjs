@@ -10,6 +10,7 @@ const data = join(root, "data");
 const apps = join(data, "applications");
 await mkdir(apps, { recursive: true });
 await mkdir(join(data, "projector"), { recursive: true });
+await mkdir(join(root, "fail"), { recursive: true });
 const mac = process.platform === "darwin";
 // macOS lists .app bundles from ~/Applications instead of .desktop entries.
 const bundle = join(root, "Applications", "Projector Probe.app");
@@ -65,7 +66,7 @@ await writeFile(
       {
         id: "fail-project",
         name: "Failing workspace",
-        path: root,
+        path: join(root, "fail"),
         url: "",
         icon: "",
         mode: "server",

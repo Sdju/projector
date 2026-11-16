@@ -112,9 +112,9 @@ export async function userMcpServers(
 }
 
 /**
- * The MCP servers of a session: the project's own, plus the built-in IDE and widget servers when
- * their features are on. Only those additions may hide a same-named project server; with the
- * feature off the user's `projector-ide` or `projector-widgets` from `.mcp.json` is passed as is.
+ * The MCP servers of a session: the project's own plus the built-in IDE server when its feature
+ * is on. Only that addition may hide a same-named project server; with the feature off the user's
+ * `projector-ide` from `.mcp.json` is passed as is.
  */
 export async function sessionMcpServers(
   cwd: string | undefined,

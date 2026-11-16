@@ -3,7 +3,13 @@ import { describe, expect, test } from "vite-plus/test";
 import {
   externalThemeId,
   isExternalThemeId,
+  isSafePluginPath,
   pluginApiVersion,
+  pluginAssetPath,
+  pluginHttpMethodsOf,
+  pluginHttpPath,
+  pluginPackageKey,
+  pluginPackageName,
   sanitizePluginIconSvg,
   serializeThemeTokens,
   themeStyleProperties,
@@ -404,6 +410,33 @@ describe("plugin agent contribution", () => {
       validatePluginManifest(withAgent({ ...agentContribution, caption: "x".repeat(301) })),
     ).toThrow(/Подпись агента/);
   });
+
+  test("requires command without projector.server and validates defaultFeatures", () => {
+    const noCommand = { ...agentContribution };
+    delete noCommand.command;
+    expect(() => validatePluginManifest(withAgent(noCommand))).toThrow(/Команда агента/);
+    expect(
+      validatePluginManifest(
+        withAgent({ ...agentContribution, defaultFeatures: ["widgets", "a.b_c-1"] }),
+      ),
+    ).toBeTruthy();
+    expect(
+      validatePluginManifest(withAgent({ ...agentContribution, defaultFeatures: [] })),
+    ).toBeTruthy();
+    for (const defaultFeatures of [
+      "widgets",
+      ["Widgets"],
+      ["-bad"],
+      [""],
+      ["x".repeat(65)],
+      Array.from({ length: 21 }, (_, index) => `f${index}`),
+      [1],
+    ]) {
+      expect(() =>
+        validatePluginManifest(withAgent({ ...agentContribution, defaultFeatures })),
+      ).toThrow(/Некорректный defaultFeatures агента/);
+    }
+  });
 });
 
 function withServer(server, base = agentManifest) {
@@ -417,6 +450,14 @@ describe("plugin server entry", () => {
     for (const server of ["dist/server.cjs", "./dist/server.cjs"]) {
       expect(validatePluginManifest(withServer(server))).toEqual(withServer(server));
     }
+  });
+
+  test("makes command optional when projector.server is present", () => {
+    const copy = withServer("dist/server.cjs");
+    delete copy.projector.contributes.agents[0].command;
+    expect(validatePluginManifest(copy)).toEqual(copy);
+    copy.projector.contributes.agents[0].command = "agent\necho";
+    expect(() => validatePluginManifest(copy)).toThrow(/Команда агента/);
   });
 
   test("accepts npm-style private and type metadata", () => {
@@ -465,5 +506,278 @@ describe("plugin server entry", () => {
     ]) {
       expect(() => validatePluginManifest(withServer(server))).toThrow(/projector\.server/);
     }
+  });
+});
+
+describe("plugin package dependencies", () => {
+  test("accepts npm dependency maps and rejects unsafe protocols and keys", () => {
+    const copy = structuredClone(agentManifest);
+    copy.dependencies = { leftpad: "^1.0.0", "@scope/pkg": "1.2.3" };
+    copy.optionalDependencies = { extra: "2.0.0" };
+    expect(validatePluginManifest(copy)).toEqual(copy);
+    expect(() => validatePluginManifest({ ...copy, dependencies: [] })).toThrow(/объектом/);
+    expect(() => validatePluginManifest({ ...copy, dependencies: null })).toThrow(/объектом/);
+    const withProto = JSON.parse('{"__proto__": "1.0.0"}');
+    expect(() => validatePluginManifest({ ...copy, dependencies: withProto })).toThrow(
+      /недопустимое поле __proto__/,
+    );
+    for (const key of ["constructor", "prototype"]) {
+      expect(() => validatePluginManifest({ ...copy, dependencies: { [key]: "1.0.0" } })).toThrow(
+        /недопустимое поле/,
+      );
+    }
+    expect(() => validatePluginManifest({ ...copy, dependencies: { Foo: "1.0.0" } })).toThrow(
+      /некорректное имя пакета/,
+    );
+    const tooMany = Object.fromEntries(
+      Array.from({ length: 201 }, (_, index) => [`pkg${index}`, "1.0.0"]),
+    );
+    expect(() => validatePluginManifest({ ...copy, dependencies: tooMany })).toThrow(/200/);
+    for (const spec of ["", "x".repeat(201), "1.0.0\n", "1.0.0\0"]) {
+      expect(() => validatePluginManifest({ ...copy, dependencies: { leftpad: spec } })).toThrow(
+        /версия leftpad/,
+      );
+    }
+    for (const spec of ["workspace:*", "catalog:", "file:../x", "link:../x", "portal:../x"]) {
+      expect(() => validatePluginManifest({ ...copy, dependencies: { leftpad: spec } })).toThrow(
+        /недопустимый протокол/,
+      );
+      expect(() =>
+        validatePluginManifest({ ...copy, optionalDependencies: { extra: spec } }),
+      ).toThrow(/недопустимый протокол/);
+    }
+  });
+});
+
+const browserManifest = {
+  name: "@acme/fict",
+  version: "1.0.0",
+  type: "module",
+  projector: {
+    apiVersion: 1,
+    browser: "dist/browser.js",
+    contributes: {
+      languages: [
+        {
+          id: "fict",
+          title: "Fict",
+          extensions: [".fict"],
+          filenames: ["fictfile"],
+          priority: 10,
+        },
+      ],
+      panels: [{ id: "inspector", title: "Inspector", placement: "aside" }],
+      tabs: [{ id: "overview", title: "Overview", description: "Service tab" }],
+    },
+  },
+};
+
+describe("plugin browser contract", () => {
+  test("accepts a browser-only package with declared language, panel and tab metadata", () => {
+    expect(validatePluginManifest(browserManifest)).toEqual(browserManifest);
+    expect(pluginPackageName(pluginPackageKey(browserManifest.name))).toBe(browserManifest.name);
+    expect(pluginAssetPath("@acme/fict", "a".repeat(64), "dist/chunk.js")).toBe(
+      `/api/plugins/assets/${pluginPackageKey("@acme/fict")}/${"a".repeat(64)}/dist/chunk.js`,
+    );
+    expect(isSafePluginPath("dist/chunks/a.js")).toBe(true);
+    for (const path of ["../a.js", "/a.js", "dist/../../a.js", "dist\\a.js", "dist//a.js", ""])
+      expect(isSafePluginPath(path)).toBe(false);
+  });
+
+  test("rejects unsafe entries, undeclared matching data and malformed contributions", () => {
+    for (const browser of [
+      "/dist/browser.js",
+      "../browser.js",
+      "dist/../browser.js",
+      "dist\\browser.js",
+      "dist/browser.ts",
+      "browser.js",
+      "dist/browser.cjs",
+      "",
+      42,
+    ])
+      expect(() =>
+        validatePluginManifest({
+          ...browserManifest,
+          projector: { ...browserManifest.projector, browser },
+        }),
+      ).toThrow(/projector\.browser/);
+    for (const contributions of [
+      { languages: [{ id: "fict", title: "Fict", extensions: [] }] },
+      { languages: [{ id: "Fict", title: "Fict", extensions: [".fict"] }] },
+      { languages: [{ id: "fict", title: "Fict", extensions: ["../fict"] }] },
+      {
+        languages: [
+          { id: "fict", title: "Fict", extensions: [".fict"] },
+          { id: "fict", title: "Again", extensions: [".f"] },
+        ],
+      },
+      { panels: [{ id: "inspector", title: "Inspector", placement: "dock" }] },
+      { tabs: [{ id: "overview", title: "Overview", mount: "src/x.ts" }] },
+    ])
+      expect(() =>
+        validatePluginManifest({
+          ...browserManifest,
+          projector: {
+            apiVersion: 1,
+            browser: "dist/browser.js",
+            contributes: contributions,
+          },
+        }),
+      ).toThrow();
+  });
+});
+
+describe("plugin balance contribution", () => {
+  const balanceManifest = {
+    name: "@acme/router",
+    version: "1.0.0",
+    projector: {
+      apiVersion: 1,
+      server: "dist/server.cjs",
+      contributes: {
+        balances: [
+          {
+            kind: "acme-router",
+            title: "Acme Router",
+            description: "Остаток кредитов Acme Router",
+            url: "https://router.example.com/v1",
+            model: "acme/chat",
+          },
+        ],
+      },
+    },
+  };
+
+  test("accepts a server-only package that declares a balance kind", () => {
+    expect(validatePluginManifest(balanceManifest)).toEqual(balanceManifest);
+    expect(validatePluginManifest(balanceManifest).projector.contributes.agents).toBeUndefined();
+  });
+
+  test("requires server code for a balance kind", () => {
+    const noServer = structuredClone(balanceManifest);
+    delete noServer.projector.server;
+    expect(() => validatePluginManifest(noServer)).toThrow(/projector\.server/);
+  });
+
+  test("rejects reserved, repeated and malformed kinds", () => {
+    for (const kind of ["deepseek", "openrouter"]) {
+      const reserved = structuredClone(balanceManifest);
+      reserved.projector.contributes.balances[0].kind = kind;
+      expect(() => validatePluginManifest(reserved)).toThrow(/зарезервирован/);
+    }
+
+    const duplicate = structuredClone(balanceManifest);
+    duplicate.projector.contributes.balances.push({
+      ...duplicate.projector.contributes.balances[0],
+    });
+    expect(() => validatePluginManifest(duplicate)).toThrow(/Повторяющийся вид/);
+
+    for (const kind of ["", "OpenRouter", "-openrouter", "open router", "x".repeat(65)]) {
+      const broken = structuredClone(balanceManifest);
+      broken.projector.contributes.balances[0].kind = kind;
+      expect(() => validatePluginManifest(broken)).toThrow(/Некорректный вид/);
+    }
+  });
+
+  test("an empty balance list is not a contribution", () => {
+    expect(() =>
+      validatePluginManifest({
+        ...structuredClone(balanceManifest),
+        projector: { apiVersion: 1, contributes: { balances: [] } },
+      }),
+    ).toThrow(/хотя бы один вид баланса/);
+  });
+});
+
+describe("plugin HTTP routes", () => {
+  const route = { id: "webhook", path: "api/webhook", methods: ["POST"] };
+  const httpManifest = {
+    name: "@scope/http-pack",
+    version: "1.0.0",
+    projector: {
+      apiVersion: 1,
+      server: "server.cjs",
+      contributes: { http: [route] },
+    },
+  };
+
+  test("a route-only server plugin is a valid contribution", () => {
+    expect(validatePluginManifest(httpManifest).projector.contributes.http).toEqual([route]);
+    expect(pluginHttpPath(route)).toBe("api/webhook");
+    expect(pluginHttpPath({ id: "status" })).toBe("status");
+    expect(pluginHttpMethodsOf(route)).toEqual(["POST"]);
+    expect(pluginHttpMethodsOf({ id: "status" })).toEqual(["GET"]);
+  });
+
+  test("the server entry and safe static paths are required", () => {
+    expect(() =>
+      validatePluginManifest({
+        ...structuredClone(httpManifest),
+        projector: { apiVersion: 1, contributes: { http: [route] } },
+      }),
+    ).toThrow(/требуют projector\.server/);
+
+    for (const path of [
+      "../secret",
+      "/api/status",
+      "api/%2e%2e",
+      "api\\x",
+      "api//x",
+      "api/./x",
+      "api#x",
+    ]) {
+      const broken = structuredClone(httpManifest);
+      broken.projector.contributes.http[0].path = path;
+      expect(() => validatePluginManifest(broken)).toThrow(/Небезопасный путь|неизвестные поля/);
+    }
+
+    for (const path of ["api/:id", "api/:id?", "api/*", "api/**", "api/:id(\\d+)"]) {
+      const pattern = structuredClone(httpManifest);
+      pattern.projector.contributes.http[0].path = path;
+      expect(validatePluginManifest(pattern).projector.contributes.http[0].path).toBe(path);
+    }
+  });
+
+  test("ids, paths, methods and fields are validated", () => {
+    const duplicateId = structuredClone(httpManifest);
+    duplicateId.projector.contributes.http.push({ id: "webhook", path: "other" });
+    expect(() => validatePluginManifest(duplicateId)).toThrow(/Повторяющийся идентификатор/);
+
+    const duplicatePath = structuredClone(httpManifest);
+    duplicatePath.projector.contributes.http.push({ id: "other", path: "api/webhook" });
+    expect(() => validatePluginManifest(duplicatePath)).toThrow(/Повторяющийся путь/);
+
+    const badMethod = structuredClone(httpManifest);
+    badMethod.projector.contributes.http[0].methods = ["TRACE"];
+    expect(() => validatePluginManifest(badMethod)).toThrow(/недопустимый метод/);
+
+    const emptyMethods = structuredClone(httpManifest);
+    emptyMethods.projector.contributes.http[0].methods = [];
+    expect(() => validatePluginManifest(emptyMethods)).toThrow(/непустым массивом/);
+
+    const unknownField = structuredClone(httpManifest);
+    unknownField.projector.contributes.http[0].handler = "x";
+    expect(() => validatePluginManifest(unknownField)).toThrow(/неизвестные поля/);
+
+    const tooMany = structuredClone(httpManifest);
+    tooMany.projector.contributes.http = Array.from({ length: 30 }, (_, index) => ({
+      id: `route${index}`,
+    }));
+    expect(validatePluginManifest(tooMany).projector.contributes.http).toHaveLength(30);
+
+    const optionsOnly = structuredClone(httpManifest);
+    optionsOnly.projector.contributes.http[0].methods = ["OPTIONS"];
+    expect(validatePluginManifest(optionsOnly).projector.contributes.http[0].methods).toEqual([
+      "OPTIONS",
+    ]);
+
+    const localAccess = structuredClone(httpManifest);
+    localAccess.projector.contributes.http[0].access = "local";
+    expect(validatePluginManifest(localAccess).projector.contributes.http[0].access).toBe("local");
+
+    const badAccess = structuredClone(httpManifest);
+    badAccess.projector.contributes.http[0].access = "public";
+    expect(() => validatePluginManifest(badAccess)).toThrow(/режим доступа/);
   });
 });

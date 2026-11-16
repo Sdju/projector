@@ -12,10 +12,11 @@ import type { ClientAgent } from "../../agents-integration/catalog/index.ts";
 import { focusedRoleId, revealFocusedRole } from "../model/nav.ts";
 import type { RoleControl } from "../model/roles.ts";
 import type { RoleMcpServer, RoleResources, RoleSkill } from "../model/resources.ts";
-import type {
-  AgentRole,
-  AgentRoleSelection,
-  AgentRoleView,
+import {
+  ROLE_TEMPLATE_VARIABLES,
+  type AgentRole,
+  type AgentRoleSelection,
+  type AgentRoleView,
 } from "@ai-projector/core/modules/agent-role/index.ts";
 
 const props = defineProps<{
@@ -29,12 +30,17 @@ const emit = defineEmits<{ save: [value: Partial<AgentRole>]; remove: [] }>();
 
 type ResourceMode = "all" | "some" | "none";
 
+const SOURCE_LABELS = { user: "личный", project: "проект", system: "встроенный" } as const;
+const sourceLabel = (source: RoleSkill["source"]) => SOURCE_LABELS[source];
+const TEMPLATE_TOKENS = ROLE_TEMPLATE_VARIABLES.map((name) => `{${name}}`);
+
 const draft = reactive({
   name: "",
   description: "",
   agent: "projector",
   selection: {} as AgentRoleSelection,
   prompt: "",
+  template: false,
   skillsMode: "all" as ResourceMode,
   skills: [] as string[],
   mcpMode: "all" as ResourceMode,
@@ -57,6 +63,7 @@ function adopt(role: AgentRoleView) {
   draft.agent = role.agent;
   draft.selection = { ...role.selection };
   draft.prompt = role.prompt ?? "";
+  draft.template = role.template === true;
   draft.skillsMode = modeOf(role.skills);
   draft.skills = [...(role.skills ?? [])];
   draft.mcpMode = modeOf(role.mcp);
@@ -191,6 +198,7 @@ function save() {
     agent: draft.agent,
     selection: { ...draft.selection },
     prompt: draft.prompt.trim(),
+    ...(draft.template ? { template: true } : {}),
     ...(skills !== undefined ? { skills } : {}),
     ...(mcp !== undefined ? { mcp } : {}),
   });
@@ -248,9 +256,31 @@ function remove() {
         @input="draft.prompt = ($event.target as HTMLTextAreaElement).value"
       />
       <span class="control-hint">
-        Добавляется к системному промпту агента; пустое поле ничего не меняет.
+        Добавляется к системному промпту агента; пустое поле ничего не меняет. В режиме шаблона
+        промпт становится системным промптом роли.
       </span>
     </UiField>
+    <label class="choice template">
+      <UiControl
+        type="checkbox"
+        :checked="draft.template"
+        :disabled="busy"
+        aria-label="Шаблонизировать контекст роли"
+        @change="draft.template = ($event.target as HTMLInputElement).checked"
+      />
+      <span>
+        <strong>Шаблонизировать контекст</strong>
+        <small>
+          Подставлять в промпт контекст Projector:
+          <code v-for="token in TEMPLATE_TOKENS" :key="token">{{ token }}</code>.
+          <template v-if="draft.template">
+            Без <code>{system}</code> базовый промпт агента не включается: шаблон сам решает, что
+            попадёт в системный промпт. Внешний агент получает только <code>{role}</code>,
+            <code>{project}</code> и <code>{skills}</code>, остальные подстановки у него пусты.
+          </template>
+        </small>
+      </span>
+    </label>
     <UiField v-slot="{ control }" label="навыки">
       <UiControl as="select" v-bind="control" v-model="draft.skillsMode" :disabled="busy">
         <option value="all">Все доступные</option>
@@ -271,7 +301,8 @@ function remove() {
         <span>
           <strong>{{ skill.name }}</strong>
           <small
-            >{{ skill.kind === "command" ? "команда" : "навык" }} · {{ skill.description }}</small
+            >{{ skill.kind === "command" ? "команда" : "навык" }} ·
+            {{ sourceLabel(skill.source) }} · {{ skill.description }}</small
           >
         </span>
       </label>
@@ -399,5 +430,16 @@ function remove() {
   color: var(--muted);
   font-size: var(--fs-2xs);
   line-height: 1.4;
+}
+.choice code {
+  font-family: var(--mono);
+  font-size: var(--fs-2xs);
+  color: var(--text);
+}
+.choice code + code {
+  margin-left: 4px;
+}
+.template {
+  padding: var(--sp-1) 0;
 }
 </style>

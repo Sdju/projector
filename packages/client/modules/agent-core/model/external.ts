@@ -1,9 +1,9 @@
 import { computed } from "vue";
+import { fetchLiveRuns } from "../api/runs.ts";
 import {
   fetchCommands,
   fetchControls,
   fetchDefaults,
-  fetchLiveRuns,
   fetchSessions,
   loadSessionTurns,
   saveDefault,

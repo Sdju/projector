@@ -7,13 +7,36 @@ export type {
   AgentBackend,
   AgentCommand,
   AgentControl,
+  AgentEmitter,
+  AgentEventName,
   AgentQuestion,
+  AgentRunHandle,
   AgentRunOptions,
   AgentSelection,
   AgentSessionInfo,
   AgentSessionTurn,
+  AgentUsageProvider,
   McpServerInfo,
+  MessagePart,
+  RewindResult,
 } from "../agent/index.ts";
+export type {
+  PluginBalanceProvider,
+  PluginCodeApi,
+  PluginCodeLoadOptions,
+  PluginFeatureApi,
+  PluginHostApi,
+  PluginMcpApi,
+  PluginProviderApi,
+  PluginRoleApi,
+  PluginWidgetApi,
+} from "../agents/plugin/index.ts";
+export type {
+  ProviderBalanceContext,
+  ProviderBalanceReading,
+  ProviderBalanceResolver,
+} from "../providers/index.ts";
+export type { McpServerConfig, McpSource } from "../agent-mcp/index.ts";
 export type {
   AcpCompaction,
   AcpDialect,
@@ -24,7 +47,6 @@ export type {
   AcpTaskPatch,
   AcpUpdate,
 } from "../agents/acp/index.ts";
-export type { PluginCodeApi } from "../agents/plugin/index.ts";
 export type {
   AgentUsage,
   AgentUsageWindowDefinition,

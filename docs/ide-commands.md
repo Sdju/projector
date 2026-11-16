@@ -132,13 +132,13 @@ The terminal read is the `{ action: "read", lines }` POST on the terminal contro
 
 ## Workspace panels
 
-The workspace has a second rail on the right for owner-specific panels. The base project has no sections there; a profile adds them through `profile.aside`, and the embedding page supplies their views with the `asideViews` prop of `ProjectWorkspace` (the same `SidebarView` contract as the left sidebar). The panel starts collapsed, and the rail itself is hidden on narrow screens. Commands are `ide.workbench.aside.toggle`, `ide.workbench.aside.section.show` `{ section }`, `ide.workbench.aside.refresh` and `ide.workbench.aside.section.close` `{ section }`; they are available only while the workspace has right-rail sections.
+The workspace has no right rail. Service sections (Hub, trash and plugin panels declared with `placement: "aside"`) form the bottom group of the left section rail: a profile adds them through `profile.utility` (`SidebarType.utility`), and they open with `ide.workbench.section.show` `{ section }` like any other sidebar section. The former `ide.workbench.aside.*` commands are removed.
 
-Local and GitHub/GitLab profiles put the global work inbox in that rail as section `inbox`. Its own scope registers `ide.inbox.open` (the header bell), `ide.inbox.refresh`, `ide.inbox.work.open` `{ key }`, `ide.inbox.work.stop` `{ key }` and `ide.inbox.notifications.allow`. The panel and bell share one feed; the page's server pushes its jobs, the Hub pushes device and other-device changes, and on a Hub device page the same commands read and control jobs on every online device.
+Local and GitHub/GitLab profiles offer the global work inbox as the dock tab `inbox`; `ide.workbench.inbox.open` opens or focuses it (the header bell runs it). Its own scope registers `ide.inbox.open` (the header bell), `ide.inbox.refresh`, `ide.inbox.work.open` `{ key }`, `ide.inbox.work.stop` `{ key }`, `ide.inbox.notice.open` `{ key }`, `ide.inbox.notice.trust` `{ key }`, `ide.inbox.notice.read` `{ key }`, `ide.inbox.read.all` and `ide.inbox.notifications.allow`. The panel and bell share one feed; the page's server pushes its jobs, the Hub pushes device and other-device changes, and on a Hub device page the same commands read and control jobs on every online device.
 
 ## Reload and server mode
 
-Global `workbench` scope: `ide.workbench.pages.reload` reloads all same-origin pages (BroadcastChannel). `ide.workbench.server.restart` confirms, calls `POST /api/app/restart`, waits for a new PID in `/api/health` (60 s timeout), then reloads; `ide.workbench.server.mode.dev|prod` call `POST /api/app/mode` with `{ mode }` (detached `projector mode <mode>`, see [usage](usage.md)). All of them end terminals and child processes. `ide.workbench.pwa.install` opens the saved browser install prompt, `ide.workbench.fullscreen.toggle` uses the Fullscreen API (also in the mobile surface pill and the scope of every project workspace).
+Global `workbench` scope: `ide.workbench.pages.reload` reloads all same-origin pages (BroadcastChannel). `ide.workbench.server.restart` confirms, calls `POST /api/app/restart`, waits for a new PID in `/api/health` (60 s timeout), then reloads; `ide.workbench.server.mode.dev|prod` call `POST /api/app/mode` with `{ mode }` (detached `projector mode <mode>`, see [usage](usage.md)). All of them end terminals and child processes. `ide.workbench.pwa.install` opens the saved browser install prompt, `ide.workbench.fullscreen.toggle` uses the Fullscreen API (also in the mobile surface pill and the scope of every project workspace). `ide.workbench.zen.toggle` (`Mod+Shift+Z`, optional `{ on?: boolean }`) expands the active dock panel to the full window and hides sidebars, shell header, status bar, dock tabs and chat chrome (composer, tools, turn actions/footers, work/changes blocks and activity dock); exit via `Esc`, the shortcut or the corner button.
 
 ## Git commands
 
@@ -198,7 +198,8 @@ carries `commit`, `commitPath` and `historyOpen`. Commands:
 - `ide.git.commit.openTree` `{ hash }` opens **Файлы коммита @hash** in the sidebar: a read-only tree at that commit for sources with snapshot trees (local, GitHub, GitLab); close with `ide.workbench.section.close` `{ section }`;
 - `ide.git.commit.openChanges` opens the changed files of a non-root commit against its first parent in the sidebar. The section is a `compare` file scope: paths carry A/M/D/R marks, clicking a row opens a read-only diff `parent → commit`; filtering and collapsing a single-child directory chain are shared with the merge request changes tree. It works for local repositories, GitHub and GitLab;
 - `ide.workbench.tree.open` `{ rev }` or `{ from, to }` opens the same tree/changes section without an overview tab; useful for the agent and future revision pickers;
-- `ide.workbench.tree.search` `{ rev, q, case?, word?, regex? }` searches a committed tree through `git grep` locally or GitLab blob search with `ref` and returns hits with paths, lines, columns and match offsets. GitLab needs Advanced Search; GitHub does not expose code search at a commit, so the command is unavailable there;
+- `ide.workbench.tree.search` `{ rev, q, case?, word?, regex? }` searches a committed tree through `git grep` locally or GitLab blob search with `ref` and returns hits with paths, lines, columns and match offsets. `q` may contain newlines (a pasted snippet): the working copy uses ripgrep `--multiline`, a local snapshot locates the first line then checks the blob. GitLab needs Advanced Search; GitHub does not expose code search at a commit, so the command is unavailable there;
+- `ide.workbench.paths.find` `{ q, rev? }` finds files and folders by name or a path fragment (the same ranking as `@` in chat and the **Файлы** mode of the Search sidebar). Without `rev` it reads the working copy; with `rev` — the committed tree via `git ls-tree`;
 - `ide.git.commit.file.toggle` `{ path, open? }` and `ide.git.commit.files.toggleAll` `{ open? }` expand file code inside the overview tab (read lazily);
 - `ide.git.commit.openFile` `{ path }` opens the current file; `ide.git.commit.open` `{ hash }` opens the **Коммит** overview
   tab (message, metadata, parents, every file with +/− lines); `ide.git.commit.copyHash` `{ hash }`.
@@ -209,6 +210,40 @@ A comparison reads `changes?from&to` and `compare-file?from&to&path&originalPath
 Commit contents are immutable, so the client caches them by hash; the list is re-read on every Git refresh with
 the loaded extent. Merge commits are shown against their first parent, and files are limited to the project folder.
 Commit diff tabs are history: staging, discarding or moving files never closes them.
+
+## Корзина проекта
+
+The `trash` section of the left rail (utility group) exists for writable profiles. Its scope is
+`trash:<projectId>` with `{ surface: 'trash', projectId, count, busy }`. The panel shows a tree of
+`.projector-trash`: top-level entries keep their original base name, folders expand to any depth,
+file sizes are immediate and folder sizes are recursive; the badge is the entry count and the header
+sums the trash size. It is added by `workspaceUtility` and is shown with
+`ide.workbench.section.show` `{ section: 'trash' }`.
+
+- `ide.trash.list` returns `{ entries }` with every top-level entry (`id`, `path`, `name`, `directory`,
+  `deletedAt`, `size`) and re-reads the trash.
+- `ide.trash.tree` `{ path }` returns one level inside a trashed folder: `{ path, entries, truncated }`,
+  where each node has `key`, `name`, `directory` and `size` (`null` for folders). `path` is an entry
+  `id` from `ide.trash.list` or a `key` from a previous level.
+- `ide.trash.sizes` `{ path? }` returns recursive sizes for the direct children of a folder:
+  `{ path, sizes: [{ key, size, files, truncated }], truncated }`. Without `path` it measures the
+  top-level entries. `truncated` means the answer is a lower bound: one request is limited to 8 seconds
+  and 500 000 visited entries, complete measurements are cached, and a partial one is retried.
+- `ide.trash.refresh` re-reads the trash and returns the same `{ entries }` list.
+- `ide.trash.restore` `{ ids?, paths?, all? }` moves entries back to their original paths and returns
+  `{ restored: [{ id, path }], entries }`. Missing parent folders are created; a taken name becomes
+  `name (2).ext` instead of being overwritten.
+- `ide.trash.delete` `{ ids?, paths?, all?, confirm? }` erases entries for good. Without `confirm` it opens
+  the confirmation dialog; the SDK passes `confirm: true`.
+- `ide.trash.empty` `{ confirm? }` clears the whole trash; permanent like `delete`.
+
+`ids` or `paths` select entries, `all` selects every entry. Permanent deletion requires confirmation on
+both the UI and the HTTP route. Reads use `GET /api/projects/:id/workspace/trash?path=` (without `path` —
+top-level entries; with `path` — one level) and `GET /api/projects/:id/workspace/trash-sizes?path=`;
+mutations use `POST /api/projects/:id/workspace/trash` with `{ action, ids, confirm }`. Records live in
+`.projector-trash/.projector-meta`; entries without a record (written by older versions) still list and
+restore by their stored base name. Symlinked trash folders, foreign identifiers and metadata that points
+outside the project or into excluded paths are rejected.
 
 ## Project settings commands
 
@@ -255,7 +290,7 @@ and refuses a path already used by another project.
 
 `ide.workbench.agent.open` opens one virtual **Агент** tab; switching to a file keeps an active request alive, closing the chat or leaving the project aborts it. The agent has `list_commands`, `describe_command` and `execute_command`: discovery reads the live browser registry, execution requires a prior description in the same request and rechecks availability. `command-request` delegates to the originating browser through SSE, `POST /api/agent/tool-result` answers with a single-use id, requests expire after 60 seconds, other projects and disposed registrations are rejected; agent HTTP routes require loopback and reject foreign origins.
 
-The `bash` tool uses the OS adapter, defaults to the project directory, limits to 30 seconds and 256 KiB combined output, stops the process group on cancellation and excludes env names with KEY, TOKEN, SECRET, PASSWORD or CREDENTIAL. It runs with the user's permissions, not as a sandbox; with a Docker environment it runs inside the container, in a trusted Dev Container — through `devcontainer exec` ([docker](docker.md)).
+The `bash` tool uses the OS adapter, defaults to the project directory, has no time limit by default (`PROJECTOR_AGENT_BASH_SECONDS` sets one, `0` is no limit), limits output to 256 KiB, stops the process group on cancellation and excludes env names with KEY, TOKEN, SECRET, PASSWORD or CREDENTIAL. It runs with the user's permissions, not as a sandbox; with a Docker environment it runs inside the container, in a trusted Dev Container — through `devcontainer exec` ([docker](docker.md)).
 
 ### IDE MCP server for external agents
 
@@ -263,13 +298,13 @@ The optional `ide` feature gives Claude Code and ACP agents three tools (`list_c
 
 ### Agent backends
 
-`runAgent` (`packages/server/modules/agent/registry.ts`) picks a backend by `backend` from `packages/server/app/agents.ts` (`projector` by default, `claude-code`, `codex`, `opencode`, `kimi`, plus enabled plugin agents such as `cursor`). `AgentBackend` emits the shared events: `text`, `tool`, `tool-result`, `project`, `status`, `done`, `error`, `session`, `permission-request` (`detail` + `persistent`, answered via `POST /api/agent/tool-result` with `{ allow, always? }`, 10-minute single-use id; `always` only when the backend can honor it), `commands` (slash commands; ACP — from a promptless `session/new`, Claude Code — `GET /api/agent/commands`), `context` (`used`, `size`, `model?`, `compactAt?`, `categories?`, `cost?`), `thought`, `task` (contract in [architecture](architecture.md)), `question-request`, `run` (also `X-Agent-Run` and the 202 body, so a broken stream can rejoin), `checkpoint`, `worktree`, `command-request`, and `controls` at the start of a turn.
+`runAgent` (`packages/server/modules/agent/registry.ts`) picks a backend by `backend` from `packages/server/app/agents.ts` (`projector` by default, `codex`, `opencode`, `kimi`, plus enabled plugin agents such as `cursor` and `claude-code`). `AgentBackend` emits the shared events: `text`, `tool`, `tool-result`, `project`, `status`, `done`, `error`, `session`, `permission-request` (`detail` + `persistent`, answered via `POST /api/agent/tool-result` with `{ allow, always? }`, 10-minute single-use id; `always` only when the backend can honor it), `commands` (slash commands; ACP — from a promptless `session/new`, Claude Code — `GET /api/agent/commands`), `context` (`used`, `size`, `model?`, `compactAt?`, `categories?`, `cost?`), `thought`, `task` (contract in [architecture](architecture.md)), `question-request`, `run` (also `X-Agent-Run` and the 202 body, so a broken stream can rejoin), `checkpoint`, `worktree`, `command-request`, and `controls` at the start of a turn.
 
 **Controls and sessions.** `AgentControl` (`controls.ts`: `id`, `category` `model|effort|mode|flag|other`, `current`, `options` with optional `group`) is rendered as received. ACP reads `configOptions` from `session/new`/`session/load` (`thought_level`→effort, `model_config`→flag, boolean → on/off, legacy `models`/`modes` fill gaps) and applies `selection` through `session/set_config_option`, `set_model` or `set_mode` before the prompt, model first; a refused value is skipped. Adapters may add `clientCapabilities` and `normalizeSelection`. Claude Code takes `model` aliases and `effort` natively. HTTP: `GET /api/agent/controls?backend&projectId` (ACP probe cached 5 minutes, probe session always tries `session/delete` then `session/close`), `GET /api/agent/sessions?backend&projectId`, `POST /api/agent/sessions/load|delete`, `GET/PUT /api/agent/defaults`; commands `ide.agent.controls.list`, `ide.agent.control.set`, `ide.agent.sessions.list`, `ide.agent.session.resume|delete` (`confirm: true`).
 
-`projector` is the IDE assistant with catalog tools from `packages/server/modules/agents/projector/tool-specs.ts`. `claude-code` uses the Agent SDK with its own prompt, tools, login, `CLAUDE.md` and settings; Projector adds only enabled features. Permission modes: `default`, `acceptEdits`, `auto` (SDK classifier), `bypassPermissions`. Requires a project; refused with Docker or Dev Container.
+`projector` is the IDE assistant with catalog tools from `packages/server/modules/agents/projector/tool-specs.ts`. `claude-code` comes from the trusted plugin `plugins/claude-code`: the Agent SDK with its own prompt, tools, login, `CLAUDE.md` and settings; Projector adds only enabled features. Permission modes: `default`, `acceptEdits`, `auto` (SDK classifier), `bypassPermissions`. Requires a project; refused with Docker or Dev Container. Its hosted answer is held by `server/app/plugin-runner.ts`.
 
-`codex`, `opencode`, `kimi` are built-in ACP agents over stdio (`agents/<id>/`; programs `opencode acp`, `kimi acp`, `codex-acp`; a global binary is preferred, otherwise `npx -y @agentclientprotocol/codex-acp` outside the project; OpenCode prefers `opencode2 acp` from v2 `@opencode/cli` and falls back to `opencode acp`). Cursor is the example plugin in `plugins/cursor` (`agent acp`): its icon, plan tools and limits arrive with the plugin catalog, not a client module. One JSON-RPC client (`acp-client.ts`) maps `session/update` (`acp-events.ts`), resumes with `session/load` or starts `session/new`, answers `session/request_permission` and cancels with `session/cancel`. A fresh process per turn, never the user's sessions; refused in isolating environments. A new built-in ACP agent = module with `index.ts` + `createAcpBackend`, `terminal` override, row in `packages/server/app/agents.ts`, `ClientAgent` descriptor and row in `packages/client/app/agents.ts`; a plugin agent registers through the trusted package instead.
+`codex`, `opencode`, `kimi` are built-in ACP agents over stdio (`agents/<id>/`; programs `opencode acp`, `kimi acp`, `codex-acp`; a global binary is preferred, otherwise `npx -y @agentclientprotocol/codex-acp` outside the project; OpenCode prefers `opencode2 acp` from v2 `@opencode/cli` and falls back to `opencode acp`). Cursor (`plugins/cursor`, `agent acp`) и Claude Code (`plugins/claude-code`, Agent SDK) — доверенные плагины: их иконка, plan tools и лимиты приходят с каталогом плагина, а не из клиентского модуля. One JSON-RPC client (`acp-client.ts`) maps `session/update` (`acp-events.ts`), resumes with `session/load` or starts `session/new`, answers `session/request_permission` and cancels with `session/cancel`. A fresh process per turn, never the user's sessions; refused in isolating environments. A new built-in ACP agent = module with `index.ts` + `createAcpBackend`, `terminal` override, row in `packages/server/app/agents.ts`, `ClientAgent` descriptor and row in `packages/client/app/agents.ts`; a plugin agent registers through the trusted package instead.
 
 ### Фоновые агенты
 
@@ -291,7 +326,7 @@ The optional `ide` feature gives Claude Code and ACP agents three tools (`list_c
 
 ## Чат
 
-The chat input (`AgentInput.vue`) is a CodeMirror editor with atomic chips (`MessagePart`: `text`, `file`, `image`, `command`); plain text always survives — `message` and history carry the text, `parts`/`content` carry chips. A file chip may carry `range: { from, to }` (lines counted from 1, both ends included): its text is `@path:12-34`, its label `name.ts:12–34`, and a click calls `ide.editor.path.open` with `line`/`endLine` to reveal the same lines. Files come from `@` search (`rg --files` + fuzzy ranking), tree drops (`application/x-projector-tree-entry`) and desktop drops: a path the browser provides is made relative when inside the project, while a file without a path (Windows drag from Explorer) is uploaded as a chat attachment of any type through `POST /api/agent/attachments` (10 MB) and attached by its absolute path; a folder without a path is imported into the project root under a free name without overwriting anything. Pasted or dropped images (PNG, JPEG, GIF, WebP) keep their inline preview. `/` at the start suggests the agent's commands. Claude Code sends images as content blocks; ACP gets a `resource_link` per file and `image` blocks when `promptCapabilities.image` is set. When the last answer ends with `<IntelligentForm>`/`<Form>`, the composer shows it instead of the editor and the sent turn keeps `form: { source, values }`.
+The chat input (`AgentInput.vue`) is a CodeMirror editor with atomic chips (`MessagePart`: `text`, `file`, `image`, `command`); plain text always survives — `message` and history carry the text, `parts`/`content` carry chips. A file chip may carry `range: { from, to }` (lines counted from 1, both ends included): its text is `@path:12-34`, its label `name.ts:12–34`, and a click calls `ide.editor.path.open` with `line`/`endLine` to reveal the same lines. Files come from `@` search (`rg --files` + fuzzy ranking), tree and Git drops (`application/x-projector-tree-entry`) and desktop drops: a path the browser provides is made relative when inside the project, while a file without a path (Windows drag from Explorer) is uploaded as a chat attachment of any type through `POST /api/agent/attachments` (10 MB) and attached by its absolute path; a folder without a path is imported into the project root under a free name without overwriting anything. Pasted or dropped images (PNG, JPEG, GIF, WebP) keep their inline preview. `/` at the start suggests the agent's commands. Claude Code sends images as content blocks; ACP gets a `resource_link` per file and `image` blocks when `promptCapabilities.image` is set. When the last answer ends with `<IntelligentForm>`/`<Form>`, the composer shows it instead of the editor and the sent turn keeps `form: { source, values }`.
 
 `ide.editor.selection.toChat` (`Mod+Shift+L` in the editor scope, and the «В чат» button beside a non-empty selection) adds the focused editor's selection as a range chip without sending: the visible chat wins, then the last chat in use; with no open chat, the newest saved chat opens, or a new Projector chat when none can be reopened. An empty selection means the line under the cursor. The command accepts `{ path?, from?, to?, chat? }` for the agent; range chips are saved with the message, and old messages without ranges load unchanged. With `{ text }` (and an optional `source` label) it appends selected text instead of a range chip: the visual Markdown editor uses this from Crepe's native formatting toolbar, and `ide.terminal.selection.toChat { text, source?, chat? }` does the same for a terminal selection, with its button placed beside the pointer after the drag ends; neither sends the message.
 
@@ -304,13 +339,24 @@ All chat commands are registered once per workspace (`registerAgentCommands` in 
 ## Hub
 
 - `ide.hub.login` — войти в Hub и вернуться к запрошенному устройству.
+- `ide.hub.loginQr.show` — запросить одноразовую ссылку и показать QR-код входа с телефона.
+- `ide.hub.loginQr.hide` — убрать показанный QR-код и ссылку входа.
 - `ide.hub.logout` — отозвать сессию браузера, включая открытые потоки и WebSocket.
 - `ide.hub.devices.refresh` — перечитать устройства и их доступность.
 - `ide.hub.device.open` с `deviceId` — открыть подключённую машину.
+- `ide.hub.device.notify` с `deviceId` и `enabled` — включить или выключить браузерные
+  уведомления от другой машины; собственное устройство не отключается.
+- `ide.hub.notifications.allow` — запросить у браузера разрешение на уведомления Hub.
 - `ide.hub.devices.open` — вернуться из устройства к списку Hub.
 - `ide.hub.connection.save` — сохранить поля локальной формы подключения и обновить туннель.
 - `ide.hub.connection.disconnect` — отключить туннель и удалить credentials.
-- `ide.hub.open` — открыть настроенный Hub в новой вкладке.
+- `ide.hub.open` — открыть настроенный Hub в новой вкладке; на странице Hub — к списку
+  устройств.
+
+Раздел **Hub** служебной группы левой полосы workspace регистрирует `ide.hub.devices.refresh`,
+`ide.hub.device.open`, `ide.hub.device.notify`, `ide.hub.notifications.allow` и `ide.hub.open`
+в собственной области страницы, чтобы те же действия были доступны агенту без открытия
+настроек.
 
 Публичная оболочка Hub использует отдельный реестр команд без запуска runner устройства.
 Подключение меняется только на самой машине, из **Настройки → Hub**; через туннель

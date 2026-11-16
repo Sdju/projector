@@ -1,4 +1,10 @@
-import { isBridgeRequestPending } from "./command-bridge.ts";
+import { isJudgeVerdict, type JudgeVerdict } from "@ai-projector/core/modules/agent-judge/index.ts";
+import { runsChanged } from "./change-events.ts";
+import {
+  isBridgeRequestPending,
+  type AgentQuestion,
+  type SecretDestination,
+} from "./command-bridge.ts";
 
 /** A page watching a run: its own event stream and how to tell it the answer is over. */
 export interface RunViewer {
@@ -8,15 +14,26 @@ export interface RunViewer {
   key?: string;
 }
 
+/** A pending user-facing request of a live run, shown in the notification center. */
+export interface RunPending {
+  id: string;
+  kind: "permission" | "question" | "secret";
+  title: string;
+  tool?: string;
+  detail?: string;
+  persistent?: boolean;
+  judge?: JudgeVerdict;
+  questions?: AgentQuestion[];
+  custom?: boolean;
+  reason?: string;
+  destination?: SecretDestination;
+}
+
 /** Events only one page may act on: a command must run once, not in every viewer. */
 const ACTIONS = new Set(["command-request"]);
+const USER_WAITING = new Set(["permission-request", "question-request", "secret-request"]);
 /** Requests waiting for the user: a page that joins late still sees the unanswered ones. */
-const WAITING = new Set([
-  "command-request",
-  "permission-request",
-  "question-request",
-  "secret-request",
-]);
+const WAITING = new Set(["command-request", ...USER_WAITING]);
 
 interface Entry {
   event: string;
@@ -72,14 +89,17 @@ export function driveRun(id: string, owner: RunViewer): RunDriver {
       if (event === "done" || event === "error") run.delivered ||= run.viewers.size > 0;
       if (ACTIONS.has(event)) run.owner?.emit(event, data);
       else for (const viewer of run.viewers) viewer.emit(event, data);
+      if (USER_WAITING.has(event)) runsChanged();
     },
     finish() {
       if (run.ended) return;
+      const hadWaiting = run.events.some((entry) => USER_WAITING.has(entry.event));
       run.ended = true;
       runs.delete(id);
       for (const viewer of [...run.viewers]) viewer.close();
       run.viewers.clear();
       run.owner = undefined;
+      if (hadWaiting) runsChanged();
     },
     leave: () => leave(run, owner),
     delivered: () => run.delivered,
@@ -119,6 +139,68 @@ export function joinRun(id: string, viewer: RunViewer): (() => void) | undefined
 /** Whether this server is already answering the run. */
 export function isRunDriven(id: string): boolean {
   return runs.has(id);
+}
+
+function previewInput(input: unknown): string | undefined {
+  if (input === undefined) return undefined;
+  if (typeof input === "string") return input.trim().slice(0, 2000) || undefined;
+  try {
+    const text = JSON.stringify(input, null, 2);
+    return text ? text.slice(0, 2000) : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/** Unanswered user-facing requests (permissions with Judge, questions, secrets) for a live run. */
+export function pendingRunRequests(id: string): RunPending[] {
+  const run = runs.get(id);
+  if (!run) return [];
+  const pending: RunPending[] = [];
+  for (const entry of run.events) {
+    if (!USER_WAITING.has(entry.event) || !waiting(entry)) continue;
+    const data = (entry.data ?? {}) as Record<string, unknown>;
+    const requestId = typeof data.id === "string" ? data.id : "";
+    if (!requestId) continue;
+    if (entry.event === "permission-request") {
+      const detail =
+        typeof data.detail === "string" && data.detail.trim()
+          ? data.detail
+          : previewInput(data.input);
+      const tool = typeof data.tool === "string" ? data.tool : "";
+      const title =
+        typeof data.title === "string" && data.title ? data.title : tool || "Разрешение";
+      pending.push({
+        id: requestId,
+        kind: "permission",
+        title,
+        tool,
+        ...(detail ? { detail } : {}),
+        persistent: data.persistent === true,
+        ...(isJudgeVerdict(data.judge) ? { judge: data.judge } : {}),
+      });
+    } else if (entry.event === "question-request") {
+      const questions = Array.isArray(data.questions) ? (data.questions as AgentQuestion[]) : [];
+      pending.push({
+        id: requestId,
+        kind: "question",
+        title: typeof data.title === "string" && data.title ? data.title : "Вопрос агента",
+        questions,
+        custom: data.custom === true,
+      });
+    } else if (entry.event === "secret-request") {
+      pending.push({
+        id: requestId,
+        kind: "secret",
+        title: typeof data.label === "string" && data.label ? data.label : "Секрет",
+        ...(typeof data.reason === "string" && data.reason ? { reason: data.reason } : {}),
+        ...(data.destination && typeof data.destination === "object"
+          ? { destination: data.destination as SecretDestination }
+          : {}),
+      });
+    }
+  }
+  return pending;
 }
 
 /** A command asked while nobody owned the run: the first page that joins answers it. */

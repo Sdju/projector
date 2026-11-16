@@ -7,6 +7,7 @@ import UiEmpty from "../../../common/ui/UiEmpty.vue";
 import UiInline from "../../../common/ui/UiInline.vue";
 import UiLoader from "../../../common/ui/UiLoader.vue";
 import UiMessage from "../../../common/ui/UiMessage.vue";
+import UiStat from "../../../common/ui/UiStat.vue";
 import { countRu } from "../../../common/utilities/plural.ts";
 import { usageTokenSeries, type BreakdownRow } from "../model/rows.ts";
 import {
@@ -78,32 +79,37 @@ const hourEdges = computed(() =>
 
     <template v-if="data">
       <div class="day-stats">
-        <div class="stat">
-          <span class="stat-label">Токены</span>
-          <strong>{{ formatTokens(data.totals.tokens) }}</strong>
-          <span class="stat-hint">{{ countRu(answers, "ответ", "ответа", "ответов") }}</span>
-        </div>
-        <div class="stat">
-          <span class="stat-label">Из кэша</span>
-          <strong>{{ formatPercent(cacheShare * 100) }}</strong>
-          <span class="stat-hint">{{ formatTokens(data.totals.cacheRead) }} токенов</span>
-        </div>
-        <div class="stat">
-          <span class="stat-label">Стоимость</span>
-          <strong>{{ priced ? formatCost(data.totals.cost) : "—" }}</strong>
-          <span class="stat-hint">{{
+        <UiStat
+          frame
+          label="Токены"
+          :value="formatTokens(data.totals.tokens)"
+          :hint="countRu(answers, 'ответ', 'ответа', 'ответов')"
+        />
+        <UiStat
+          frame
+          label="Из кэша"
+          :value="formatPercent(cacheShare * 100)"
+          :hint="`${formatTokens(data.totals.cacheRead)} токенов`"
+        />
+        <UiStat
+          frame
+          label="Стоимость"
+          :value="priced ? formatCost(data.totals.cost) : '—'"
+          :hint="
             !hasUsage
-              ? "нет расхода"
+              ? 'нет расхода'
               : priced
-                ? `${countRu(data.totals.pricedAnswers, "ответ", "ответа", "ответов")} с ценой`
-                : "цена моделей не задана"
-          }}</span>
-        </div>
-        <div v-if="data.serviceCalls" class="stat">
-          <span class="stat-label">Служебные вызовы</span>
-          <strong>{{ data.serviceCalls }}</strong>
-          <span class="stat-hint">Lens, Судья, Доктор</span>
-        </div>
+                ? `${countRu(data.totals.pricedAnswers, 'ответ', 'ответа', 'ответов')} с ценой`
+                : 'цена моделей не задана'
+          "
+        />
+        <UiStat
+          v-if="data.serviceCalls"
+          frame
+          label="Служебные вызовы"
+          :value="data.serviceCalls"
+          hint="Lens, Судья, Доктор"
+        />
       </div>
 
       <UiEmpty v-if="!hasUsage" density="compact" align="start">
@@ -217,26 +223,6 @@ const hourEdges = computed(() =>
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
   gap: var(--sp-2);
-}
-.stat {
-  display: grid;
-  gap: 3px;
-  align-content: start;
-  padding: var(--sp-2) var(--sp-3);
-  border: 1px solid var(--line);
-  border-radius: var(--r-sm);
-}
-.stat-label,
-.stat-hint {
-  color: var(--muted);
-  font-size: var(--fs-2xs);
-}
-.stat strong {
-  color: var(--text);
-  font-size: var(--fs-md);
-  font-weight: 600;
-  line-height: 1.2;
-  font-variant-numeric: tabular-nums;
 }
 .day-chart,
 .day-cell {

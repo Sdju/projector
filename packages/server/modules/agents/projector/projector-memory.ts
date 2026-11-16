@@ -1,7 +1,8 @@
 import { createHash } from "node:crypto";
-import { mkdir, readdir, readFile, rename, rm, writeFile } from "node:fs/promises";
+import { readdir, readFile, rm } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { dataDir } from "@ai-projector/core/modules/app-paths/index.ts";
+import { writeFileAtomic } from "../../atomic-files/index.ts";
 
 export type MemoryScope = "user" | "project";
 
@@ -58,11 +59,8 @@ export async function writeMemory(
     if (scope === "project") await rm(`${path}.path`, { force: true });
     return "";
   }
-  await mkdir(join(path, ".."), { recursive: true });
-  const temporary = `${path}.${process.pid}.tmp`;
-  await writeFile(temporary, `${next}\n`, "utf8");
-  await rename(temporary, path);
-  if (scope === "project" && cwd) await writeFile(`${path}.path`, cwd, "utf8");
+  await writeFileAtomic(path, `${next}\n`);
+  if (scope === "project" && cwd) await writeFileAtomic(`${path}.path`, cwd);
   return next;
 }
 

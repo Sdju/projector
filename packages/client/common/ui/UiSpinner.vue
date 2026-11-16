@@ -4,7 +4,12 @@ defineProps<{ label?: string }>();
 </script>
 
 <template>
-  <IconLoader class="ui-spinner" :aria-hidden="label ? undefined : true" :aria-label="label" />
+  <IconLoader
+    class="ui-spinner"
+    :role="label ? 'img' : undefined"
+    :aria-hidden="label ? undefined : true"
+    :aria-label="label"
+  />
 </template>
 
 <style scoped>

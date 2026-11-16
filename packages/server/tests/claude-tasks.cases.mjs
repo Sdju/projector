@@ -1,5 +1,5 @@
 import { expect, test } from "vite-plus/test";
-import { createClaudeEventMapper } from "../modules/agents/claude-code/claude-code-events.ts";
+import { createClaudeEventMapper } from "../../../plugins/claude-code/src/claude-code-events.ts";
 import { applyAgentEvent } from "../../client/modules/agent-core/model/turn-events.ts";
 
 const system = (subtype, extra) => ({

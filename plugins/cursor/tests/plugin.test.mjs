@@ -19,6 +19,7 @@ import {
   trustPlugin,
 } from "../../../packages/server/modules/plugins/index.ts";
 import { registerBuiltinAgents, syncPluginAgents } from "../../../packages/server/app/agents.ts";
+import { usageLogReaders } from "../../../packages/server/modules/usage-log/index.ts";
 
 const root = fileURLToPath(new URL("../../..", import.meta.url));
 const source = join(root, "plugins/cursor");
@@ -70,6 +71,9 @@ test("the Cursor plugin installs, trusts, loads its code entry and disappears wh
   expect(backend.iconSvg).toMatch(/<svg xmlns="http:\/\/www.w3.org\/2000\/svg"/);
   expect(backend.iconSvg).toMatch(/viewBox="0 0 24 24"/);
   expect(backend.usageWindows?.map((window) => window.name)).toEqual(["total", "auto", "api"]);
+  expect(usageLogReaders().find((reader) => reader.agent === "cursor")).toMatchObject({
+    label: "Cursor",
+  });
   const program = acpProgram("cursor");
   expect(program.dialect).toBeTypeOf("function");
   expect(Object.keys(program.extensions ?? {}).sort()).toEqual([
@@ -123,6 +127,7 @@ test("the Cursor plugin installs, trusts, loads its code entry and disappears wh
 
   await setPluginEnabled(pluginId, false);
   expect(listAgentBackends().some((item) => item.id === "cursor")).toBe(false);
+  expect(usageLogReaders().some((reader) => reader.agent === "cursor")).toBe(false);
   expect(await readAgentUsageLimits("cursor")).toMatchObject({
     status: "unavailable",
     windows: null,

@@ -11,6 +11,7 @@ import {
 import { projectAppUrl } from "@ai-projector/core/modules/app-paths/index.ts";
 import { HttpError } from "../../../../modules/http/index.ts";
 import { isLocalRequest } from "../../../../modules/access/index.ts";
+import { auditProjectTrust } from "../../../../modules/project-trust/index.ts";
 import {
   devcontainerState,
   decideDevcontainer,
@@ -211,7 +212,9 @@ export const routes: RouteDefinition[] = [
       const body = await readBody(context.req);
       if (body.decision !== "trusted" && body.decision !== "declined" && body.decision !== "forget")
         throw new HttpError(400, "decision: trusted, declined или forget");
-      json(context.res, 200, await decideDevcontainer(project, body.decision, body.hash));
+      const state = await decideDevcontainer(project, body.decision, body.hash);
+      void auditProjectTrust(project.id);
+      json(context.res, 200, state);
     },
   },
   {

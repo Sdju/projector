@@ -6,21 +6,32 @@ import {
 } from "../modules/agent/index.ts";
 import { configureAgentPreferences } from "../modules/preferences/index.ts";
 import { configureTerminalPrograms } from "../modules/terminal/index.ts";
-import { claudeCodeBackend } from "../modules/agents/claude-code/index.ts";
 import { codexBackend } from "../modules/agents/codex/index.ts";
 import { kimiBackend } from "../modules/agents/kimi/index.ts";
 import { opencodeBackend } from "../modules/agents/opencode/index.ts";
-import { createPluginAgent, loadCodeAgents } from "../modules/agents/plugin/index.ts";
-import { projectorBackend } from "../modules/agents/projector/index.ts";
-import { isPluginIconFile } from "@ai-projector/core/modules/plugins/index.ts";
 import {
-  configurePluginAgents,
+  clearPluginBalances,
+  createPluginAgent,
+  loadCodeAgents,
+} from "../modules/agents/plugin/index.ts";
+import { projectorBackend } from "../modules/agents/projector/index.ts";
+import {
+  isPluginIconFile,
+  type PluginAgentContribution,
+} from "@ai-projector/core/modules/plugins/index.ts";
+import {
+  configurePluginCode,
   discoverPlugins,
   readPluginIcon,
-  type PluginAgentCandidate,
-  type PluginAgentDiagnostic,
+  type PluginCandidate,
+  type PluginCodeDiagnostic,
 } from "../modules/plugins/index.ts";
 import { registerUsageLogReader, unregisterUsageLogReader } from "../modules/usage-log/index.ts";
+import {
+  beginPluginRoutes,
+  dropPluginRoutes,
+  pluginRoutePlugins,
+} from "../modules/plugin-routes/index.ts";
 import { registerBuiltinAgentFeatures } from "./features.ts";
 
 /** Plugin agent id → package id. Built-ins are everything else in the registry. */
@@ -38,13 +49,7 @@ function registerBackendUsageLog(backend: AgentBackend): void {
  * module stays independent and the generic core never imports one. Registering again replaces.
  */
 export function registerBuiltinAgents(): void {
-  const builtins = [
-    projectorBackend,
-    claudeCodeBackend,
-    codexBackend,
-    opencodeBackend,
-    kimiBackend,
-  ];
+  const builtins = [projectorBackend, codexBackend, opencodeBackend, kimiBackend];
   registerAgentBackend(projectorBackend, { asDefault: true });
   for (const backend of builtins.slice(1)) registerAgentBackend(backend);
   // Native journals live on the backend itself: built-ins and plugin code use one path.
@@ -63,26 +68,26 @@ export function registerBuiltinAgents(): void {
       listAgentBackends().find((backend) => backend.terminal?.program === program)?.terminal,
   );
   // Plugin agents join the same registry. Discovery is async, so the first API request waits.
-  configurePluginAgents(applyPluginAgents);
+  configurePluginCode(applyPluginCatalog);
   ready = undefined;
   void syncPluginAgents();
 }
 
 interface ResolvedAgent {
-  candidate: PluginAgentCandidate;
+  plugin: string;
+  candidate: PluginCandidate;
+  agent: PluginAgentContribution;
   backend: AgentBackend;
-}
-
-function pluginProgram(candidate: PluginAgentCandidate): string {
-  return candidate.agent.program ?? candidate.agent.id;
 }
 
 /** Fills presentation and limits the manifest declared but the code backend may have left out. */
 async function applyDescriptor(
   backend: AgentBackend,
-  candidate: PluginAgentCandidate,
+  candidate: PluginCandidate,
+  agent: PluginAgentContribution,
 ): Promise<void> {
-  const { agent } = candidate;
+  if (!backend.defaultFeatures && agent.defaultFeatures?.length)
+    backend.defaultFeatures = [...agent.defaultFeatures];
   if (!backend.caption && agent.caption) backend.caption = agent.caption;
   if (agent.icon && isPluginIconFile(agent.icon)) {
     if (!candidate.path) throw new Error("Нет каталога пакета для иконки агента");
@@ -93,30 +98,33 @@ async function applyDescriptor(
   if (backend.usage) backend.usageUrl = `/api/agent/usage/${encodeURIComponent(agent.id)}`;
 }
 
-/** Reconciles the registry with the enabled, trusted plugin agents. */
-async function applyPluginAgents(
-  candidates: PluginAgentCandidate[],
-): Promise<PluginAgentDiagnostic[]> {
-  const diagnostics: PluginAgentDiagnostic[] = [];
-  const byPlugin = new Map<string, PluginAgentCandidate[]>();
-  for (const candidate of candidates) {
-    const list = byPlugin.get(candidate.plugin) ?? [];
-    list.push(candidate);
-    byPlugin.set(candidate.plugin, list);
-  }
+/** Plugins whose balance readers are currently registered; removed packages are cleaned up. */
+const pluginBalances = new Set<string>();
+
+/** Reconciles the registry with the enabled, trusted plugin code. */
+async function applyPluginCatalog(candidates: PluginCandidate[]): Promise<PluginCodeDiagnostic[]> {
+  const diagnostics: PluginCodeDiagnostic[] = [];
   const resolved: ResolvedAgent[] = [];
-  for (const [plugin, list] of byPlugin) {
-    const server = list[0]?.server;
-    if (!server) {
-      for (const candidate of list)
+  for (const candidate of candidates) {
+    const plugin = candidate.plugin;
+    if (!candidate.server) {
+      if (candidate.balances.length) {
+        diagnostics.push({
+          plugin,
+          subject: candidate.balances[0]!.kind,
+          message: "Вклады balances требуют projector.server",
+        });
+        continue;
+      }
+      for (const agent of candidate.agents)
         try {
-          const backend = createPluginAgent(candidate.agent);
-          await applyDescriptor(backend, candidate);
-          resolved.push({ candidate, backend });
+          const backend = createPluginAgent(agent);
+          await applyDescriptor(backend, candidate, agent);
+          resolved.push({ plugin, candidate, agent, backend });
         } catch (error) {
           diagnostics.push({
             plugin,
-            agent: candidate.agent.id,
+            subject: agent.id,
             message:
               error instanceof Error ? error.message : "Не удалось подготовить агента плагина",
           });
@@ -124,33 +132,57 @@ async function applyPluginAgents(
       continue;
     }
     try {
-      const backends = await loadCodeAgents(server, list[0]?.hash);
-      const declared = new Map(list.map((candidate) => [candidate.agent.id, candidate]));
+      beginPluginRoutes(plugin);
+      const backends = await loadCodeAgents(candidate.server, candidate.hash, {
+        plugin,
+        balances: candidate.balances,
+        http: candidate.http,
+      });
+      if (candidate.balances.length) pluginBalances.add(plugin);
+      const declared = new Map(candidate.agents.map((agent) => [agent.id, agent]));
       for (const backend of backends) {
-        const candidate = declared.get(backend.id);
-        if (!candidate) {
+        const agent = declared.get(backend.id);
+        if (!agent) {
           diagnostics.push({
             plugin,
-            agent: backend.id,
+            subject: backend.id,
             message: "Код плагина вернул агента, которого нет в манифесте",
           });
           continue;
         }
-        await applyDescriptor(backend, candidate);
-        resolved.push({ candidate, backend });
+        await applyDescriptor(backend, candidate, agent);
+        resolved.push({ plugin, candidate, agent, backend });
       }
-      for (const candidate of list)
-        if (!backends.some((backend) => backend.id === candidate.agent.id))
+      for (const agent of candidate.agents)
+        if (!backends.some((backend) => backend.id === agent.id))
           diagnostics.push({
             plugin,
-            agent: candidate.agent.id,
+            subject: agent.id,
             message: "Код плагина не вернул заявленного агента",
           });
     } catch (error) {
+      clearPluginBalances(plugin);
+      pluginBalances.delete(plugin);
+      dropPluginRoutes(plugin);
       const message = error instanceof Error ? error.message : "Не удалось загрузить код плагина";
-      for (const candidate of list)
-        diagnostics.push({ plugin, agent: candidate.agent.id, message });
+      for (const agent of candidate.agents)
+        diagnostics.push({ plugin, subject: agent.id, message });
+      for (const balance of candidate.balances)
+        diagnostics.push({ plugin, subject: balance.kind, message });
+      for (const route of candidate.http) diagnostics.push({ plugin, subject: route.id, message });
     }
+  }
+
+  // A disabled, removed or broken package must not keep its balance reader in the process.
+  const active = new Set(candidates.map((candidate) => candidate.plugin));
+  for (const plugin of pluginBalances) {
+    if (active.has(plugin)) continue;
+    clearPluginBalances(plugin);
+    pluginBalances.delete(plugin);
+  }
+  for (const plugin of pluginRoutePlugins()) {
+    if (active.has(plugin)) continue;
+    dropPluginRoutes(plugin);
   }
 
   const builtins = listAgentBackends().filter(({ id }) => !pluginAgents.has(id));
@@ -159,25 +191,25 @@ async function applyPluginAgents(
   const accepted = new Map<string, ResolvedAgent>();
   for (const entry of resolved) {
     const id = entry.backend.id;
-    const program = entry.backend.program ?? pluginProgram(entry.candidate);
+    const program = entry.backend.program ?? entry.agent.program ?? entry.agent.terminal?.program;
     if (usedIds.has(id)) {
       diagnostics.push({
-        plugin: entry.candidate.plugin,
-        agent: id,
+        plugin: entry.plugin,
+        subject: id,
         message: `Идентификатор агента уже занят: ${id}`,
       });
       continue;
     }
-    if (usedPrograms.has(program)) {
+    if (program !== undefined && usedPrograms.has(program)) {
       diagnostics.push({
-        plugin: entry.candidate.plugin,
-        agent: id,
+        plugin: entry.plugin,
+        subject: id,
         message: `Терминальная программа уже занята: ${program}`,
       });
       continue;
     }
     usedIds.add(id);
-    usedPrograms.add(program);
+    if (program !== undefined) usedPrograms.add(program);
     accepted.set(id, entry);
   }
 
@@ -188,7 +220,7 @@ async function applyPluginAgents(
     } catch (error) {
       diagnostics.push({
         plugin: pluginAgents.get(id) ?? "",
-        agent: id,
+        subject: id,
         message: error instanceof Error ? error.message : "Не удалось убрать агента",
       });
     } finally {
@@ -200,11 +232,11 @@ async function applyPluginAgents(
     try {
       registerAgentBackend(entry.backend);
       registerBackendUsageLog(entry.backend);
-      pluginAgents.set(id, entry.candidate.plugin);
+      pluginAgents.set(id, entry.plugin);
     } catch (error) {
       diagnostics.push({
-        plugin: entry.candidate.plugin,
-        agent: id,
+        plugin: entry.plugin,
+        subject: id,
         message: error instanceof Error ? error.message : "Не удалось зарегистрировать агента",
       });
     }

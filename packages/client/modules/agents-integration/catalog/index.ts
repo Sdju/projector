@@ -4,6 +4,8 @@ import IconBot from "~icons/lucide/bot";
 import IconCode from "~icons/lucide/code";
 import IconSparkles from "~icons/lucide/sparkles";
 import IconTerminal from "~icons/lucide/terminal";
+import { findRuntimeAgent, runtimeAgents } from "../../plugin-runtime/index.ts";
+import { PluginCustomUsageIndicator } from "../usage/index.ts";
 import { iconFromSvg, iconNodesFromSvg } from "./icon.ts";
 import { readTodosPlan, type AgentPlanReader } from "./plan.ts";
 
@@ -36,6 +38,8 @@ export interface ClientAgent {
   usageProps?: Record<string, unknown>;
   /** How the agent keeps its task list, if it has one. */
   plan?: AgentPlanReader;
+  /** Plugin-provided label for a tool call the shared chat does not name itself. */
+  toolLabel?: (call: { name: string; input?: string; kind?: string }) => string | undefined;
 }
 
 /** The agents a plugin added at runtime; a local descriptor with the same id always wins. */
@@ -64,6 +68,30 @@ function iconFromRemote(item: RemoteAgent): Component {
     : iconOf(item.icon);
 }
 
+/** Overlays live browser-plugin contributions without replacing a local usage indicator. */
+function withRuntimeAgent(agent: ClientAgent): ClientAgent {
+  void runtimeAgents.value;
+  const runtime = findRuntimeAgent(agent.backend);
+  if (!runtime) return agent;
+  return {
+    ...agent,
+    ...(runtime.plan ? { plan: runtime.plan } : {}),
+    ...(runtime.toolLabel ? { toolLabel: runtime.toolLabel } : {}),
+    ...(runtime.mountUsage && !agent.usage
+      ? {
+          usage: PluginCustomUsageIndicator,
+          usageProps: {
+            agentId: agent.backend,
+            title: agent.title,
+            usageUrl: agent.usageUrl,
+            packageName: runtime.packageName,
+            instance: runtime.instance,
+          },
+        }
+      : {}),
+  };
+}
+
 function planFromRemote(item: RemoteAgent): AgentPlanReader | undefined {
   const tools =
     item.plan && typeof item.plan === "object"
@@ -84,7 +112,7 @@ export function registerClientAgent(agent: ClientAgent): void {
 /** Every registered agent, in registration order. */
 export function clientAgents(): ClientAgent[] {
   void revision.value;
-  return [...agents.values()];
+  return [...agents.values()].map(withRuntimeAgent);
 }
 
 /** The external agent behind a terminal program; the built-in agent has none. */
@@ -96,7 +124,8 @@ export function clientAgentOf(program: string): ClientAgent | undefined {
 /** The agent behind a chat backend, built-in included. */
 export function clientAgentByBackend(backend: string): ClientAgent | undefined {
   void revision.value;
-  return agents.get(backend);
+  const agent = agents.get(backend);
+  return agent ? withRuntimeAgent(agent) : undefined;
 }
 
 /** Terminal programs of the external agents, in registration order. */

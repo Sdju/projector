@@ -1,6 +1,12 @@
 import type {
   AvailableTheme,
   PluginAgentContribution,
+  PluginBalanceContribution,
+  PluginBrowserEntry,
+  PluginHttpContribution,
+  PluginLanguageContribution,
+  PluginPanelContribution,
+  PluginTabContribution,
 } from "@ai-projector/core/modules/plugins/index.ts";
 
 export type PluginStatus = "enabled" | "disabled" | "error" | "missing";
@@ -12,13 +18,21 @@ export interface PluginInfo {
   status: PluginStatus;
   enabled: boolean;
   trusted: boolean;
+  requiresTrust?: boolean;
   code?: boolean;
   hash?: string;
   server?: string;
+  browser?: PluginBrowserEntry & { hash: string };
   path?: string;
   diagnostics: { message: string }[];
   themes: AvailableTheme[];
   agents: PluginAgentContribution[];
+  balances: PluginBalanceContribution[];
+  http: PluginHttpContribution[];
+  languages: PluginLanguageContribution[];
+  panels: PluginPanelContribution[];
+  tabs: PluginTabContribution[];
+  dependencies?: Record<string, string>;
 }
 
 export interface PluginCatalog {
@@ -27,8 +41,10 @@ export interface PluginCatalog {
   availableThemes: AvailableTheme[];
 }
 
+import { deviceUrl } from "../../common/utilities/device-url.ts";
+
 async function request<T>(init?: RequestInit): Promise<T> {
-  const response = await fetch("/api/plugins", {
+  const response = await fetch(deviceUrl("/api/plugins"), {
     ...init,
     headers: { "Content-Type": "application/json" },
   });
@@ -37,15 +53,25 @@ async function request<T>(init?: RequestInit): Promise<T> {
   return data;
 }
 
-/** Older servers and test fixtures omit the agent fields; the screen still needs arrays. */
+/** Older servers and test fixtures omit newer fields; the screen and runtime still need arrays. */
 function normalizeCatalog(catalog: PluginCatalog): PluginCatalog {
   return {
     ...catalog,
     plugins: catalog.plugins.map((plugin) => ({
       ...plugin,
       trusted: plugin.trusted === true,
+      requiresTrust:
+        plugin.requiresTrust ??
+        (plugin.code === true ||
+          (plugin.agents?.length ?? 0) > 0 ||
+          (plugin.balances?.length ?? 0) > 0),
       code: plugin.code === true,
       agents: Array.isArray(plugin.agents) ? plugin.agents : [],
+      balances: Array.isArray(plugin.balances) ? plugin.balances : [],
+      http: Array.isArray(plugin.http) ? plugin.http : [],
+      languages: Array.isArray(plugin.languages) ? plugin.languages : [],
+      panels: Array.isArray(plugin.panels) ? plugin.panels : [],
+      tabs: Array.isArray(plugin.tabs) ? plugin.tabs : [],
     })),
   };
 }
@@ -64,7 +90,7 @@ export function pluginAction(
 }
 
 export async function saveAppearance(choice: string): Promise<void> {
-  const response = await fetch("/api/appearance", {
+  const response = await fetch(deviceUrl("/api/appearance"), {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ choice }),

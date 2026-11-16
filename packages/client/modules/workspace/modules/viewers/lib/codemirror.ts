@@ -10,15 +10,15 @@ import {
 } from "@codemirror/state";
 import {
   HighlightStyle,
-  LanguageDescription,
   highlightingFor,
   language,
   syntaxHighlighting,
 } from "@codemirror/language";
-import { languages } from "@codemirror/language-data";
 import { oneDark } from "@codemirror/theme-one-dark";
 import { Chunk } from "@codemirror/merge";
 import { highlightTree, tags as t } from "@lezer/highlight";
+import { findLanguage } from "../../../../plugin-runtime/index.ts";
+import { fallbackLanguageOf, pluginLanguageExtension } from "./plugin-language.ts";
 import type { EditorTheme } from "@ai-projector/core/modules/editor-themes/index.ts";
 
 const palette = {
@@ -29,7 +29,7 @@ const palette = {
   selection: "#3a3934",
   gutter: "#73736b",
 };
-function projectorTheme(soft: boolean): Extension {
+function projectorTheme(soft: boolean, fontSize: number): Extension {
   const base = EditorView.theme(
     {
       "&": { backgroundColor: palette.bg, color: palette.fg, height: "100%" },
@@ -46,12 +46,19 @@ function projectorTheme(soft: boolean): Extension {
       ".cm-searchMatch": { backgroundColor: "#61533b70" },
       ".cm-searchMatch-selected": { backgroundColor: "#61533b" },
       "&.cm-focused": { outline: "none" },
-      ".cm-scroller": { fontFamily: '"Noto Sans Mono", monospace', fontSize: "13px" },
+      ".cm-scroller": {
+        fontFamily: '"Noto Sans Mono", monospace',
+        fontSize: `${fontSize}px`,
+      },
     },
     { dark: true },
   );
   if (!soft) return [base, syntaxHighlighting(classic)];
   return [base, syntaxHighlighting(softStyle)];
+}
+
+function editorFontSizeTheme(fontSize: number): Extension {
+  return EditorView.theme({ ".cm-scroller": { fontSize: `${fontSize}px` } });
 }
 const classic = HighlightStyle.define([
   { tag: [t.keyword, t.operatorKeyword], color: "#c678dd" },
@@ -80,24 +87,20 @@ const softStyle = HighlightStyle.define([
   { tag: t.link, color: "#a0b7aa", textDecoration: "underline" },
 ]);
 
-export function themeExtension(theme: EditorTheme): Extension {
-  if (theme === "projector-soft") return projectorTheme(true);
-  if (theme === "projector") return projectorTheme(false);
-  return oneDark;
+export function themeExtension(theme: EditorTheme, fontSize: number): Extension {
+  if (theme === "projector-soft") return projectorTheme(true, fontSize);
+  if (theme === "projector") return projectorTheme(false, fontSize);
+  return [oneDark, editorFontSizeTheme(fontSize)];
 }
 export const themeCompartment = new Compartment();
 export const languageCompartment = new Compartment();
 
-const languageOf = (path: string) =>
-  LanguageDescription.matchFilename(languages, path.split("/").at(-1) ?? path);
-
-/** Язык подсветки, определённый по имени файла, или `null`, если он неизвестен. */
-export function languageLabel(path: string): string | null {
-  return languageOf(path)?.name ?? null;
-}
+export { languageLabel } from "./plugin-language.ts";
 
 export async function languageExtension(path: string): Promise<Extension> {
-  const description = languageOf(path);
+  const plugin = findLanguage(path);
+  if (plugin) return pluginLanguageExtension(plugin);
+  const description = fallbackLanguageOf(path);
   return description ? await description.load() : [];
 }
 

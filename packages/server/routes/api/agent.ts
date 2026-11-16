@@ -17,6 +17,8 @@ import {
   completeCommandRequest,
   cancelRun,
   listLiveRuns,
+  listRecentRuns,
+  runsChanged,
   agentCatalogRevision,
   listAgentBackends,
   injectMessage,
@@ -109,11 +111,12 @@ async function withoutInjectedTitles(
 ): Promise<AgentSessionInfo[]> {
   const suspicious = (title: string) =>
     title.includes(FEATURE_PROMPT_END) || title.startsWith("[Projector]");
-  if (!sessions.some((session) => suspicious(session.title))) return sessions;
   const chats = projectId ? readRecentChats(projectId, backend) : [];
   const chatOf = new Map(
     chats.flatMap((chat) => (chat.session ? [[chat.session, chat] as const] : [])),
   );
+  if (!sessions.some((session) => suspicious(session.title) || chatOf.has(session.id)))
+    return sessions;
   const prompts = new Map<string, string>();
   const legacyOf = async (chat?: string) => {
     const key = chat ?? "";
@@ -127,11 +130,13 @@ async function withoutInjectedTitles(
   };
   return Promise.all(
     sessions.map(async (session) => {
-      if (!suspicious(session.title)) return session;
       const chat = chatOf.get(session.id);
+      // Cursor auto-names from the injected abilities ("Projector Widgets Guide"): the chat
+      // already stores the user's words, even when the native title has no marker.
+      if (chat?.title) return { ...session, title: chat.title };
+      if (!suspicious(session.title)) return session;
       const title = sessionTitleWithoutInjected(session.title, await legacyOf(chat?.chat));
-      if (title !== session.title) return { ...session, title };
-      return chat?.title ? { ...session, title: chat.title } : session;
+      return title !== session.title ? { ...session, title } : session;
     }),
   );
 }
@@ -164,10 +169,27 @@ function historyState<Turns>(id: string, turns: Turns) {
   };
 }
 
+/** Settle stale background rows and drop harness-only user turns before the chat paints them. */
+async function loadHistoryForClient(id: string) {
+  const turns = await readAgentHistory(id);
+  let changed = false;
+  if (id.startsWith("kimi:")) {
+    const { hydrateKimiHistoryTasks } = await import("../../modules/agents/kimi/index.ts");
+    if (hydrateKimiHistoryTasks(turns)) changed = true;
+  }
+  const { sanitizeHarnessTurns } = await import("../../modules/agent/index.ts");
+  if (sanitizeHarnessTurns(turns)) changed = true;
+  if (id.startsWith("opencode:")) {
+    const { settleOpenCodeHistoryTasks } = await import("../../modules/agents/opencode/index.ts");
+    if (settleOpenCodeHistoryTasks(turns)) changed = true;
+  }
+  return changed ? writeAgentHistory(id, turns) : turns;
+}
+
 export const routes: RouteDefinition[] = [
   route("GET", "/api/agent/history/:id", async ({ res, params }) => {
     const id = decodeURIComponent(params.id!);
-    json(res, 200, historyState(id, await readAgentHistory(id)));
+    json(res, 200, historyState(id, await loadHistoryForClient(id)));
   }),
   route("PUT", "/api/agent/history/:id", async ({ req, res, params }) => {
     const id = decodeURIComponent(params.id!);
@@ -310,6 +332,7 @@ export const routes: RouteDefinition[] = [
       output: body.output,
       error: asString(body.error) || undefined,
     });
+    if (accepted) runsChanged();
     json(res, accepted ? 200 : 410, { accepted });
   }),
   route("POST", "/api/agent/inject", async ({ req, res }) => {
@@ -326,7 +349,8 @@ export const routes: RouteDefinition[] = [
     json(res, accepted ? 200 : 410, { accepted });
   }),
   route("GET", "/api/agent/runs", async ({ res }) => {
-    json(res, 200, { runs: await listLiveRuns() });
+    const [runs, recent] = await Promise.all([listLiveRuns(), listRecentRuns()]);
+    json(res, 200, { runs, recent });
   }),
   route("POST", "/api/agent/cancel", async ({ req, res }) => {
     const body = await readBody(req);

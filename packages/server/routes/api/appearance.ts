@@ -1,22 +1,28 @@
 import {
   appearanceOptions,
   type AppearanceChoice,
+  type AppearanceFonts,
 } from "@ai-projector/core/modules/appearance/index.ts";
 import {
   themeStyleProperties,
   type AvailableTheme,
 } from "@ai-projector/core/modules/plugins/index.ts";
-import { readAppearanceChoice, writeAppearanceChoice } from "../../modules/appearance/index.ts";
+import { readAppearance, writeAppearance } from "../../modules/appearance/index.ts";
 import { discoverPlugins } from "../../modules/plugins/index.ts";
 import { json, readBody, type RouteDefinition } from "../../modules/transport/index.ts";
 import { accessAllowed } from "../../modules/access/index.ts";
 import { HttpError } from "../../modules/http/index.ts";
 
 /**
- * A blocking classic script in <head>: it applies the saved scheme before the app and styles paint.
- * The response is built per request, so changing the theme needs neither a rebuild nor a page reload.
+ * A blocking classic script in <head>: it applies the saved scheme and chat font before paint.
+ * The response is built per request, so changing appearance needs neither a rebuild nor a reload.
  */
-function bootstrapScript(choice: AppearanceChoice, theme?: AvailableTheme): string {
+function bootstrapScript(
+  choice: AppearanceChoice,
+  fonts: AppearanceFonts,
+  theme?: AvailableTheme,
+): string {
+  const chatFs = `${fonts.chat}px`;
   if (!theme) {
     const scheme = ["dark", "light", "contrast", "auto"].includes(choice) ? choice : "dark";
     return `(() => {
@@ -31,6 +37,7 @@ function bootstrapScript(choice: AppearanceChoice, theme?: AvailableTheme): stri
   const mode = scheme === "light" ? "light" : "dark";
   root.dataset.appearance = choice;
   root.dataset.theme = scheme;
+  root.style.setProperty("--chat-fs", ${JSON.stringify(chatFs)});
   document.querySelector('meta[name="color-scheme"]')?.setAttribute("content", mode);
 })();
 `;
@@ -43,6 +50,7 @@ function bootstrapScript(choice: AppearanceChoice, theme?: AvailableTheme): stri
   const mode = ${JSON.stringify(theme.mode)};
   root.dataset.appearance = choice;
   root.dataset.theme = scheme;
+  root.style.setProperty("--chat-fs", ${JSON.stringify(chatFs)});
   const properties = ${JSON.stringify(properties)};
   for (const [name, value] of Object.entries(properties)) root.style.setProperty(name, value);
   document.querySelector('meta[name="color-scheme"]')?.setAttribute("content", mode);
@@ -52,11 +60,15 @@ function bootstrapScript(choice: AppearanceChoice, theme?: AvailableTheme): stri
 }
 
 async function appearanceResponse() {
-  const [choice, catalog] = await Promise.all([readAppearanceChoice(), discoverPlugins()]);
+  const [settings, catalog] = await Promise.all([readAppearance(), discoverPlugins()]);
   const builtinThemes = appearanceOptions
     .filter((option) => option.id !== "auto")
     .map((option) => ({ ...option }));
-  return { choice, themes: [...builtinThemes, ...catalog.availableThemes] };
+  return {
+    choice: settings.choice,
+    fonts: settings.fonts,
+    themes: [...builtinThemes, ...catalog.availableThemes],
+  };
 }
 
 export const routes: RouteDefinition[] = [
@@ -69,9 +81,11 @@ export const routes: RouteDefinition[] = [
       res.setHeader("Content-Type", "text/javascript; charset=utf-8");
       res.setHeader("X-Content-Type-Options", "nosniff");
       res.setHeader("Cache-Control", "no-store");
-      const choice = await readAppearanceChoice();
-      const theme = (await discoverPlugins()).availableThemes.find((item) => item.id === choice);
-      res.end(bootstrapScript(choice, theme));
+      const settings = await readAppearance();
+      const theme = (await discoverPlugins()).availableThemes.find(
+        (item) => item.id === settings.choice,
+      );
+      res.end(bootstrapScript(settings.choice, settings.fonts, theme));
     },
   },
   {
@@ -92,15 +106,14 @@ export const routes: RouteDefinition[] = [
         throw new HttpError(403, "Настройки доступны только со страницы Projector");
       res.setHeader("Cache-Control", "no-store");
       const body = await readBody(req);
+      if (body.choice === undefined && body.fonts === undefined)
+        throw new HttpError(400, "Укажите choice или fonts");
       const catalog = await discoverPlugins();
-      json(
-        res,
-        200,
-        await writeAppearanceChoice(
-          body.choice,
-          catalog.availableThemes.map((theme) => theme.id),
-        ),
+      const settings = await writeAppearance(
+        { choice: body.choice, fonts: body.fonts },
+        catalog.availableThemes.map((theme) => theme.id),
       );
+      json(res, 200, { choice: settings.choice, fonts: settings.fonts });
     },
   },
   {

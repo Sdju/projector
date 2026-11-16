@@ -40,11 +40,20 @@ const request = (origin, path, method = "GET", body) =>
     body: body === undefined ? undefined : JSON.stringify(body),
   });
 
+// The body explains a failed write (a permission or lock message from the OS), the code alone does not.
+const expectState = async (response, status) => {
+  const text = await response.text();
+  expect(response.status, text).toBe(status);
+  return text ? JSON.parse(text) : undefined;
+};
+
 test("project roles API creates, trusts, updates and deletes a role", async () => {
   await withServer(async (origin, project) => {
-    const initial = await request(origin, "/api/agent/project-roles?projectId=p1");
-    expect(initial.status).toBe(200);
-    expect(await initial.json()).toMatchObject({
+    const initial = await expectState(
+      await request(origin, "/api/agent/project-roles?projectId=p1"),
+      200,
+    );
+    expect(initial).toMatchObject({
       projectId: "p1",
       path: project,
       exists: false,
@@ -52,49 +61,52 @@ test("project roles API creates, trusts, updates and deletes a role", async () =
       roles: [],
     });
 
-    const createdResponse = await request(origin, "/api/agent/project-roles", "POST", {
-      projectId: "p1",
-      role: {
-        name: "Ревьюер проекта",
-        agent: "projector",
-        selection: { provider: "env:test" },
-      },
-    });
-    expect(createdResponse.status).toBe(201);
-    const created = await createdResponse.json();
+    const created = await expectState(
+      await request(origin, "/api/agent/project-roles", "POST", {
+        projectId: "p1",
+        role: {
+          name: "Ревьюер проекта",
+          agent: "projector",
+          selection: { provider: "env:test" },
+        },
+      }),
+      201,
+    );
     expect(created).toMatchObject({ exists: true, trusted: false });
     expect(created.roles).toHaveLength(1);
     const role = created.roles[0];
 
-    const denied = await request(origin, "/api/agent/project-roles/trust", "PUT", {
-      projectId: "p1",
-      trusted: true,
-    });
-    expect(denied.status).toBe(200);
-    const trusted = await denied.json();
+    const trusted = await expectState(
+      await request(origin, "/api/agent/project-roles/trust", "PUT", {
+        projectId: "p1",
+        trusted: true,
+      }),
+      200,
+    );
     expect(trusted.trusted).toBe(true);
 
-    const updated = await request(origin, `/api/agent/project-roles/${role.id}`, "PUT", {
-      projectId: "p1",
-      role: { ...role, name: "Старший ревьюер" },
-    });
-    expect(updated.status).toBe(200);
-    const afterUpdate = await updated.json();
+    const afterUpdate = await expectState(
+      await request(origin, `/api/agent/project-roles/${role.id}`, "PUT", {
+        projectId: "p1",
+        role: { ...role, name: "Старший ревьюер" },
+      }),
+      200,
+    );
     expect(afterUpdate).toMatchObject({ trusted: false });
     expect(afterUpdate.roles[0].name).toBe("Старший ревьюер");
 
-    const deleted = await request(
-      origin,
-      `/api/agent/project-roles/${role.id}?projectId=p1`,
-      "DELETE",
+    const afterDelete = await expectState(
+      await request(origin, `/api/agent/project-roles/${role.id}?projectId=p1`, "DELETE"),
+      200,
     );
-    expect(deleted.status).toBe(200);
-    expect((await deleted.json()).roles).toEqual([]);
+    expect(afterDelete.roles).toEqual([]);
 
-    const badAgent = await request(origin, "/api/agent/project-roles", "POST", {
-      projectId: "p1",
-      role: { name: "Плохая", agent: "nope", selection: {} },
-    });
-    expect(badAgent.status).toBe(400);
+    await expectState(
+      await request(origin, "/api/agent/project-roles", "POST", {
+        projectId: "p1",
+        role: { name: "Плохая", agent: "nope", selection: {} },
+      }),
+      400,
+    );
   });
 });

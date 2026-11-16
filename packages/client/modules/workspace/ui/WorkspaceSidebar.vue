@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { computed, watch } from "vue";
+import { computed, provide, shallowReactive, ref, watch } from "vue";
+import { sectionRefreshKey } from "../../../common/ui/UiSectionRefresh.vue";
 import type { SidebarRegistry, WorkspaceCapabilities } from "../../workspace-api/index.ts";
 import type { GitBranchesState, GitHistoryState, GitOverviewState } from "../modules/git/index.ts";
 import type { useGitChangeSync } from "../lib/git-change-sync.ts";
@@ -8,8 +9,16 @@ import type { OpenFile } from "../open-file.ts";
 import type { FileScope } from "@ai-projector/core/modules/workspace/index.ts";
 import { baseSidebarViews, type SidebarHost, type SidebarViews } from "../lib/sidebar-views.ts";
 import SidebarTabs from "./SidebarTabs.vue";
+import UiSpinner from "../../../common/ui/UiSpinner.vue";
 import IconRefresh from "~icons/lucide/rotate-cw";
 import IconX from "~icons/lucide/x";
+
+type SidebarPanel = {
+  refresh?: () => unknown;
+  reveal?: (path: string) => void;
+  search?: () => unknown;
+  refreshing?: boolean;
+};
 
 /** Боковая панель проекта: переключатель разделов и панель выбранного раздела. */
 const props = defineProps<{
@@ -26,16 +35,10 @@ const props = defineProps<{
   gitSync: ReturnType<typeof useGitChangeSync>;
   /** Panels of the sections the embedding page owns. */
   views?: SidebarViews;
+  /** Awaits commands in the editor scope; plugin panels receive the real result. */
+  executeCommand?: (id: string, args?: unknown) => Promise<unknown>;
   /** Разделы — вертикальная полоса-остров слева; иначе вкладки сверху панели (мобильный вид). */
   rail?: boolean;
-  /** Сторона рабочей области: полоса и панель разворачиваются зеркально. */
-  side?: "left" | "right";
-  /** Команда, сворачивающая и раскрывающая панель с полосы разделов. */
-  toggleCommand?: string;
-  /** Команда кнопки обновления раздела. */
-  refreshCommand?: string;
-  /** Команда закрытия временного раздела. */
-  closeCommand?: string;
 }>();
 const section = defineModel<string>("section", { required: true });
 const emit = defineEmits<{
@@ -48,8 +51,9 @@ const emit = defineEmits<{
   openCommitTree: [hash: string];
   openSearch: [scope: FileScope];
 }>();
-const views = { ...baseSidebarViews, ...props.views };
-const panels = new Map<string, { refresh?: () => unknown; [name: string]: unknown }>();
+const views = computed<SidebarViews>(() => ({ ...baseSidebarViews, ...props.views }));
+const panels = shallowReactive(new Map<string, SidebarPanel>());
+const localRefreshing = ref(false);
 const host: SidebarHost = {
   get projectId() {
     return props.projectId;
@@ -89,6 +93,10 @@ const host: SidebarHost = {
   openPullFile: (number, path, head, pinned) =>
     props.files.openPullFile(number, path, head, !pinned),
   command: (id, args) => emit("command", id, args),
+  executeCommand: (id, args) =>
+    props.executeCommand
+      ? props.executeCommand(id, args)
+      : Promise.resolve().then(() => emit("command", id, args)),
   refreshWorkspace: () => emit("refresh"),
   changed: () => emit("changed"),
   deleted: (path) => emit("deleted", path),
@@ -104,10 +112,11 @@ const items = computed(() => {
     group?: string;
     kind: string;
     closable?: boolean;
+    utility?: boolean;
   }> = [];
   for (const type of props.sections.list()) {
     const kind = type.kind ?? type.id;
-    const view = views[kind];
+    const view = views.value[kind];
     if (!view) continue;
     result.push({
       id: type.id,
@@ -118,25 +127,41 @@ const items = computed(() => {
       group: type.group && props.sections.has(type.group) ? type.group : undefined,
       kind,
       closable: type.closable,
+      utility: type.utility,
     });
   }
   return result;
 });
 const viewOf = (id: string) => {
   const type = props.sections.get(id);
-  return views[type?.kind ?? id];
+  return views.value[type?.kind ?? id];
 };
 const activeType = computed(() => props.sections.get(section.value));
 const activeView = computed(() => {
   const type = activeType.value;
-  return type ? views[type.kind ?? type.id] : undefined;
+  return type ? views.value[type.kind ?? type.id] : undefined;
 });
 const setPanel = (id: string, panel: unknown) =>
-  panel ? panels.set(id, panel as never) : panels.delete(id);
-function refresh() {
+  panel ? panels.set(id, panel as SidebarPanel) : panels.delete(id);
+const refreshing = computed(() => localRefreshing.value || !!panels.get(section.value)?.refreshing);
+const refreshCommandId = computed(() => "ide.workbench.sidebar.refresh");
+provide(sectionRefreshKey, {
+  refreshing,
+  command: refreshCommandId,
+  run: () => emit("command", refreshCommandId.value),
+});
+async function refresh() {
+  if (localRefreshing.value) return;
   const view = viewOf(section.value);
-  if (view?.refresh) view.refresh(host, panels.get(section.value));
-  else emit("refresh");
+  const result = view?.refresh ? view.refresh(host, panels.get(section.value)) : emit("refresh");
+  if (result && typeof result === "object" && "then" in result) {
+    localRefreshing.value = true;
+    try {
+      await result;
+    } finally {
+      localRefreshing.value = false;
+    }
+  }
 }
 watch(section, (id) => viewOf(id)?.activate?.(host));
 /** Как в WebStorm: клик по активному разделу сворачивает панель, клик при свёрнутой — раскрывает. */
@@ -145,8 +170,7 @@ function select(id: string) {
     section.value = id;
     return;
   }
-  if (props.hidden || section.value === id)
-    emit("command", props.toggleCommand ?? "ide.workbench.sidebar.toggle");
+  if (props.hidden || section.value === id) emit("command", "ide.workbench.sidebar.toggle");
   section.value = id;
 }
 
@@ -163,17 +187,17 @@ defineExpose({
   <aside
     v-show="rail || !hidden"
     class="sidebar"
-    :class="{ 'with-rail': rail, 'side-right': side === 'right' }"
-    :aria-label="side === 'right' ? 'Дополнительные панели' : 'Обзор проекта'"
+    :class="{ 'with-rail': rail }"
+    aria-label="Обзор проекта"
   >
     <SidebarTabs
       :section="section"
       :items="items"
       :vertical="rail"
       :collapsed="rail && hidden"
-      :project-settings="side !== 'right' && capabilities.settings"
-      :label="side === 'right' ? 'Дополнительные панели' : 'Разделы проекта'"
-      :scope-id="side === 'right' ? 'aside-sections' : 'sidebar-sections'"
+      :refreshing="refreshing"
+      :project-settings="capabilities.settings"
+      label="Разделы проекта"
       @update:section="select"
       @command="(id, args) => emit('command', id, args)"
     />
@@ -196,8 +220,8 @@ defineExpose({
           class="panel-head-close"
           :title="`Закрыть «${activeType.title}»`"
           :aria-label="`Закрыть «${activeType.title}»`"
-          :data-command="closeCommand ?? 'ide.workbench.section.close'"
-          @click="emit('command', closeCommand ?? 'ide.workbench.section.close', { section })"
+          data-command="ide.workbench.section.close"
+          @click="emit('command', 'ide.workbench.section.close', { section })"
         >
           <IconX aria-hidden="true" />
         </button>
@@ -207,20 +231,24 @@ defineExpose({
         class="panel-close"
         title="Закрыть раздел"
         aria-label="Закрыть раздел"
-        :data-command="closeCommand ?? 'ide.workbench.section.close'"
-        @click="emit('command', closeCommand ?? 'ide.workbench.section.close', { section })"
+        data-command="ide.workbench.section.close"
+        @click="emit('command', 'ide.workbench.section.close', { section })"
       >
         <IconX aria-hidden="true" />
       </button>
       <button
-        v-if="rail"
+        v-if="rail && !activeView?.refreshGutter"
         class="panel-refresh"
+        :class="{ busy: refreshing }"
         title="Обновить раздел"
-        aria-label="Обновить раздел"
-        :data-command="refreshCommand ?? 'ide.workbench.sidebar.refresh'"
-        @click="emit('command', refreshCommand ?? 'ide.workbench.sidebar.refresh')"
+        :aria-label="refreshing ? 'Обновление раздела' : 'Обновить раздел'"
+        :aria-busy="refreshing || undefined"
+        :disabled="refreshing || undefined"
+        :data-command="refreshCommandId"
+        @click="emit('command', refreshCommandId)"
       >
-        <IconRefresh aria-hidden="true" />
+        <UiSpinner v-if="refreshing" />
+        <IconRefresh v-else aria-hidden="true" />
       </button>
       <component
         :is="views[item.kind].component"
@@ -255,10 +283,6 @@ defineExpose({
   overflow: visible;
   border: 0;
   background: none;
-}
-/* Правая панель зеркалит левую: полоса разделов уходит к правому краю окна */
-.sidebar.side-right.with-rail {
-  flex-direction: row-reverse;
 }
 .panel {
   display: contents;
@@ -377,10 +401,15 @@ defineExpose({
 }
 .with-rail .panel:hover .panel-refresh,
 .with-rail .panel:focus-within .panel-refresh,
+.with-rail .panel .panel-refresh.busy,
 .with-rail .panel:hover .panel-close,
 .with-rail .panel:focus-within .panel-close {
   opacity: 1;
   pointer-events: auto;
+}
+.panel-refresh:disabled {
+  opacity: 1;
+  color: var(--muted);
 }
 .panel-refresh:hover,
 .panel-close:hover {

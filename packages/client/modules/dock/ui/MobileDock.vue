@@ -11,6 +11,7 @@ const props = defineProps<{
   terminalPanel: (id: string) => boolean;
 }>();
 const dock = inject(dockKey)!;
+const zen = computed(() => dock.zen?.() ?? false);
 const terminalOpen = computed(() => props.surface === "terminal");
 const terminalFocused = ref(props.surface === "terminal");
 watch(
@@ -72,7 +73,11 @@ const handlers = {
         :inert="surface.side === 'editor' && terminalOpen"
         :aria-label="surface.side === 'editor' ? 'Редактор' : 'Терминалы'"
       >
-        <header v-if="surface.tabs.length || surface.side === 'terminal'" class="tabs">
+        <header
+          v-if="surface.tabs.length || surface.side === 'terminal'"
+          v-show="!zen"
+          class="tabs"
+        >
           <DockSlot
             v-if="dock.slots.leading"
             :render="dock.slots.leading"
@@ -86,6 +91,7 @@ const handlers = {
             :command-namespace="dock.commandNamespace"
             :command-handlers="handlers"
             :actions="dock.tabActions"
+            compact
             close-saved
           >
             <template #icon="{ tab }"

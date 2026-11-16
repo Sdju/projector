@@ -10,9 +10,23 @@ import { createAcpBackend, usageReportOf, type AcpProgram } from "../acp/index.t
  * adapter only turns it into an `AcpProgram`. No plugin code runs, and nothing beyond plain ACP
  * is added — dialects, forms, extensions and usage reporting stay off.
  */
-export { loadCodeAgents, type PluginCodeApi } from "./code.ts";
+export {
+  clearPluginBalances,
+  loadCodeAgents,
+  type PluginBalanceDeclaration,
+  type PluginBalanceProvider,
+  type PluginCodeApi,
+  type PluginCodeLoadOptions,
+  type PluginFeatureApi,
+  type PluginHostApi,
+  type PluginMcpApi,
+  type PluginProviderApi,
+  type PluginRoleApi,
+  type PluginWidgetApi,
+} from "./code.ts";
 
 export function createPluginAgent(agent: PluginAgentContribution): AgentBackend {
+  if (!agent.command) throw new Error("Декларативный агент плагина должен указать command");
   const program = agent.program ?? agent.id;
   const acp: AcpProgram = {
     id: agent.id,
@@ -43,5 +57,6 @@ export function createPluginAgent(agent: PluginAgentContribution): AgentBackend 
     backend.usage = agent.usage;
     backend.usageUrl = `/api/agent/usage/${encodeURIComponent(agent.id)}`;
   }
+  if (agent.defaultFeatures?.length) backend.defaultFeatures = [...agent.defaultFeatures];
   return backend;
 }

@@ -1,7 +1,6 @@
 export {
   mcpConfigsForNames,
   mcpServerConfigs,
-  processMcpConfig,
   readUserMcp,
   userMcpFile,
   writeUserMcp,

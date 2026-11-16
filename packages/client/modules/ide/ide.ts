@@ -9,8 +9,16 @@ import {
 } from "@ai-projector/core/modules/ide/index.ts";
 import { commandHostKey } from "../../common/utilities/commands.ts";
 import { fullscreenAvailable, installApp, toggleFullscreen, usePwa } from "../pwa/index.ts";
+import { toggleZenMode, zenAvailable } from "../../common/utilities/zen-mode.ts";
+import { appearanceFonts, applyAppearanceFonts, saveAppearanceFonts } from "../appearance/index.ts";
+import { commandArgs } from "../../common/utilities/commands.ts";
+import {
+  clampAppearanceFont,
+  type AppearanceFonts,
+} from "@ai-projector/core/modules/appearance/index.ts";
 import { listenIdeCommands } from "./command-bridge.ts";
 import { createPageReload } from "./reload.ts";
+import { registerWidgetCommands } from "../widget-runtime/index.ts";
 interface PaletteSession {
   commands: PaletteCommand[];
   trigger: HTMLElement | null;
@@ -45,6 +53,7 @@ export function provideIdeCommands() {
     error.value = value instanceof Error ? value.message : "Не удалось выполнить команду";
   };
   const workbench = sdk.createScope("workbench", () => ({ surface: "workbench" }));
+  registerWidgetCommands(workbench);
   const { canInstall } = usePwa();
   const pageReload = createPageReload(reportError, () => revision.value++);
   workbench.registerCommand({
@@ -62,6 +71,21 @@ export function provideIdeCommands() {
       "Скрывает интерфейс браузера и освобождает весь экран под рабочую область; на телефоне это заменяет установленное приложение. Выход — повторный вызов или Esc.",
     enabled: () => fullscreenAvailable(),
     run: () => toggleFullscreen(),
+  });
+  workbench.registerCommand({
+    id: "ide.workbench.zen.toggle",
+    title: "Режим Zen",
+    description:
+      "Разворачивает активный блок на всё окно и скрывает боковые панели, шапку, строку состояния и служебные элементы чата (панель отправки, футеры, детали работы и фоновую активность). Выход — повторный вызов, Esc или кнопка в углу.",
+    arguments: {
+      on: "boolean (необязательно): true — включить, false — выключить; без аргумента переключает",
+    },
+    enabled: () => zenAvailable.value,
+    run: (value) => {
+      const { on } = commandArgs(value);
+      if (on !== undefined && typeof on !== "boolean") throw new Error("on должен быть boolean");
+      return { zen: toggleZenMode(on) };
+    },
   });
   workbench.registerCommand({
     id: "ide.workbench.pages.reload",
@@ -126,6 +150,35 @@ export function provideIdeCommands() {
       };
     },
   });
+  workbench.registerCommand({
+    id: "ide.appearance.fonts.set",
+    title: "Задать размер шрифта контента",
+    description:
+      "Меняет базовый кегль текста в чате агента, редакторе кода или терминале в оформлении. Это не масштаб интерфейса: передайте одно или несколько полей chat, editor, terminal — целые px от 11 до 20.",
+    arguments: {
+      chat: "number?: размер текста сообщений чата",
+      editor: "number?: размер шрифта редактора кода",
+      terminal: "number?: размер шрифта терминала",
+    },
+    run: async (value) => {
+      const args = commandArgs(value);
+      const patch: Partial<AppearanceFonts> = {};
+      for (const key of ["chat", "editor", "terminal"] as const) {
+        if (args[key] === undefined) continue;
+        patch[key] = clampAppearanceFont(args[key], appearanceFonts.value[key]);
+      }
+      if (!Object.keys(patch).length)
+        throw new Error("Укажите chat, editor или terminal (11–20 px)");
+      const previous = { ...appearanceFonts.value };
+      applyAppearanceFonts({ ...appearanceFonts.value, ...patch });
+      try {
+        return await saveAppearanceFonts(patch);
+      } catch (error) {
+        applyAppearanceFonts(previous);
+        throw error;
+      }
+    },
+  });
   function globalKeydown(event: KeyboardEvent) {
     if (event.defaultPrevented || (document.querySelector("dialog[open]") && !palette.value))
       return;
@@ -188,5 +241,5 @@ export function provideIdeCommands() {
     workbench.dispose();
     if (browser.projector?.ide === api) browser.projector.ide = previous;
   });
-  return { error };
+  return { error, api };
 }

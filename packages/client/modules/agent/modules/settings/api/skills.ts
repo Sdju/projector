@@ -2,13 +2,13 @@ export interface AgentSkill {
   name: string;
   description: string;
   hint?: string;
-  source: "user" | "project";
+  source: "user" | "project" | "system";
   kind: "skill" | "command";
 }
 
 export interface AgentSkills {
   skills: AgentSkill[];
-  folders: { source: "user" | "project"; path: string }[];
+  folders: { source: "user" | "project" | "system"; path: string }[];
 }
 
 export async function readAgentSkills(projectId = ""): Promise<AgentSkills> {

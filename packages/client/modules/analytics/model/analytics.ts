@@ -13,13 +13,21 @@ import { countRu } from "../../../common/utilities/plural.ts";
 import { readUsageAnalytics } from "../api/analytics.ts";
 import { isDayKey, useUsageDay } from "./day.ts";
 import { formatCost, formatDay, formatRange, formatTokens, windowLabel } from "./format.ts";
-import { agentTitle, breakdownRows, taskLabel } from "./rows.ts";
+import { agentTitle, breakdownRows, taskLabel, walletTotals } from "./rows.ts";
 
 export type { BreakdownRow } from "./rows.ts";
 
 const limitTitle = (window: string) => windowLabel(window);
 
 export function useUsageAnalytics() {
+  const sections = [
+    { id: "overview", label: "Обзор и лимиты" },
+    { id: "activity", label: "Активность" },
+    { id: "breakdown", label: "Структура расхода" },
+    { id: "finance", label: "Кошельки" },
+    { id: "sources", label: "Источники" },
+  ] as const;
+  const section = ref<(typeof sections)[number]["id"]>("overview");
   const days = ref<AnalyticsRange>(30);
   const data = shallowRef<UsageAnalytics | null>(null);
   const loading = ref(false);
@@ -59,7 +67,7 @@ export function useUsageAnalytics() {
     probing.value = true;
     try {
       await Promise.allSettled(
-        [...urls, "/api/providers/balance"].map((url) => fetch(url, { cache: "no-store" })),
+        [...urls, "/api/providers/balances"].map((url) => fetch(url, { cache: "no-store" })),
       );
     } finally {
       probing.value = false;
@@ -95,6 +103,19 @@ export function useUsageAnalytics() {
     surface: "analytics",
     days: days.value,
   }));
+  commands.scope.registerCommand({
+    id: "ide.analytics.section.set",
+    title: "Открыть раздел аналитики",
+    description:
+      "Переключает обзор и лимиты, активность, структуру расхода, кошельки или источники журналов.",
+    arguments: { section: "overview | activity | breakdown | finance | sources" },
+    run: (value) => {
+      const next = sections.find((item) => item.id === commandArgs(value).section);
+      if (!next) throw new Error("Неизвестный раздел аналитики");
+      section.value = next.id;
+      return { section: section.value };
+    },
+  });
   commands.scope.registerCommand({
     id: "ide.analytics.refresh",
     title: "Обновить аналитику расхода",
@@ -169,6 +190,7 @@ export function useUsageAnalytics() {
   const dailyPoints = computed(() =>
     (data.value?.daily ?? []).map((day) => ({
       label: formatDay(day.day),
+      day: day.day,
       values: {
         input: day.input,
         output: day.output,
@@ -262,6 +284,7 @@ export function useUsageAnalytics() {
   );
   const today = computed(() => data.value?.daily.at(-1));
   const providerRows = computed(() => data.value?.providers ?? []);
+  const providerTotals = computed(() => walletTotals(providerRows.value));
   /** Dollars first: that is the balance people usually mean, and DeepSeek reports USD. */
   const primaryProvider = computed(
     () =>
@@ -309,6 +332,8 @@ export function useUsageAnalytics() {
   );
 
   return {
+    section,
+    sections,
     ranges: ANALYTICS_RANGES,
     days,
     data,
@@ -335,6 +360,7 @@ export function useUsageAnalytics() {
     serviceCalls,
     limitCards,
     providerRows,
+    providerTotals,
     primaryProvider,
     today,
     todayLabel,

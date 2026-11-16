@@ -77,7 +77,7 @@ projector status --json | jq '.running'
 projector search opencode --json
 ```
 
-`projects` и `status` не запускают сервер: при остановленном сервере они читают `projects.json` и показывают проекты как остановленные.
+`projects` и `status` не запускают сервер: при остановленном сервере они читают `projects.json` и `.projector/scenarios.json` проектов и показывают проекты как остановленные.
 
 ## Сервер
 

@@ -1,15 +1,138 @@
+import { pipeline } from "node:stream/promises";
 import {
+  PluginStorageLimitError,
+  PluginStoragePathError,
+  deletePluginStorageValue,
   discoverPlugins,
   installPlugin,
+  openPluginAsset,
+  pluginPackageExists,
+  readPluginStorage,
   removePlugin,
   setPluginEnabled,
   trustPlugin,
+  writePluginStorageValue,
 } from "../../modules/plugins/index.ts";
+import {
+  pluginPackageName,
+  pluginStorageMaxBytes,
+} from "@ai-projector/core/modules/plugins/index.ts";
 import { accessAllowed } from "../../modules/access/index.ts";
 import { HttpError } from "../../modules/http/index.ts";
 import { asString, json, readBody, type RouteDefinition } from "../../modules/transport/index.ts";
 
+const assetPath = "/api/plugins/assets/:key/:hash/**";
+const storagePath = "/api/plugins/:key/storage";
+/** The envelope around one value is small; the quota itself is checked after serialization. */
+const storageBodyLimit = pluginStorageMaxBytes + 64_000;
+
+/** The key in the URL is base64url of the package name; data never accepts a raw path. */
+async function storagePackage(key: string | undefined): Promise<string> {
+  const name = pluginPackageName(key ?? "");
+  if (!name || !(await pluginPackageExists(name))) throw new HttpError(404, "Плагин не найден");
+  return name;
+}
+
+function storageFailure(error: unknown): never {
+  if (error instanceof PluginStorageLimitError) throw new HttpError(413, error.message);
+  if (error instanceof PluginStoragePathError) throw new HttpError(409, error.message);
+  throw error;
+}
+
 export const routes: RouteDefinition[] = [
+  {
+    method: ["GET", "HEAD"],
+    path: assetPath,
+    handler: async ({ req, res, method, params }) => {
+      if (!accessAllowed(req, false))
+        throw new HttpError(403, "Плагины доступны только со страницы Projector");
+      res.setHeader("Cache-Control", "no-store");
+      res.setHeader("X-Content-Type-Options", "nosniff");
+      const name = pluginPackageName(params.key ?? "");
+      let relative: string;
+      try {
+        relative = (params["0"] ?? "").split("/").map(decodeURIComponent).join("/");
+      } catch {
+        throw new HttpError(400, "Некорректный путь ассета");
+      }
+      const catalog = await discoverPlugins();
+      const plugin = name ? catalog.plugins.find((item) => item.id === name) : undefined;
+      const asset = await openPluginAsset(plugin, params.hash ?? "", relative);
+      if (!asset) {
+        json(res, 404, { error: "Ассет плагина недоступен" });
+        return;
+      }
+      res.setHeader("Content-Type", asset.type);
+      res.setHeader("Content-Length", asset.size);
+      res.setHeader("Cross-Origin-Resource-Policy", "same-origin");
+      if (method === "HEAD") {
+        asset.stream.destroy();
+        res.end();
+        return;
+      }
+      await pipeline(asset.stream, res).catch(() => res.destroy());
+    },
+  },
+  {
+    method: "",
+    path: assetPath,
+    handler: ({ req, res }) => {
+      if (!accessAllowed(req, false))
+        throw new HttpError(403, "Плагины доступны только со страницы Projector");
+      res.setHeader("Cache-Control", "no-store");
+      json(res, 405, { error: "Допустим только GET" });
+    },
+  },
+  {
+    method: "GET",
+    path: storagePath,
+    handler: async ({ req, res, params }) => {
+      if (!accessAllowed(req, false))
+        throw new HttpError(403, "Плагины доступны только со страницы Projector");
+      res.setHeader("Cache-Control", "no-store");
+      const name = await storagePackage(params.key);
+      const data = await readPluginStorage(name).catch(storageFailure);
+      json(res, 200, { data });
+    },
+  },
+  {
+    method: "PUT",
+    path: storagePath,
+    handler: async ({ req, res, params }) => {
+      if (!accessAllowed(req, true))
+        throw new HttpError(403, "Плагины доступны только со страницы Projector");
+      res.setHeader("Cache-Control", "no-store");
+      const name = await storagePackage(params.key);
+      const body = await readBody(req, storageBodyLimit);
+      if (!("value" in body)) throw new HttpError(400, "Укажите ключ и значение");
+      await writePluginStorageValue(name, body.key, body.value).catch(storageFailure);
+      json(res, 200, { ok: true });
+    },
+  },
+  {
+    method: "DELETE",
+    path: storagePath,
+    handler: async ({ req, res, params, url }) => {
+      if (!accessAllowed(req, true))
+        throw new HttpError(403, "Плагины доступны только со страницы Projector");
+      res.setHeader("Cache-Control", "no-store");
+      const name = await storagePackage(params.key);
+      const key = url.searchParams.get("key");
+      if (!key) throw new HttpError(400, "Укажите ключ");
+      await deletePluginStorageValue(name, key).catch(storageFailure);
+      json(res, 200, { ok: true });
+    },
+  },
+  {
+    method: "",
+    path: storagePath,
+    handler: ({ req, res }) => {
+      if (!accessAllowed(req, false))
+        throw new HttpError(403, "Плагины доступны только со страницы Projector");
+      res.setHeader("Cache-Control", "no-store");
+      json(res, 405, { error: "Метод не поддерживается" });
+    },
+  },
   {
     method: "GET",
     path: "/api/plugins",

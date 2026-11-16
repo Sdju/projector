@@ -12,6 +12,11 @@ import IconProjectSettings from "~icons/lucide/sliders-horizontal";
 import IconChevron from "~icons/lucide/chevron-down";
 import IconCheck from "~icons/lucide/check";
 import IconX from "~icons/lucide/x";
+import IconMenu from "~icons/lucide/menu";
+import IconEyeOff from "~icons/lucide/eye-off";
+import IconEye from "~icons/lucide/eye";
+import { useHiddenActions } from "../lib/hidden-actions.ts";
+import { useActionOrder } from "../lib/action-order.ts";
 import { groupSidebar } from "../../workspace-api/index.ts";
 
 export interface SidebarItem {
@@ -26,6 +31,8 @@ export interface SidebarItem {
   kind?: string;
   /** Временный раздел можно закрыть. */
   closable?: boolean;
+  /** Служебный раздел (Hub, корзина): живёт в нижней группе вертикальной полосы. */
+  utility?: boolean;
 }
 const props = defineProps<{
   section: string;
@@ -40,6 +47,8 @@ const props = defineProps<{
   label?: string;
   /** Separate command scopes for the left sidebar and the right rail on one page. */
   scopeId?: string;
+  /** The section is reloading: the mobile refresh button shows a spinner. */
+  refreshing?: boolean;
 }>();
 const emit = defineEmits<{
   "update:section": [section: string];
@@ -52,7 +61,82 @@ const picker = useIslandMenu({
   initialFocus: [".section-item.selected", ".section-item"],
   items: ".section-item",
 });
-const groups = computed(() => groupSidebar(props.items));
+const overflow = useIslandMenu({ anchor: "left", initialFocus: ".section-item" });
+const visibility = useHiddenActions();
+const ordering = useActionOrder("sidebar");
+const dragging = ref("");
+const dropTarget = ref<{ id: string; after: boolean }>();
+function endDrag() {
+  dragging.value = "";
+  dropTarget.value = undefined;
+}
+function dragLeave(event: DragEvent) {
+  if (
+    !(event.relatedTarget instanceof Node) ||
+    !(event.currentTarget as HTMLElement).contains(event.relatedTarget)
+  )
+    dropTarget.value = undefined;
+}
+function dragOver(event: DragEvent, id: string) {
+  const from = groups.value.find((group) => group[0]?.id === dragging.value);
+  const to = groups.value.find((group) => group[0]?.id === id);
+  if (!from || !to || dragging.value === id || !!from[0]?.utility !== !!to[0]?.utility) {
+    dropTarget.value = undefined;
+    return;
+  }
+  event.preventDefault();
+  if (event.dataTransfer) event.dataTransfer.dropEffect = "move";
+  const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
+  dropTarget.value = { id, after: event.clientY > rect.top + rect.height / 2 };
+}
+
+function dragStart(event: DragEvent, id: string) {
+  dragging.value = id;
+  event.dataTransfer?.setData("text/plain", id);
+  if (event.dataTransfer) event.dataTransfer.effectAllowed = "move";
+}
+function drop(event: DragEvent, id: string) {
+  event.preventDefault();
+  const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
+  void commands.scope.executeCommand("ide.workbench.section.move", {
+    from: dragging.value,
+    to: id,
+    after: event.clientY > rect.top + rect.height / 2,
+  });
+  endDrag();
+}
+const keyFor = (id: string) => `sidebar:${id}`;
+const settingsItem: SidebarItem = {
+  id: "project-settings",
+  title: "Настройки проекта",
+  icon: IconProjectSettings,
+  badge: 0,
+  command: "ide.workbench.project.settings.open",
+};
+const hiddenItems = computed(() =>
+  [...props.items, ...(props.projectSettings ? [settingsItem] : [])].filter((item) =>
+    visibility.hidden.value.includes(keyFor(item.id)),
+  ),
+);
+/** Служебные разделы идут после проектных; на полосе они образуют нижнюю группу. */
+const groups = computed(() => {
+  const all = groupSidebar(
+    props.items.filter(
+      (item) => !props.vertical || !visibility.hidden.value.includes(keyFor(item.id)),
+    ),
+  );
+  return [
+    ...ordering.sort(
+      all.filter((group) => !group[0]?.utility),
+      (group) => group[0]!.id,
+    ),
+    ...ordering.sort(
+      all.filter((group) => group[0]?.utility),
+      (group) => group[0]!.id,
+    ),
+  ];
+});
+const firstUtility = computed(() => groups.value.find((group) => group[0]?.utility));
 const ordered = computed(() => groups.value.flat());
 const current = computed(() => ordered.value.find((item) => item.id === props.section));
 const otherBadges = computed(() =>
@@ -62,12 +146,58 @@ const commands = useCommandScope(props.scopeId ?? "sidebar-sections", () => ({
   surface: "workbench",
 }));
 commands.scope.registerCommand({
+  id: "ide.workbench.section.move",
+  title: "Переместить раздел боковой панели",
+  description: "Меняет порядок групп разделов боковой панели и сохраняет его.",
+  arguments: {
+    from: "string: перемещаемый раздел",
+    to: "string: соседний раздел",
+    after: "boolean: разместить после",
+  },
+  run: async (args) => {
+    const value = args as { from?: unknown; to?: unknown; after?: unknown };
+    if (
+      typeof value?.from !== "string" ||
+      typeof value.to !== "string" ||
+      typeof value.after !== "boolean"
+    )
+      throw new Error("Укажите from, to и after");
+    const from = groups.value.find((group) => group[0]?.id === value.from);
+    const to = groups.value.find((group) => group[0]?.id === value.to);
+    if (!from || !to || !!from[0]?.utility !== !!to[0]?.utility) return;
+    await ordering.move(
+      groups.value.map((group) => group[0]!.id),
+      value.from,
+      value.to,
+      value.after,
+    );
+  },
+});
+commands.scope.registerCommand({
   id: "ide.workbench.section.picker.toggle",
   title: "Открыть или закрыть выбор раздела",
   description:
     "Показывает список разделов проекта (файлы, поиск, Git и другие) в мобильной боковой панели.",
   enabled: () => !props.vertical,
   run: () => void picker.toggle(),
+});
+commands.scope.registerCommand({
+  id: "ide.workbench.section.hidden.toggle",
+  title: "Открыть скрытые разделы",
+  description: "Открывает или закрывает список скрытых кнопок разделов.",
+  run: () => void overflow.toggle(),
+});
+commands.scope.registerCommand({
+  id: "ide.workbench.section.visibility.set",
+  title: "Изменить видимость раздела",
+  description: "Скрывает кнопку раздела или возвращает её на боковую панель.",
+  arguments: { section: "string: идентификатор раздела", visible: "boolean: показывать кнопку" },
+  run: async (args) => {
+    const value = args as { section?: unknown; visible?: unknown };
+    if (typeof value?.section !== "string" || typeof value.visible !== "boolean")
+      throw new Error("Укажите section и visible");
+    await visibility.setHidden(keyFor(value.section), !value.visible);
+  },
 });
 const sectionMenu = ref<InstanceType<typeof ContextMenu>>();
 const menuTarget = ref<SidebarItem>();
@@ -76,17 +206,33 @@ const menuItems = computed<ContextMenuItem[]>(() => {
   if (!item) return [];
   return [
     {
-      id: "section.close",
-      label: `Закрыть «${item.title}»`,
-      icon: IconX,
-      command: "ide.workbench.section.close",
-      args: { section: item.id },
-      run: () => emit("command", "ide.workbench.section.close", { section: item.id }),
+      id: "section.hide",
+      label: `Скрыть «${item.title}»`,
+      icon: IconEyeOff,
+      command: "ide.workbench.section.visibility.set",
+      args: { section: item.id, visible: false },
+      run: () =>
+        commands.scope.executeCommand("ide.workbench.section.visibility.set", {
+          section: item.id,
+          visible: false,
+        }),
     },
+    ...(item.closable
+      ? [
+          {
+            id: "section.close",
+            label: `Закрыть «${item.title}»`,
+            icon: IconX,
+            command: "ide.workbench.section.close",
+            args: { section: item.id },
+            run: () => emit("command", "ide.workbench.section.close", { section: item.id }),
+          },
+        ]
+      : []),
   ];
 });
 function openSectionMenu(event: MouseEvent, item: SidebarItem) {
-  if (!props.vertical || !item.closable) return;
+  if (!props.vertical) return;
   event.preventDefault();
   event.stopPropagation();
   menuTarget.value = item;
@@ -130,8 +276,9 @@ function choose(item: SidebarItem) {
         shape="icon"
         size="sm"
         title="Обновить раздел"
-        aria-label="Обновить раздел"
+        :aria-label="refreshing ? 'Обновление раздела' : 'Обновить раздел'"
         data-command="ide.workbench.sidebar.refresh"
+        :busy="refreshing"
         @click="emit('command', 'ide.workbench.sidebar.refresh')"
       >
         <IconRefresh aria-hidden="true" />
@@ -166,33 +313,61 @@ function choose(item: SidebarItem) {
     </button>
   </UiIsland>
   <nav v-else class="side-tabs vertical" :aria-label="label ?? 'Разделы проекта'">
+    <template v-for="group in groups" :key="group[0]?.id">
+      <i v-if="group === firstUtility" class="rail-divider" aria-hidden="true" />
+      <div
+        class="side-group"
+        :class="{
+          grouped: group.length > 1,
+          dragging: dragging === group[0]?.id,
+          'drop-before': dropTarget?.id === group[0]?.id && !dropTarget.after,
+          'drop-after': dropTarget?.id === group[0]?.id && dropTarget.after,
+        }"
+        draggable="true"
+        @dragstart="dragStart($event, group[0]!.id)"
+        @dragend="endDrag"
+        @dragover="dragOver($event, group[0]!.id)"
+        @dragleave="dragLeave"
+        @drop.stop="drop($event, group[0]!.id)"
+      >
+        <template v-for="(item, index) in group" :key="item.id">
+          <i v-if="index" class="side-separator" aria-hidden="true" />
+          <button
+            :class="{ selected: section === item.id && !collapsed }"
+            :aria-pressed="section === item.id && !collapsed"
+            :title="item.closable ? `${item.title} · ПКМ: закрыть` : item.title"
+            :aria-label="item.badge ? `${item.title}: ${item.badge}` : item.title"
+            aria-haspopup="menu"
+            @click="item.command ? emit('command', item.command) : emit('update:section', item.id)"
+            @contextmenu="openSectionMenu($event, item)"
+          >
+            <component
+              :is="item.icon"
+              :class="{ 'git-logo': item.id === 'git' }"
+              aria-hidden="true"
+            />
+            <span v-if="item.badge" aria-hidden="true">{{ item.badge }}</span>
+          </button>
+        </template>
+      </div>
+    </template>
+    <span :ref="overflow.trigger" class="overflow-trigger">
+      <UiButton
+        shape="icon"
+        size="sm"
+        title="Скрытые разделы"
+        aria-label="Скрытые разделы"
+        aria-haspopup="dialog"
+        :aria-expanded="overflow.open.value"
+        data-command="ide.workbench.section.hidden.toggle"
+        @click="commands.run('ide.workbench.section.hidden.toggle')"
+        ><IconMenu aria-hidden="true"
+      /></UiButton>
+    </span>
     <div
-      v-for="group in groups"
-      :key="group[0]?.id"
-      class="side-group"
-      :class="{ grouped: group.length > 1 }"
+      v-if="projectSettings && !visibility.hidden.value.includes(keyFor(settingsItem.id))"
+      class="side-actions"
     >
-      <template v-for="(item, index) in group" :key="item.id">
-        <i v-if="index" class="side-separator" aria-hidden="true" />
-        <button
-          :class="{ selected: section === item.id && !collapsed }"
-          :aria-pressed="section === item.id && !collapsed"
-          :title="item.closable ? `${item.title} · ПКМ: закрыть` : item.title"
-          :aria-label="item.badge ? `${item.title}: ${item.badge}` : item.title"
-          :aria-haspopup="item.closable ? 'menu' : undefined"
-          @click="item.command ? emit('command', item.command) : emit('update:section', item.id)"
-          @contextmenu="openSectionMenu($event, item)"
-        >
-          <component
-            :is="item.icon"
-            :class="{ 'git-logo': item.id === 'git' }"
-            aria-hidden="true"
-          />
-          <span v-if="item.badge" aria-hidden="true">{{ item.badge }}</span>
-        </button>
-      </template>
-    </div>
-    <div v-if="projectSettings" class="side-actions">
       <UiButton
         shape="icon"
         size="sm"
@@ -200,15 +375,91 @@ function choose(item: SidebarItem) {
         aria-label="Настройки проекта"
         data-command="ide.workbench.project.settings.open"
         @click="emit('command', 'ide.workbench.project.settings.open')"
+        @contextmenu="openSectionMenu($event, settingsItem)"
       >
         <IconProjectSettings aria-hidden="true" />
       </UiButton>
     </div>
   </nav>
+  <UiIsland v-if="vertical" :menu="overflow" label="Скрытые разделы" :width="280">
+    <p v-if="visibility.error.value" role="alert">{{ visibility.error.value }}</p>
+    <p v-if="!hiddenItems.length" class="empty">Скрытых разделов нет</p>
+    <div v-for="item in hiddenItems" :key="item.id" class="hidden-row">
+      <button
+        class="section-item"
+        @click="
+          overflow.close();
+          choose(item);
+        "
+      >
+        <component :is="item.icon" aria-hidden="true" /><span class="label">{{ item.title }}</span>
+        <span v-if="item.badge" class="count">{{ item.badge }}</span>
+      </button>
+      <UiButton
+        shape="icon"
+        size="sm"
+        :title="`Вернуть «${item.title}»`"
+        :aria-label="`Вернуть «${item.title}»`"
+        data-command="ide.workbench.section.visibility.set"
+        @click="
+          commands.run('ide.workbench.section.visibility.set', { section: item.id, visible: true })
+        "
+        ><IconEye aria-hidden="true"
+      /></UiButton>
+    </div>
+  </UiIsland>
   <ContextMenu ref="sectionMenu" :items="menuItems" label="Действия раздела" />
 </template>
 
 <style scoped>
+.side-tabs.vertical .side-group {
+  position: relative;
+}
+.side-group.drop-before::before,
+.side-group.drop-after::after {
+  content: "";
+  position: absolute;
+  left: 2px;
+  right: 2px;
+  height: 2px;
+  background: var(--focus);
+  border-radius: 2px;
+  pointer-events: none;
+  z-index: 1;
+}
+.side-group.drop-before::before {
+  top: -3px;
+}
+.side-group.drop-after::after {
+  bottom: -3px;
+}
+
+.side-group.dragging {
+  opacity: 0.4;
+}
+.overflow-trigger {
+  display: flex;
+}
+.hidden-row {
+  display: flex;
+  align-items: center;
+  border-radius: var(--r-md);
+}
+.hidden-row:hover {
+  background: var(--hover);
+}
+.hidden-row .section-item {
+  flex: 1;
+  min-width: 0;
+}
+.hidden-row .section-item:hover {
+  background: transparent;
+}
+.empty {
+  margin: var(--sp-3);
+  color: var(--muted);
+  font-size: var(--fs-xs);
+}
 .side-tabs {
   display: flex;
   height: 40px;
@@ -277,6 +528,17 @@ function choose(item: SidebarItem) {
 /* Дочерние разделы делят подложку с родителем: это одна «стопка», а не отдельные кнопки */
 .side-tabs.vertical .side-group.grouped {
   background: var(--bg-2);
+}
+/* Нижняя группа служебных разделов: тонкая черта прижата к низу, настройки проекта идут следом */
+.side-tabs.vertical .rail-divider {
+  width: 16px;
+  height: 1px;
+  flex-shrink: 0;
+  margin-top: auto;
+  background: var(--line-strong);
+}
+.side-tabs.vertical .rail-divider ~ .side-actions {
+  margin-top: 0;
 }
 .side-tabs.vertical .side-separator {
   width: 16px;

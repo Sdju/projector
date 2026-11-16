@@ -32,6 +32,9 @@ test("API dispatch preserves fallthrough, method errors and the canonical MCP en
     expect(JSON.parse(health.body)).toMatchObject({ ok: true, app: "projector" });
     expect((await call("/api/health/")).status).toBe(200);
     expect((await call("/api/health", "POST")).status).toBe(404);
+    const session = await call("/api/browser/session");
+    expect(session.status).toBe(200);
+    expect(JSON.parse(session.body).key).toMatch(/^[0-9a-f]{16}$/);
     expect((await call("/api/browser/session", "POST")).status).toBe(405);
     expect((await call("/api/unknown-route")).status).toBe(404);
     expect(await call("/projects/example")).toEqual({ status: 418, body: "fallthrough" });

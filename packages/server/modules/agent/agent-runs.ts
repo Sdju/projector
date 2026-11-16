@@ -4,44 +4,14 @@ import { join } from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
 import { dataDir } from "@ai-projector/core/modules/app-paths/index.ts";
 import { os } from "@ai-projector/core/modules/os/index.ts";
-import type { JudgeOverride } from "@ai-projector/core/modules/agent-judge/index.ts";
-import type { AgentHistoryTurn } from "../providers/index.ts";
-import type { AgentBackendId, AgentPermissionMode, MessagePart } from "./backend.ts";
+import type { AgentBackendId } from "./backend.ts";
 import { runsChanged } from "./change-events.ts";
-import type { AgentSelection } from "./controls.ts";
-import type { AgentRoleSnapshot } from "@ai-projector/core/modules/agent-role/index.ts";
+import { recordRecentRun } from "./recent-runs.ts";
+import { parseRunRecord, type AgentRunRecord } from "./run-record.ts";
+import { readStateFile } from "./state-file.ts";
+import { pendingRunRequests, type RunPending } from "./run-hub.ts";
 
-/** What a restarted server needs to repeat a run and so rejoin its answer in progress. */
-export interface AgentRunRecord {
-  backend: AgentBackendId;
-  message: string;
-  parts?: MessagePart[];
-  history: AgentHistoryTurn[];
-  /** Feature ids chosen for the chat; absent means the user's defaults. */
-  features?: string[];
-  /** The chat's own Judge settings; absent means the global ones. */
-  judge?: JudgeOverride;
-  cwd?: string;
-  sessionId?: string;
-  messageId?: string;
-  tail?: string;
-  selection?: AgentSelection;
-  permissionMode?: AgentPermissionMode;
-  /** The role the run belongs to, when a job or a future task started it. */
-  role?: AgentRoleSnapshot;
-  providerId?: string;
-  /** The client can show permission and question prompts (its answers come back to the run). */
-  approvals?: boolean;
-  /** The client can run Projector commands for the agent. */
-  commandBridge?: boolean;
-  /** The project and chat the run belongs to, so any page can tell what works right now. */
-  projectId?: string;
-  chat?: string;
-  /** The agent's own session of the run, once it reported it: a reopened session finds its live run by it. */
-  session?: string;
-  /** When the run started (ms since the epoch), for the elapsed time in the overview. */
-  startedAt?: number;
-}
+export type { AgentRunRecord } from "./run-record.ts";
 
 /** A run whose agent process is alive, for the overview of what works now. */
 export interface LiveRun {
@@ -50,6 +20,8 @@ export interface LiveRun {
   projectId: string;
   chat: string;
   topic: string;
+  status: "running" | "needs-user";
+  pending: RunPending[];
   /** The agent's own session, if it reported it already. */
   session?: string;
   /** When the run started (ms since the epoch). */
@@ -71,12 +43,15 @@ export async function listLiveRuns(): Promise<LiveRun[]> {
         const startedAt =
           record.startedAt ??
           (await stat(join(runDirectory(id), "run.json")).catch(() => null))?.mtimeMs;
+        const pending = pendingRunRequests(id);
         return {
           id,
           backend: record.backend,
           projectId: record.projectId ?? "",
           chat: record.chat ?? "",
           topic: record.message.trim().slice(0, 120),
+          status: pending.length ? "needs-user" : "running",
+          pending,
           ...(record.session ? { session: record.session } : {}),
           ...(startedAt !== undefined ? { startedAt } : {}),
         };
@@ -115,11 +90,10 @@ export async function createRun(record: AgentRunRecord): Promise<string> {
 }
 
 export async function readRun(id: string): Promise<AgentRunRecord | null> {
-  try {
-    return JSON.parse(await readFile(join(runDirectory(id), "run.json"), "utf8"));
-  } catch {
-    return null;
-  }
+  // Идентификатор приходит от клиента: негодный — это отсутствующий ход, а не ошибка.
+  if (!RUN_ID.test(id)) return null;
+  const read = await readStateFile(join(runDirectory(id), "run.json"), "Файл хода", parseRunRecord);
+  return read.status === "ok" ? read.value : null;
 }
 
 /** Notes the agent's session in the stored run. */
@@ -220,6 +194,20 @@ export function trackRun(id: string, cancel: () => void): () => void {
 export async function cancelRun(id: string): Promise<void> {
   const cancel = active.get(id);
   if (cancel) return cancel();
+  const record = await readRun(id);
   await stopRun(id);
+  if (record && !record.chat?.startsWith(JOB_CHAT)) {
+    await recordRecentRun({
+      id,
+      backend: record.backend,
+      projectId: record.projectId ?? "",
+      chat: record.chat ?? "",
+      topic: record.message.trim().slice(0, 120),
+      status: "stopped",
+      ...(record.session ? { session: record.session } : {}),
+      startedAt: record.startedAt ?? Date.now(),
+      endedAt: Date.now(),
+    }).catch(() => {});
+  }
   await removeRun(id);
 }

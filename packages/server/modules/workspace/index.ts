@@ -1,3 +1,4 @@
+export { projectEntryInfo, type EntryInfo } from "./info.ts";
 export {
   listProjectDirectory,
   readProjectFile,
@@ -14,6 +15,13 @@ export {
   uploadProjectEntry,
 } from "./import.ts";
 export { revealProjectEntry } from "./reveal.ts";
+export {
+  deleteProjectTrash,
+  emptyProjectTrash,
+  listProjectTrash,
+  restoreProjectTrash,
+} from "./trash.ts";
+export { listProjectTrashDirectory, listProjectTrashSizes } from "./trash-tree.ts";
 export { watchProject, bindWorkspaceEvents } from "./watcher.ts";
 export { openProjectSiteFile } from "./site.ts";
 export { searchProject, searchProjectGit } from "./search.ts";

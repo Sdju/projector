@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import UiInline from "../../../../../common/ui/UiInline.vue";
 import EmojiText from "../../../../../common/ui/EmojiText.vue";
-import type { Discussion } from "@ai-projector/core/modules/workspace/index.ts";
 import { usePagedList } from "../lib/paged-list.ts";
 import { useTrackerPanel } from "../lib/tracker-panel.ts";
 import TrackerPanel from "./TrackerPanel.vue";
@@ -14,12 +13,7 @@ const props = defineProps<{ projectId: string; active: boolean }>();
 const emit = defineEmits<{
   open: [discussion: { number: number; title: string }, pinned?: boolean];
 }>();
-const list = usePagedList<Discussion>(
-  () => props.projectId,
-  "discussions",
-  "discussions",
-  "Не удалось прочитать discussions",
-);
+const list = usePagedList(() => props.projectId, "discussions", "Не удалось прочитать discussions");
 const { commands, open } = useTrackerPanel({
   kind: "discussions",
   plural: "discussions",

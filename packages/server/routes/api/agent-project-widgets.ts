@@ -4,6 +4,7 @@ import {
   setProjectWidgetTrust,
 } from "../../modules/project-widgets/index.ts";
 import { accessAllowed } from "../../modules/access/index.ts";
+import { auditProjectTrust } from "../../modules/project-trust/index.ts";
 import { HttpError } from "../../modules/http/index.ts";
 import { asString, json, readBody } from "../../modules/transport/index.ts";
 import type { RouteContext, RouteDefinition } from "../../modules/transport/index.ts";
@@ -43,8 +44,11 @@ export const routes: RouteDefinition[] = [
       const body = await readBody(req);
       if (typeof body.trusted !== "boolean")
         throw new HttpError(400, "trusted должен быть boolean");
+      const projectId = projectIdOf(body.projectId);
       try {
-        json(res, 200, await setProjectWidgetTrust(projectIdOf(body.projectId), body.trusted));
+        const state = await setProjectWidgetTrust(projectId, body.trusted);
+        void auditProjectTrust(projectId);
+        json(res, 200, state);
       } catch (error) {
         if (error instanceof HttpError) throw error;
         throw new HttpError(400, error instanceof Error ? error.message : "Неверное доверие");

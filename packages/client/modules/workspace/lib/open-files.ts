@@ -1,6 +1,7 @@
 import { onBeforeUnmount, ref, type Ref } from "vue";
 import { toastErrors } from "../../../common/utilities/notice.ts";
 import { isFileDrag, pathsFromDataTransfer } from "../../path-drop/index.ts";
+import { isProjectorDrag, readProjectorDrag } from "../../path-drop/index.ts";
 import type { DockTarget } from "../../dock/index.ts";
 import {
   workspaceRequest,
@@ -26,7 +27,6 @@ import { ensureTab } from "./service-tabs.ts";
 import { useDirtyGuard } from "./dirty-guard.ts";
 import { useFileSync } from "./file-sync.ts";
 import { confirmBrowserFile, readOpenData } from "./read-file.ts";
-import { treeDragType } from "../modules/tree/index.ts";
 
 export interface OpenFilesContext {
   projectId: () => string;
@@ -218,25 +218,25 @@ export function useOpenFiles(ctx: OpenFilesContext) {
   }
   const acceptsFileDrop = (data: DataTransfer | null) =>
     (workspaceCapabilities(ctx.projectId()).externalFiles && isFileDrag(data)) ||
-    !!data?.types.includes(treeDragType);
+    isProjectorDrag(data);
   async function dropFiles(event: DragEvent, target: DockTarget) {
     event.preventDefault();
     const data = event.dataTransfer;
-    if (!data || (!isFileDrag(data) && !data.types.includes(treeDragType))) return;
+    if (!data || (!isFileDrag(data) && !isProjectorDrag(data))) return;
     const generation = ++dropGeneration;
     const projectId = ctx.projectId();
     const paths = pathsFromDataTransfer(data);
     const files = [...data.files];
     const directories = [...data.items].some((item) => item.webkitGetAsEntry?.()?.isDirectory);
-    const tree = data.getData(treeDragType);
+    const entry = readProjectorDrag(data); // DataTransfer пустеет после первого await.
     const current = () => generation === dropGeneration && projectId === ctx.projectId();
     fileError.value = "";
     ctx.pending.target = target;
     try {
-      if (tree) {
-        const entry = JSON.parse(tree) as { projectId: string; path: string };
+      if (entry) {
         if (entry.projectId === projectId) {
-          await openFile(entry.path, undefined, undefined, undefined, { preview: false });
+          if (entry.commit) await openCommitFile(entry.commit, entry.path, false);
+          else await openFile(entry.path, undefined, undefined, entry.staged, { preview: false });
           return;
         }
         const response = await fetch(`/api/projects/${encodeURIComponent(entry.projectId)}`);
@@ -245,7 +245,7 @@ export function useOpenFiles(ctx: OpenFilesContext) {
         paths.push(`${result.project.path.replace(/\/+$/, "")}/${entry.path}`);
       }
       if (paths.length) {
-        const { root } = await workspaceRequest<{ root: string }>(projectId, "root");
+        const { root } = await workspaceRequest(projectId, "root");
         for (const path of paths) {
           if (!current()) return;
           const relative = projectRelativePath(root, path);

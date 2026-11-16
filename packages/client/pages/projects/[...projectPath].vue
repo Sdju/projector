@@ -14,6 +14,7 @@ import type { Project } from "../../modules/project/index.ts";
 import {
   ProjectMissing,
   ProjectSettings,
+  projectSettingsSection,
   useProjectCommands,
 } from "../../modules/catalog/index.ts";
 import { RunMenu, useRunner } from "../../modules/runner/index.ts";
@@ -35,10 +36,11 @@ import {
   GitlabRepositoryInfoLoader,
 } from "../../modules/gitlab-workspace/index.ts";
 import { useCommandScope } from "../../common/utilities/commands.ts";
+import { bindProjectAppearance } from "../../modules/appearance/index.ts";
 import UiButton from "../../common/ui/UiButton.vue";
 import IconGithub from "~icons/simple-icons/github";
 import IconGitlab from "~icons/simple-icons/gitlab";
-import { projectInitPrompt, useAgent } from "../../modules/agent/index.ts";
+import { projectInitPrompt, requestChatTab, useAgent } from "../../modules/agent/index.ts";
 import { settingsTabViews } from "../../modules/app-settings/index.ts";
 
 const route = useRoute();
@@ -196,16 +198,23 @@ gitlabCommands.scope.registerCommand({
 });
 // A project created by this visit gets an agent tab with a suggested initialization request.
 let initProjectId = "";
-/** A notification opens the project together with the job or chat it points at. */
+/** A notification opens the project together with the job, chat or settings section it points at. */
 function openInboxTarget() {
   const job = typeof route.query.job === "string" ? route.query.job : "";
   const chat = typeof route.query.chat === "string" ? route.query.chat : "";
-  if (!job && !chat) return;
+  const section = typeof route.query.settings === "string" ? route.query.settings : "";
+  if (!job && !chat && !section) return;
   if (job) workspace.value?.openTab("agent-job", { job });
-  else workspace.value?.openTab("agent", { chatId: chat });
+  else if (chat) {
+    if (!requestChatTab(projectId.value, chat)) workspace.value?.openTab("agent", { chatId: chat });
+  } else if (section) {
+    projectSettingsSection.value = section;
+    workspace.value?.openTab("project");
+  }
   const query = { ...route.query };
   delete query.job;
   delete query.chat;
+  delete query.settings;
   void router.replace({ path: route.path, query });
 }
 function suggestInit(instance: unknown) {
@@ -219,6 +228,13 @@ function suggestInit(instance: unknown) {
   if (!agent.draft.value.trim() && !agent.turns.value.length) agent.draft.value = projectInitPrompt;
   workspace.value.openTab("agent");
 }
+// The inbox may link to settings of the project that is already open; the page is not remounted then.
+watch(
+  () => [route.query.job, route.query.chat, route.query.settings] as const,
+  () => {
+    if (workspace.value) openInboxTarget();
+  },
+);
 const missing = ref(false);
 const opening = ref(false);
 const openError = ref("");
@@ -242,6 +258,7 @@ watch(
     onCleanup(() => {
       active = false;
       dispose?.();
+      void bindProjectAppearance(null).catch(() => undefined);
     });
     projectId.value = "";
     githubRepository.value = null;
@@ -279,6 +296,7 @@ watch(
         projectId.value = item.id;
         initProjectId = created && !gone ? item.id : "";
         missing.value = gone;
+        void bindProjectAppearance(item.id).catch(() => undefined);
         const canonical = projectRoute(item.path);
         if (route.path !== canonical) await router.replace(canonical);
       }
@@ -313,8 +331,10 @@ watch(
       :save-project-settings="() => settings?.save()"
       :tab-views="tabViews"
     >
-      <template #terminal-actions>
+      <template #project-run>
         <RunMenu :project="project" />
+      </template>
+      <template v-if="gitlabRepository || githubRepository" #project-repository>
         <UiButton
           v-if="gitlabRepository"
           shape="icon"

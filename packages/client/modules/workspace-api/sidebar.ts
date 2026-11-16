@@ -18,6 +18,8 @@ export interface SidebarType {
   params?: Record<string, unknown>;
   /** A temporary section can be closed from the sidebar. */
   closable?: boolean;
+  /** Service section (Hub, trash, plugin tools): drawn in the bottom group of the section rail. */
+  utility?: boolean;
   /** Short note about the source shown above the panel when the section is temporary. */
   source?: string;
 }
@@ -27,6 +29,15 @@ export interface SidebarRegistry {
   get(id: string): SidebarType | undefined;
   list(): SidebarType[];
 }
+
+/**
+ * Standard service sections of a Projector workspace: the Hub devices and the project trash.
+ * They sit in the bottom group of the left rail; the work inbox is a tab (`inboxTab`).
+ */
+export const workspaceUtility: readonly SidebarType[] = [
+  { id: "hub", title: "Hub", utility: true },
+  { id: "trash", title: "Корзина", requires: "write", utility: true },
+];
 
 /** Later groups win by id; sections whose capability is off are left out. */
 export function createSidebarRegistry(

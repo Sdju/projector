@@ -86,6 +86,7 @@ export default {
       "@ai-projector/core": "packages/core",
       "@ai-projector/cli": "packages/cli",
       "@ai-projector/hub": "packages/hub",
+      "@ai-projector/plugin-api": "packages/plugin-api/modules/api",
     },
     imports: { computed: "forbid", unresolved: "forbid" },
     cycles: { modules: true, types: "include" },
@@ -109,10 +110,6 @@ export default {
             ceiling: 402,
             plan: "Вынести чтение файлов и ассетов GitLab в отдельный files.ts",
           },
-          "packages/server/modules/agents/projector/projector-backend.ts": {
-            ceiling: 409,
-            plan: "Вынести настройку инструментов хода (guard, review, task runner) в projector-turn-setup.ts.",
-          },
         },
       },
       confine: adapters,
@@ -120,7 +117,7 @@ export default {
   },
   roots: {
     "packages/client": {
-      dependencies: ["packages/core"],
+      dependencies: ["packages/core", "packages/plugin-api"],
       transitModules: ["agents-integration", "agent-widgets"],
       extra: { confine: [...nodeOnly, ...adapters] },
     },
@@ -137,5 +134,6 @@ export default {
       extra: { confine: [...nodeOnly, ...adapters] },
     },
     "packages/cli": { layers: cliLayers, dependencies: ["packages/core"] },
+    "packages/plugin-api": { dependencies: [] },
   },
 };

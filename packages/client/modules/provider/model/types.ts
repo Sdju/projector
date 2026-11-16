@@ -1,4 +1,7 @@
-export type ProviderKind = "custom" | "local" | "deepseek" | "qwencloud";
+export type BuiltinProviderKind = "custom" | "local" | "deepseek" | "openrouter" | "qwencloud";
+
+/** Built-in presets plus kinds contributed by trusted balance plugins. */
+export type ProviderKind = BuiltinProviderKind | (string & {});
 
 /** How the provider is asked to think; the server turns the chosen level into its own request fields. */
 export type ThinkingStyle =
@@ -42,11 +45,24 @@ export interface OpenAIProviderPublic {
   enabled: boolean;
   models: ProviderModel[];
   hasApiKey: boolean;
+  hasBalanceApiKey?: boolean;
+}
+
+export interface ProviderKindInfo {
+  kind: string;
+  title: string;
+  description?: string;
+  url?: string;
+  model?: string;
+  plugin?: string;
 }
 
 export interface OpenAIProvidersPublicState {
   activeProviderId: string | null;
   providers: OpenAIProviderPublic[];
+  balanceKinds: ProviderKindInfo[];
+  /** Виды провайдеров с читателем расхода. */
+  usageKinds: ProviderKindInfo[];
 }
 
 export interface ProviderBalanceEntry {
@@ -64,4 +80,27 @@ export interface ProviderBalance {
   message: string | null;
   providerId?: string;
   providerName?: string;
+  providerKind?: string;
+}
+
+export interface ProviderUsageQuota {
+  modelId: string;
+  remaining: string | null;
+  total: string | null;
+  unit: string | null;
+  percent: number | null;
+  status: string | null;
+}
+
+/** Расход и квоты провайдера; это не остаток кошелька. */
+export interface ProviderUsage {
+  status: "ready" | "unavailable";
+  period: { from: string; to: string } | null;
+  currency: string | null;
+  spend: string | null;
+  quotas: ProviderUsageQuota[];
+  plan: string | null;
+  credits: { total: number; remaining: number } | null;
+  checkedAt: number;
+  message: string | null;
 }

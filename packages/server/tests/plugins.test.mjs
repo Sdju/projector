@@ -4,7 +4,7 @@ import { cp, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/pr
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { beforeEach, expect, onTestFinished, test } from "vite-plus/test";
+import { beforeEach, expect, onTestFinished, test, vi } from "vite-plus/test";
 import { dataDir } from "../../core/modules/app-paths/index.ts";
 import { readAppearanceChoice } from "../modules/appearance/index.ts";
 import {
@@ -172,4 +172,38 @@ test("plugins API installs a local fixture, applies its theme and falls back aft
   expect(rejected.status).toBe(400);
 
   expect((await request("install", { path: source })).status).toBe(400);
+});
+
+test("проверка engines.projector берёт версию из манифеста, а не из кода", async () => {
+  const { installedProjectorVersion } = await import("../modules/plugins/version.ts");
+  const root = JSON.parse(
+    await readFile(fileURLToPath(new URL("../../../package.json", import.meta.url)), "utf8"),
+  );
+  // Вторая копия номера в коде отставала бы от манифеста после релиза.
+  expect(installedProjectorVersion()).toBe(root.version);
+});
+
+test("версия проекта читается из ближайшего манифеста, а сбой виден в логе", async () => {
+  const { readProjectorVersion } = await import("../modules/plugins/version.ts");
+  const directory = await mkdtemp(join(tmpdir(), "projector-version-"));
+  onTestFinished(() => rm(directory, { recursive: true, force: true }));
+  // Собранная поставка: манифесты пакетов не копируются, ближайший — манифест пакета IDE.
+  const server = join(directory, "packages/server/modules/plugins");
+  await mkdir(server, { recursive: true });
+  await writeFile(join(directory, "package.json"), JSON.stringify({ version: "9.8.7" }));
+  expect(readProjectorVersion(server)).toBe("9.8.7");
+
+  // Дерево исходников: ближайший манифест — манифест пакета сервера.
+  await writeFile(join(server, "package.json"), JSON.stringify({ version: "1.0.0" }));
+  expect(readProjectorVersion(server)).toBe("1.0.0");
+
+  const warned = vi.spyOn(console, "warn").mockImplementation(() => {});
+  try {
+    await writeFile(join(server, "package.json"), "{ broken");
+    expect(readProjectorVersion(server)).toBeUndefined();
+    expect(warned.mock.calls.flat().join(" ")).toMatch(/повреждён/);
+    expect(warned.mock.calls.flat().join(" ")).toMatch(/engines\.projector/);
+  } finally {
+    warned.mockRestore();
+  }
 });

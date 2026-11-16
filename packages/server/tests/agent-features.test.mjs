@@ -1,9 +1,7 @@
 import "../../../tests/helpers/builtins.mjs";
 import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
-import { spawn } from "node:child_process";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { fileURLToPath, pathToFileURL } from "node:url";
 import { afterEach, beforeEach, describe, expect, it } from "vite-plus/test";
 import { registerBuiltinAgentFeatures } from "../app/features.ts";
 import { registerBuiltinWidgetDefinitions } from "../app/widgets.ts";
@@ -19,9 +17,15 @@ import {
   setFeatureAgent,
   splitFeaturePrompt,
 } from "../modules/agent-features/index.ts";
-import { readChatFeatures, writeAgentHistory } from "../modules/agent/index.ts";
+import {
+  readChatFeatures,
+  registerAgentBackend,
+  unregisterAgentBackend,
+  writeAgentHistory,
+} from "../modules/agent/index.ts";
 import { promptWithHistory } from "../modules/agent/agent-host.ts";
-import { claudeSystemPrompt } from "../modules/agents/claude-code/claude-code-backend.ts";
+import { claudeSystemPrompt } from "../../../plugins/claude-code/src/claude-code-backend.ts";
+import { loadPluginAnswer } from "../app/plugin-runner.ts";
 import { buildSystemPrompt } from "../modules/agents/projector/prompts.ts";
 
 registerBuiltinWidgetDefinitions();
@@ -49,7 +53,6 @@ describe("agent features", () => {
     expect(widgets.title).toBe("Виджеты в ответах");
     expect(widgets.agents.map((agent) => agent.id)).toEqual([
       "projector",
-      "claude-code",
       "codex",
       "opencode",
       "kimi",
@@ -194,43 +197,84 @@ describe("agent features", () => {
     expect(promptWithHistory("Новое", [], "КОНТЕКСТ")).toBe("КОНТЕКСТ\n\nНовое");
   });
 
-  it("registers the features in the Claude Code runner process", async () => {
+  it("registers the features in a plugin runner process", async () => {
     // The runner is a composition of its own: without these registrations the catalog is empty
     // there, and a saved toggle silently adds nothing to the prompt.
+    const directory = await mkdtemp(join(tmpdir(), "projector-plugin-runner-"));
+    const entry = join(directory, "plugin.cjs");
+    await writeFile(
+      entry,
+      `exports.createAgents = () => [
+        { id: "claude-code", label: "Claude Code", run: async () => {} },
+      ];`,
+      "utf8",
+    );
+    await loadPluginAnswer(entry, "test", "claude-code");
     await setFeatureAgent("widgets", "claude-code", true);
-    const url = (path) => pathToFileURL(fileURLToPath(new URL(path, import.meta.url))).href;
-    const script = `
-      const { featurePrompt } = await import(${JSON.stringify(url("../modules/agent-features/index.ts"))});
-      await import(${JSON.stringify(url("../app/claude-runner.ts"))});
-      process.stdout.write(await featurePrompt("claude-code"));
-    `;
-    const child = spawn(process.execPath, ["--input-type=module", "-e", script], {
-      env: process.env,
-    });
-    let output = "";
-    let errors = "";
-    child.stdout.on("data", (chunk) => (output += chunk));
-    child.stderr.on("data", (chunk) => (errors += chunk));
-    const code = await new Promise((resolve) => child.on("close", resolve));
-    expect(code, errors).toBe(0);
-    expect(output).toContain("Bars —");
+    expect(await featurePrompt("claude-code")).toContain("Bars —");
   });
 
   it("keeps the Claude Code prompt fresh so a toggle applies in a continued session", async () => {
-    const off = await claudeSystemPrompt();
+    const api = {
+      features: { prompt: (id, features) => featurePrompt(id, features) },
+    };
+    const off = await claudeSystemPrompt(api);
     expect(off).toMatchObject({ type: "preset", preset: "claude_code", snapshot: false });
     expect(off.append).toBeUndefined();
 
     await setFeatureAgent("widgets", "claude-code", true);
-    const on = await claudeSystemPrompt();
+    const on = await claudeSystemPrompt(api);
     expect(on.snapshot).toBe(false);
 
     // The chat's own choice wins over the default in both directions.
-    expect((await claudeSystemPrompt([])).append).toBeUndefined();
+    expect((await claudeSystemPrompt(api, [])).append).toBeUndefined();
   });
 
   it("the system prompt names the feature section only when the feature is on", () => {
     expect(buildSystemPrompt("Правило")).toContain("Интерактивные блоки:\nПравило");
     expect(buildSystemPrompt("")).not.toContain("Интерактивные блоки");
+  });
+
+  it("enables widgets by default for a plugin agent even after another agent was toggled", async () => {
+    await setFeatureAgent("widgets", "codex", true);
+    const id = "plugin-widgets-default";
+    registerAgentBackend({
+      id,
+      label: "Plugin Widgets",
+      defaultFeatures: ["widgets"],
+      run: async () => {},
+    });
+    try {
+      registerBuiltinAgentFeatures();
+      const settings = await featureSettings();
+      expect(agentOf(settings, id).enabled).toBe(true);
+      expect(agentOf(settings, "codex").enabled).toBe(true);
+
+      const off = await setFeatureAgent("widgets", id, false);
+      expect(agentOf(off, id).enabled).toBe(false);
+      registerBuiltinAgentFeatures();
+      expect(agentOf(await featureSettings(), id).enabled).toBe(false);
+    } finally {
+      unregisterAgentBackend(id);
+      registerBuiltinAgentFeatures();
+    }
+  });
+
+  it("does not enable ide by default when a plugin agent asks for it", async () => {
+    const id = "plugin-ide-default";
+    registerAgentBackend({
+      id,
+      label: "Plugin IDE",
+      defaultFeatures: ["ide"],
+      run: async () => {},
+    });
+    try {
+      registerBuiltinAgentFeatures();
+      const ide = (await featureSettings()).features.find((feature) => feature.id === "ide");
+      expect(ide.agents.find((agent) => agent.id === id).enabled).toBe(false);
+    } finally {
+      unregisterAgentBackend(id);
+      registerBuiltinAgentFeatures();
+    }
   });
 });

@@ -1,0 +1,41 @@
+<!doctype html>
+<link rel="icon" href="data:," />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<div id="fixture"></div>
+<script type="module">
+  import "/packages/client/app/styles.css";
+  import { createApp, h, ref } from "vue";
+  import AgentFormPanel from "/packages/client/modules/agent-turns/ui/AgentFormPanel.vue";
+  import { registerBuiltinWidgets } from "/packages/client/app/widgets.ts";
+  registerBuiltinWidgets();
+
+  const source = ref("");
+  const values = ref();
+  const readonly = ref(true);
+  const replies = [];
+  const app = createApp({
+    setup: () => () =>
+      h("div", { style: "padding: 24px; max-width: 600px" }, [
+        source.value
+          ? h(AgentFormPanel, {
+              source: source.value,
+              values: values.value,
+              readonly: readonly.value,
+              onSubmit: (text, data, summary) => replies.push({ text, data, summary }),
+            })
+          : null,
+      ]),
+  });
+  app.mount("#fixture");
+  window.fixture = {
+    ready: true,
+    replies,
+    source,
+    values,
+    set(nextSource, nextValues, nextReadonly = true) {
+      source.value = nextSource;
+      values.value = nextValues;
+      readonly.value = nextReadonly;
+    },
+  };
+</script>

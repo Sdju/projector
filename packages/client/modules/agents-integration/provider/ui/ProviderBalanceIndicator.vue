@@ -5,45 +5,58 @@ import { publishProviderBalance } from "../../_/usage-summary.ts";
 import { useUsagePolling } from "../../_/use-usage-polling.ts";
 import IconWallet from "~icons/lucide/wallet";
 import { useCommandScope } from "../../../../common/utilities/commands.ts";
-import { formatBalance, useProviders } from "../../../provider/index.ts";
+import { formatAmount, formatBalances, useProviders } from "../../../provider/index.ts";
 import type { ProviderBalance } from "../../../provider/index.ts";
 
 const { activeProviderId, revision } = useProviders();
-const { usage, failed, refresh } = useUsagePolling<ProviderBalance>("/api/providers/balance", {
+const { usage, failed, refresh } = useUsagePolling<{
+  wallets: ProviderBalance[];
+  checkedAt: number;
+}>("/api/providers/balances", {
   nextCheckAt: (value) => value.checkedAt + 60000,
 });
-// The server resolves the active provider, so a switch or a saved key only needs a new request.
+// A saved key, a new wallet or a switch of the default only needs a new request.
 watch([activeProviderId, revision], () => void refresh());
 
-const shown = computed(() => usage.value && usage.value.status !== "unsupported");
-const ready = computed(() => usage.value?.status === "ready");
-const text = computed(() =>
-  usage.value && ready.value ? formatBalance(usage.value.entries) || "0" : "—",
+const wallets = computed(() => usage.value?.wallets ?? []);
+const shown = computed(() => wallets.value.some((wallet) => wallet.status !== "unsupported"));
+const ready = computed(() => wallets.value.some((wallet) => wallet.status === "ready"));
+const text = computed(() => (ready.value ? formatBalances(wallets.value) || "0" : "—"));
+const tone = computed(() =>
+  wallets.value.some((wallet) => wallet.available === false) ? "over" : "normal",
 );
-const tone = computed(() => (usage.value?.available === false ? "over" : "normal"));
 const tooltip = computed(() => {
-  const value = usage.value;
-  if (!value || !ready.value)
-    return value?.message ?? (failed.value ? "Баланс провайдера недоступен" : "Баланс провайдера");
-  const rows = value.entries.map(
-    (entry) =>
-      `${entry.currency}: ${entry.total} (пополнено ${entry.toppedUp}, подарочные ${entry.granted})`,
-  );
-  if (value.available === false) rows.push("Средств недостаточно для вызовов");
-  return ["Баланс провайдера", ...rows].join("\n");
+  const value = wallets.value;
+  if (!value.length) return failed.value ? "Баланс кошельков недоступен" : "Баланс кошельков";
+  const rows = value.map((wallet) => {
+    const name = wallet.providerName ?? "Провайдер";
+    if (wallet.status !== "ready") return `${name}: ${wallet.message ?? "—"}`;
+    const amounts = wallet.entries
+      .map((entry) => {
+        const total = formatAmount(entry.currency, entry.total);
+        const toppedUp = formatAmount(entry.currency, entry.toppedUp);
+        const granted = formatAmount(entry.currency, entry.granted);
+        return `${total} (пополнено ${toppedUp}, подарочные ${granted})`;
+      })
+      .join(" · ");
+    return `${name}: ${amounts}`;
+  });
+  if (value.some((wallet) => wallet.available === false))
+    rows.push("Средств недостаточно для вызовов");
+  return ["Баланс кошельков", ...rows].join("\n");
 });
 
 publishProviderBalance(
-  computed(() => (ready.value && usage.value ? text.value : null)),
+  computed(() => (ready.value ? text.value : null)),
   tone,
 );
 
 const commands = useCommandScope(`providerBalance:${useId()}`, () => ({ surface: "statusBar" }));
 commands.scope.registerCommand({
   id: "ide.providers.balance.show",
-  title: "Обновить баланс активного провайдера",
+  title: "Обновить баланс кошельков",
   description:
-    "Заново запрашивает баланс активного провайдера для индикатора в статусной строке (сейчас только DeepSeek).",
+    "Заново запрашивает балансы всех включённых провайдеров с известным способом чтения (DeepSeek и виды из плагинов).",
   run: refresh,
 });
 </script>
@@ -57,7 +70,7 @@ commands.scope.registerCommand({
     :remaining="null"
     :value-text="text"
     :tone="tone"
-    meter-label="Баланс активного провайдера"
+    meter-label="Баланс всех кошельков"
     :rows="[]"
     interactive
     @cycle="commands.run('ide.providers.balance.show')"

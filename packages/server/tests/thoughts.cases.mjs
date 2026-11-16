@@ -1,7 +1,7 @@
 import { expect, test } from "vite-plus/test";
 import { createOpencodeDialect } from "../modules/agents/opencode/dialect.ts";
 import { createAcpEventMapper } from "../modules/agents/acp/acp-events.ts";
-import { createClaudeEventMapper } from "../modules/agents/claude-code/claude-code-events.ts";
+import { createClaudeEventMapper } from "../../../plugins/claude-code/src/claude-code-events.ts";
 import { applyAgentEvent } from "../../client/modules/agent-core/model/turn-events.ts";
 
 const thoughts = (events) =>

@@ -29,6 +29,10 @@ export interface AgentToolChip {
   detail: string;
   /** The kind of action the agent named (ACP: read, edit, execute, search, fetch…). */
   kind?: string;
+  /** Host- or plugin-provided label; wins over the built-in name table. */
+  label?: string;
+  /** Paths the call named when the input does not. */
+  paths?: string[];
   /** Output the call has streamed so far, while it is still running. */
   output?: string;
   /** The call of a subagent (`Task`) this call was made inside of. */
@@ -39,7 +43,11 @@ export interface AgentToolChip {
 }
 
 /** A call with the calls a subagent made inside of it, for showing. */
-export type AgentToolView = AgentToolChip & { children?: AgentToolChip[] };
+export type AgentToolView = AgentToolChip & {
+  children?: AgentToolChip[];
+  /** The task this call started, when the agent reports it: its agent kind and model. */
+  task?: AgentTask;
+};
 
 /** The answer in the order it happened: text and tool calls interleave. */
 export type AgentPart =

@@ -80,6 +80,7 @@ export function taskReadout(detail: AgentTaskDetail): string {
   return [
     `${task.title || "Задача"} — ${taskStatusLabel[task.status]}`,
     task.subagent ? `Субагент: ${task.subagent}` : "",
+    task.model ? `Модель: ${task.model}` : "",
     call?.input ? `Задание: ${call.input.slice(0, 1000)}` : "",
     calls.length ? `Вызовы: ${calls.map((c) => `${c.name} — ${c.status}`).join("; ")}` : "",
     task.summary ? `Итог: ${task.summary}` : "",

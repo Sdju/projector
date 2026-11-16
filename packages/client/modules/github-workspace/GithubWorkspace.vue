@@ -133,7 +133,7 @@ const tabViews: TabViews = {
     :project-id="projectId"
     :tab-views="tabViews"
   >
-    <template #terminal-actions>
+    <template #project-repository>
       <UiButton
         shape="icon"
         size="sm"

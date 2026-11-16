@@ -7,13 +7,14 @@ import UiFormGrid from "../../../common/ui/UiFormGrid.vue";
 import UiScrollArea from "../../../common/ui/UiScrollArea.vue";
 
 import UiHint from "../../../common/ui/UiHint.vue";
-import { computed, ref } from "vue";
+import UiLoader from "../../../common/ui/UiLoader.vue";
+import { computed, onMounted, ref } from "vue";
 import UiButton from "../../../common/ui/UiButton.vue";
 import UiField from "../../../common/ui/UiField.vue";
 import { commandArgs, useCommandScope } from "../../../common/utilities/commands.ts";
 import { useProviders } from "../model/store.ts";
-import { PROVIDER_KINDS, PROVIDER_PRESETS, THINKING_STYLES } from "../model/presets.ts";
-import { formatAmount } from "../model/format-balance.ts";
+import { THINKING_STYLES } from "../model/presets.ts";
+import { combineBalances, formatAmount, formatBalance } from "../model/format-balance.ts";
 import type { ModelPrice, ProviderKind, ThinkingStyle } from "../model/types.ts";
 
 /** The provider whose page the navigation opened. Without one, the section is the overview. */
@@ -27,14 +28,21 @@ const {
   error,
   saving,
   keyDrafts,
+  balanceKeyDrafts,
   save,
   setActive,
   addProvider,
   removeProvider,
   setKeyDraft,
+  setBalanceKeyDraft,
   patchProvider,
   balances,
+  usage,
+  usageBusy,
+  hasUsage: kindHasUsage,
   loadBalance,
+  loadBalances,
+  loadUsage,
   fetchModels,
   registerModel,
   unregisterModel,
@@ -45,6 +53,9 @@ const {
   remoteModels,
   fetchingModels,
   modelsError,
+  kindOptions,
+  presetFor,
+  hasBalance: kindHasBalance,
 } = useProviders();
 const selected = computed(() => providers.value.find((item) => item.id === props.providerId));
 const enabledCount = computed(() => providers.value.filter((item) => item.enabled).length);
@@ -52,9 +63,30 @@ const modelCount = computed(() =>
   providers.value.reduce((sum, item) => sum + (item.enabled ? item.models.length : 0), 0),
 );
 
-const preset = computed(() => PROVIDER_PRESETS[selected.value?.kind ?? "custom"]);
+const preset = computed(() => presetFor(selected.value?.kind ?? "custom"));
+// A provider saved with a plugin kind stays editable after the plugin is disabled.
+const shownKinds = computed(() => {
+  const list = [...kindOptions.value];
+  const kind = selected.value?.kind;
+  if (kind && !list.some((item) => item.kind === kind))
+    list.push({ kind, title: `${kind} · плагин выключен` });
+  return list;
+});
 const balance = computed(() => (selected.value ? balances.value[selected.value.id] : undefined));
-const hasBalance = computed(() => selected.value?.kind === "deepseek");
+const hasBalance = computed(() => (selected.value ? kindHasBalance(selected.value.kind) : false));
+const providerUsage = computed(() => (selected.value ? usage.value[selected.value.id] : undefined));
+const providerUsageBusy = computed(() =>
+  Boolean(selected.value && usageBusy.value[selected.value.id]),
+);
+const hasUsage = computed(() => (selected.value ? kindHasUsage(selected.value.kind) : false));
+const walletRows = computed(() =>
+  providers.value.flatMap((provider) => {
+    const value = balances.value[provider.id];
+    return value?.status === "ready" ? [{ provider, value }] : [];
+  }),
+);
+const combined = computed(() => combineBalances(walletRows.value.map((row) => row.value)));
+onMounted(() => void loadBalances());
 
 const PRICE_FIELDS = [
   ["input", "вход"],
@@ -117,7 +149,7 @@ function setContext(id: string, value: string): void {
 /** A new type brings the thinking dialect that suits it; the user can pick another afterwards. */
 function changeKind(kind: ProviderKind): void {
   if (selected.value)
-    patchProvider(selected.value.id, { kind, thinkingStyle: PROVIDER_PRESETS[kind].thinking });
+    patchProvider(selected.value.id, { kind, thinkingStyle: presetFor(kind).thinking });
 }
 
 function toggle(row: ModelRow, on: boolean): void {
@@ -150,13 +182,14 @@ commands.scope.registerCommand({
   id: "ide.providers.add",
   title: "Добавить провайдера",
   description:
-    "Добавляет провайдера из пресета: deepseek, qwencloud, local или custom (по умолчанию custom). Подставляет адрес и модель; ключ вводится в форме, затем «сохранить».",
-  arguments: { kind: "deepseek | qwencloud | local | custom" },
+    "Добавляет провайдера из пресета: deepseek, openrouter, qwencloud, local или custom (по умолчанию custom), а также вид, объявленный включённым плагином. Подставляет адрес и модель; ключ вводится в форме, затем «сохранить».",
+  arguments: { kind: "deepseek | openrouter | qwencloud | local | custom | <вид из плагина>" },
   run: (value) => {
-    const kind = commandArgs(value).kind ?? "custom";
-    if (!PROVIDER_KINDS.includes(kind as ProviderKind))
+    const raw = commandArgs(value).kind;
+    const kind = typeof raw === "string" ? raw : "custom";
+    if (!kindOptions.value.some((item) => item.kind === kind))
       throw new Error("Неизвестный тип провайдера");
-    return add(kind as ProviderKind);
+    return add(kind);
   },
 });
 commands.scope.registerCommand({
@@ -199,16 +232,31 @@ commands.scope.registerCommand({
   id: "ide.providers.balance.refresh",
   title: "Обновить баланс провайдера",
   description:
-    "Запрашивает баланс выбранного провайдера (сейчас только DeepSeek; у Qwen Cloud и локальных баланса по ключу нет).",
+    "Запрашивает баланс выбранного провайдера: DeepSeek, OpenRouter и виды, для которых включённый плагин зарегистрировал читатель.",
   enabled: () => hasBalance.value,
   run: async () => {
     if (selected.value) await loadBalance(selected.value.id);
+  },
+});
+commands.scope.registerCommand({
+  id: "ide.providers.usage.refresh",
+  title: "Проверить расход провайдера",
+  description:
+    "Запрашивает расход и квоты выбранного провайдера, если для его вида зарегистрирован читатель. Это не остаток кошелька: читатель возвращает только то, что отдаёт провайдер.",
+  enabled: () => hasUsage.value && !providerUsageBusy.value,
+  run: async () => {
+    if (selected.value) await loadUsage(selected.value.id);
   },
 });
 
 function keyDraft(): string {
   if (!selected.value) return "";
   return keyDrafts.value[selected.value.id] ?? "";
+}
+
+function balanceKeyDraft(): string {
+  if (!selected.value) return "";
+  return balanceKeyDrafts.value[selected.value.id] ?? "";
 }
 </script>
 
@@ -220,14 +268,25 @@ function keyDraft(): string {
         Провайдеры OpenAI-compatible API перечислены слева: у каждого своя страница. Включённых
         может быть сколько угодно, агент выбирает любую их модель.
       </UiHint>
+      <UiStack v-if="walletRows.length" class="wallets" :gap="1">
+        <UiInline wrap justify="between">
+          <span class="kicker">все кошельки</span>
+          <strong>{{ formatBalance(combined) }}</strong>
+        </UiInline>
+        <UiInline v-for="row in walletRows" :key="row.provider.id" wrap :gap="2">
+          <span>{{ row.provider.name }}</span>
+          <span class="wallet-balance">{{ formatBalance(row.value.entries) }}</span>
+          <span v-if="!row.provider.enabled" class="wallet-off">выключен</span>
+        </UiInline>
+      </UiStack>
       <UiInline wrap :gap="2">
         <UiButton
-          v-for="kind in PROVIDER_KINDS"
-          :key="kind"
-          :title="PROVIDER_PRESETS[kind].label"
-          @click="commands.run('ide.providers.add', { kind })"
+          v-for="info in kindOptions"
+          :key="info.kind"
+          :title="info.title"
+          @click="commands.run('ide.providers.add', { kind: info.kind })"
         >
-          + {{ kind === "custom" ? "другой" : PROVIDER_PRESETS[kind].name.split(" ")[0] }}
+          + {{ info.kind === "custom" ? "другой" : info.title.split(" ")[0] }}
         </UiButton>
       </UiInline>
       <UiHint v-if="providers.length">
@@ -254,8 +313,8 @@ function keyDraft(): string {
             :value="selected.kind"
             @change="changeKind(($event.target as HTMLSelectElement).value as ProviderKind)"
           >
-            <option v-for="kind in PROVIDER_KINDS" :key="kind" :value="kind">
-              {{ PROVIDER_PRESETS[kind].label }}
+            <option v-for="info in shownKinds" :key="info.kind" :value="info.kind">
+              {{ info.title }}
             </option>
           </UiControl>
         </UiField>
@@ -315,6 +374,19 @@ function keyDraft(): string {
             autocomplete="off"
             :placeholder="selected.hasApiKey ? 'сохранён — введите новый' : preset.keyPlaceholder"
             @input="setKeyDraft(selected.id, ($event.target as HTMLInputElement).value)"
+          />
+        </UiField>
+        <UiField v-if="selected.kind === 'openrouter'" v-slot="{ control }" label="management key">
+          <UiControl
+            v-bind="control"
+            aria-label="OpenRouter management key"
+            :value="balanceKeyDraft()"
+            type="password"
+            autocomplete="off"
+            :placeholder="
+              selected.hasBalanceApiKey ? 'сохранён — введите новый' : 'для просмотра баланса'
+            "
+            @input="setBalanceKeyDraft(selected.id, ($event.target as HTMLInputElement).value)"
           />
         </UiField>
       </UiFormGrid>
@@ -452,11 +524,61 @@ function keyDraft(): string {
             Провайдер сообщает, что средств для вызовов недостаточно.
           </UiMessage>
         </template>
+        <UiLoader
+          v-else-if="!balance?.message && (selected.hasApiKey || selected.hasBalanceApiKey)"
+          size="sm"
+          >загрузка…</UiLoader
+        >
+        <UiHint v-else>{{ balance?.message ?? "Сохраните ключ, чтобы увидеть баланс." }}</UiHint>
+      </UiStack>
+      <UiStack v-if="hasUsage" class="balance" :gap="1">
+        <UiInline wrap justify="between">
+          <span class="kicker">расход провайдера</span>
+          <UiButton
+            appearance="outline"
+            tone="muted"
+            shape="chip"
+            :disabled="providerUsageBusy"
+            @click="commands.run('ide.providers.usage.refresh')"
+          >
+            проверить
+          </UiButton>
+        </UiInline>
+        <template v-if="providerUsage?.status === 'ready'">
+          <UiInline wrap :gap="3">
+            <strong>{{
+              providerUsage.spend ? `${providerUsage.currency ?? ""} ${providerUsage.spend}` : "—"
+            }}</strong>
+            <span v-if="providerUsage.period" class="meta">
+              {{ providerUsage.period.from }} → {{ providerUsage.period.to }}
+            </span>
+          </UiInline>
+          <UiInline v-if="providerUsage.plan" wrap :gap="2">
+            <span class="meta">план</span><strong>{{ providerUsage.plan }}</strong>
+            <span v-if="providerUsage.credits" class="meta">
+              кредиты {{ providerUsage.credits.remaining }} / {{ providerUsage.credits.total }}
+            </span>
+          </UiInline>
+          <UiInline
+            v-for="item in providerUsage.quotas.slice(0, 4)"
+            :key="item.modelId"
+            wrap
+            :gap="2"
+          >
+            <code>{{ item.modelId }}</code>
+            <span class="meta">
+              {{ item.remaining ?? "—" }} / {{ item.total ?? "—" }} {{ item.unit ?? "" }}
+              <template v-if="item.percent !== null"> · {{ item.percent }}%</template>
+            </span>
+          </UiInline>
+          <UiHint>
+            Это расход и квоты провайдера, не остаток кошелька. Источник зависит от вида провайдера.
+          </UiHint>
+          <UiHint v-if="providerUsage.message">{{ providerUsage.message }}</UiHint>
+        </template>
+        <UiLoader v-else-if="providerUsageBusy" size="sm">читаем расход…</UiLoader>
         <UiHint v-else>
-          {{
-            balance?.message ??
-            (selected.hasApiKey ? "загрузка…" : "Сохраните ключ, чтобы увидеть баланс.")
-          }}
+          {{ providerUsage?.message ?? "Нажмите «проверить», чтобы прочитать расход провайдера." }}
         </UiHint>
       </UiStack>
       <UiInline wrap justify="between">
@@ -589,5 +711,32 @@ function keyDraft(): string {
   align-items: center;
   font-size: var(--fs-xs);
   cursor: pointer;
+}
+
+.wallets {
+  padding: var(--sp-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+}
+
+.wallets strong,
+.wallet-balance {
+  font-variant-numeric: tabular-nums;
+}
+
+.wallets .kicker {
+  color: var(--muted);
+  font-size: var(--fs-2xs);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.wallet-balance {
+  color: var(--text-2);
+}
+
+.wallet-off {
+  color: var(--muted);
+  font-size: var(--fs-2xs);
 }
 </style>

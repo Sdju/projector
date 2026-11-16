@@ -16,11 +16,15 @@ import {
 } from "../modules/project/index.ts";
 import { useRunner } from "../modules/runner/index.ts";
 import { CommandPalette, provideIdeCommands } from "../modules/ide/index.ts";
+import { registerMediaCommands } from "../modules/media/index.ts";
 import UiMessage from "../common/ui/UiMessage.vue";
 import UiNoticeHost from "../common/ui/UiNoticeHost.vue";
 import AppShell from "./layouts/AppShell.vue";
 
-const { error: commandError } = provideIdeCommands();
+const { error: commandError, api } = provideIdeCommands();
+/** Media commands live at app level, not in the tab: an agent may use them while it is closed. */
+const mediaCommands = api.createScope("media", () => ({ surface: "media" }));
+registerMediaCommands(mediaCommands);
 const { load, projects } = useProjects();
 const { connect } = useRunner();
 const route = useRoute();
@@ -118,6 +122,7 @@ onMounted(() => {
 });
 onUnmounted(() => {
   cancelHide();
+  mediaCommands.dispose();
   window.removeEventListener("projector:show", showLauncher);
   window.removeEventListener("blur", windowBlur);
   window.removeEventListener("focus", cancelHide);

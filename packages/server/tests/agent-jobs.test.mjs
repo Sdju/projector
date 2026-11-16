@@ -13,14 +13,18 @@ let store;
 let attached;
 let replayed;
 
-async function until(check, timeoutMs = 15000) {
+// Git worktrees and fs on Windows CI runners are an order of magnitude slower than on Linux/macOS.
+async function until(check, timeoutMs = process.platform === "win32" ? 90_000 : 15_000, where) {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     const value = await check();
     if (value) return value;
     await new Promise((resolve) => setTimeout(resolve, 15));
   }
-  throw new Error("condition not met in time");
+  // The dump of the state that never arrived tells a hang apart from plain slowness.
+  let detail = "";
+  if (where) detail = String((await where().catch(() => "")) ?? "");
+  throw new Error(`condition not met in time${detail ? `: ${detail}` : ""}`);
 }
 
 // A scripted backend: the task text picks what it does. No real CLI is started.
@@ -87,6 +91,29 @@ const fake = {
       });
       emit("text", { text: `allowed=${allowed} answers=${JSON.stringify(answers)}` });
       emit("done", { text: `allowed=${allowed} answers=${JSON.stringify(answers)}` });
+      return;
+    }
+    if (task === "judge") {
+      emit("judge", {
+        tool: "Read",
+        title: "Read a.txt",
+        verdict: { score: 1, label: "безопасно", reason: "Только чтение", confidence: "high" },
+        decision: "auto",
+        at: 123,
+      });
+      const allowed = await options.approve({
+        tool: "bash",
+        input: { command: "rm -rf build" },
+        title: "rm -rf build",
+        judge: {
+          score: 4,
+          label: "высокий",
+          reason: "Удаление файлов",
+          confidence: "high",
+          effect: "Удалит build",
+        },
+      });
+      emit("done", { text: `judged=${allowed}` });
       return;
     }
     emit("text", { text: "hel" });
@@ -167,10 +194,14 @@ describe("background agent jobs", () => {
     expect(await runs.readRun(done.runId)).toBeNull();
     // It is on disk, so it outlives the server. The final record is written after its status
     // becomes visible, so wait for the file instead of racing the write.
-    const saved = await until(async () => {
-      const found = await store.loadJob(job.id);
-      return found?.status === "done" ? found : undefined;
-    });
+    const saved = await until(
+      async () => {
+        const found = await store.loadJob(job.id);
+        return found?.status === "done" ? found : undefined;
+      },
+      undefined,
+      async () => JSON.stringify((await jobs.readJob(job.id)).job),
+    );
     expect(saved.result).toBe("final answer");
     expect((await jobs.listJobs("p1")).map((item) => item.id)).toContain(job.id);
     expect(await jobs.listJobs("other")).toEqual([]);
@@ -348,5 +379,62 @@ describe("background agent jobs", () => {
     await jobs.removeJob(job.id);
     expect(await jobs.readJob(job.id)).toBeNull();
     expect(await jobs.readJob("../etc")).toBeNull();
+  });
+
+  it("preserves judge verdicts on pending permissions and records auto-judge journal notes", async () => {
+    const job = await start("judge");
+    const waiting = await until(async () => {
+      const { job: now } = await jobs.readJob(job.id);
+      return now.status === "needs-user" && now.pending.length ? now : undefined;
+    });
+    expect(waiting.pending[0].judge).toMatchObject({
+      score: 4,
+      label: "высокий",
+      reason: "оценка недоступна",
+    });
+    const { open } = await import("../modules/agent/jobs.ts");
+    const { onEvent, live } = await import("../modules/agent/jobs-live.ts");
+    const synthetic = open(
+      {
+        id: "dddddddddddd",
+        backend: "fake-job",
+        task: "judge",
+        projectId: "p1",
+        cwd: folder,
+        messageId: "m1",
+        unattended: false,
+        status: "running",
+        rev: 1,
+        createdAt: Date.now(),
+        result: "",
+        files: [],
+        pending: [],
+      },
+      [],
+    );
+    onEvent(synthetic, "permission-request", {
+      id: "perm-judge",
+      tool: "bash",
+      title: "rm -rf build",
+      judge: {
+        score: 4,
+        label: "высокий",
+        reason: "Удаление файлов",
+        confidence: "high",
+        effect: "Удалит build",
+      },
+    });
+    expect(synthetic.job.pending[0].judge).toMatchObject({
+      score: 4,
+      label: "высокий",
+      reason: "Удаление файлов",
+      effect: "Удалит build",
+    });
+    live.delete("dddddddddddd");
+    await jobs.answerJob(job.id, { allow: true });
+    const { job: done, journal } = await settled(job.id);
+    expect(done.status).toBe("done");
+    expect(done.result).toBe("judged=true");
+    expect(journal.some((entry) => entry.event === "judge")).toBe(true);
   });
 });

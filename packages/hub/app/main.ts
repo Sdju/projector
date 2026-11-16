@@ -11,7 +11,13 @@ if (!password || !deviceToken || password === deviceToken)
   throw new Error("Задайте разные PROJECTOR_HUB_PASSWORD и PROJECTOR_HUB_DEVICE_TOKEN");
 const staticRoot = fileURLToPath(new URL("../../../dist", import.meta.url));
 if (!existsSync(`${staticRoot}/index.html`)) throw new Error("Сначала выполните vp run build");
-const hub = createHub({ origin, password, deviceToken, staticRoot });
+const hub = createHub({
+  origin,
+  password,
+  deviceToken,
+  staticRoot,
+  dataDir: process.env.PROJECTOR_HUB_DATA,
+});
 hub.server.listen(port, host, () => console.log(`Projector Hub: ${origin}`));
 hub.server.on("error", (error) => {
   console.error(error.message);

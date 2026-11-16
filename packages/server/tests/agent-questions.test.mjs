@@ -1,7 +1,7 @@
 import "../../../tests/helpers/builtins.mjs";
 import { expect, test } from "vite-plus/test";
 import { completeCommandRequest, createQuestionBridge } from "../modules/agent/command-bridge.ts";
-import { askClaudeQuestions } from "../modules/agents/claude-code/questions.ts";
+import { askClaudeQuestions } from "../../../plugins/claude-code/src/questions.ts";
 import { codexProgram } from "../modules/agents/codex/index.ts";
 
 const claudeInput = {
@@ -193,7 +193,12 @@ test("a question an ACP agent asks reaches the user through runAgent and the ans
   const cwd = await mkdtemp(join(tmpdir(), "projector-ask-"));
   const saved = acpProgram("opencode");
   process.env.FAKE_ACP_ASK = "form";
-  registerAcpProgram({ ...saved, command: process.execPath, args: [fake] });
+  registerAcpProgram({
+    ...saved,
+    binary: undefined,
+    command: process.execPath,
+    args: [fake],
+  });
   try {
     const asked = [];
     const events = [];

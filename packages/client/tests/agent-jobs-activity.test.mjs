@@ -3,14 +3,14 @@ import { jobItems } from "../modules/agent/modules/jobs/model/activity.ts";
 import { jobTurn } from "../modules/agent/modules/jobs/model/job-turn.ts";
 import { canContinueInChat } from "../modules/agent/modules/jobs/model/job-continue.ts";
 import { jobBarSections } from "../modules/agent/modules/jobs/lib/job-bar.ts";
-import { taskSummaryLine } from "../modules/agent-core/lib/task-detail.ts";
+import { taskReadout, taskSummaryLine } from "../modules/agent-core/lib/task-detail.ts";
 import { registerBuiltinClientAgents } from "../app/agents.ts";
 
 registerBuiltinClientAgents();
 
 const job = (id, status, extra = {}) => ({
   id,
-  backend: "claude-code",
+  backend: "codex",
   task: ` задание ${id} `,
   projectId: "p1",
   status,
@@ -29,7 +29,7 @@ test("the island lists unfinished jobs and marks the ones that wait for the user
     job("f", "queued"),
   ]);
   expect(items.map((item) => item.job.id)).toEqual(["a", "b", "f"]);
-  expect(items[0]).toMatchObject({ agent: "Claude Code", topic: "задание a", busy: true });
+  expect(items[0]).toMatchObject({ agent: "Codex", topic: "задание a", busy: true });
   expect(items[1]).toMatchObject({ busy: false, needsUser: true, chat: "job:b" });
 });
 
@@ -40,6 +40,17 @@ test("the journal of a job reads as one answer of the agent", () => {
       { at: 2, event: "text", data: { text: "привет" } },
       { at: 3, event: "tool", data: { id: "t", name: "Write", input: { file_path: "a" } } },
       { at: 4, event: "tool-result", data: { id: "t", name: "Write", output: "ok" } },
+      {
+        at: 4,
+        event: "judge",
+        data: {
+          tool: "Read",
+          title: "Read file",
+          verdict: { score: 1, label: "безопасно", reason: "Только чтение", confidence: "high" },
+          decision: "auto",
+          at: 4,
+        },
+      },
       { at: 5, event: "answer", data: { summary: "разрешено" } },
     ],
     "job-x",
@@ -47,6 +58,7 @@ test("the journal of a job reads as one answer of the agent", () => {
   );
   expect(turn.text.trim()).toBe("привет");
   expect(turn.tools).toMatchObject([{ id: "t", status: "done" }]);
+  expect(turn.parts.some((part) => part.type === "judge")).toBe(true);
   expect(turn.parts.at(-1)).toEqual({ type: "note", text: "Ответ на запрос: разрешено" });
 });
 
@@ -88,6 +100,23 @@ test("a task summary loses markdown before it reaches the compact row", () => {
   expect(taskSummaryLine(undefined)).toBe("");
 });
 
+test("a task readout names the agent and the model that worked on it", () => {
+  const readout = taskReadout({
+    task: {
+      id: "t1",
+      kind: "agent",
+      title: "Разбор",
+      status: "done",
+      background: false,
+      subagent: "Исследователь",
+      model: "deepseek-v4",
+    },
+    calls: [],
+  });
+  expect(readout).toContain("Субагент: Исследователь");
+  expect(readout).toContain("Модель: deepseek-v4");
+});
+
 test("a page hears about a job that waits for the user or ended, once", async () => {
   const { jobNotices } = await import("../modules/agent/modules/jobs/lib/job-notify.ts");
   const known = new Map();
@@ -97,7 +126,7 @@ test("a page hears about a job that waits for the user or ended, once", async ()
   const waiting = jobNotices(known, [
     job("a", "needs-user", { pending: [{ id: "r", kind: "permission", title: "Write" }] }),
   ]);
-  expect(waiting).toMatchObject([{ id: "a", title: "Claude Code ждёт вашего ответа" }]);
+  expect(waiting).toMatchObject([{ id: "a", title: "Codex ждёт вашего ответа" }]);
   expect(waiting[0].body).toContain("Write");
   expect(jobNotices(known, [job("a", "needs-user")])).toEqual([]);
   expect(jobNotices(known, [job("a", "error", { error: "boom" })])).toMatchObject([
@@ -106,6 +135,6 @@ test("a page hears about a job that waits for the user or ended, once", async ()
   // A job that started and ended between two polls is still announced.
   expect(jobNotices(known, [job("b", "running"), job("a", "error")])).toEqual([]);
   expect(jobNotices(known, [job("b", "done")])).toMatchObject([
-    { id: "b", title: "Claude Code закончил задание" },
+    { id: "b", title: "Codex закончил задание" },
   ]);
 });

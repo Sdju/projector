@@ -211,6 +211,7 @@ test("the prompt guide lists project widgets and keeps special ones on demand", 
   expect(guide).toContain("ProjectTrace — обычный виджет проекта");
   expect(guide).toContain("ModelMetrics — метрики модели");
   expect(guide).toContain("Специальные виджеты проекта");
+  expect(guide).toContain("ide.project.widgets.list");
   expect(guide).not.toContain("template");
   const catalog = createWidgetCatalog();
   expect(catalog.describe("ModelMetrics", [definition])).toContain("model: string");

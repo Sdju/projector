@@ -1,4 +1,4 @@
-import { ref, shallowRef, watch } from "vue";
+import { ref, shallowRef, watch, type Ref, type ShallowRef } from "vue";
 import type {
   PipelineDetail,
   PipelineJobDetail,
@@ -6,13 +6,20 @@ import type {
 } from "@ai-projector/core/modules/workspace/index.ts";
 import { workspaceRequest } from "../../../../workspace-api/index.ts";
 
+export interface CiDetailState<T> {
+  detail: ShallowRef<T | undefined>;
+  loading: Ref<boolean>;
+  error: Ref<string>;
+  reload(): void;
+}
+
 function useCiDetail<T>(
   projectId: () => string,
   id: () => number,
-  action: "pipeline" | "job",
+  readCi: (project: string, id: number, signal: AbortSignal) => Promise<T>,
   failure: string,
   live?: (data: T) => boolean,
-) {
+): CiDetailState<T> {
   const detail = shallowRef<T>();
   const loading = ref(false);
   const error = ref("");
@@ -31,12 +38,7 @@ function useCiDetail<T>(
       loading.value = !detail.value;
       error.value = "";
       try {
-        const data = await workspaceRequest<T>(
-          currentProject,
-          action,
-          { id: String(currentId) },
-          controller.signal,
-        );
+        const data = await readCi(currentProject, currentId, controller.signal);
         if (!active) return;
         detail.value = data;
         // A running run changes while it is open: keep its status and jobs fresh.
@@ -55,17 +57,22 @@ function useCiDetail<T>(
 const ACTIVE = new Set<PipelineStatus>(["queued", "running"]);
 
 export function usePipelineDetail(projectId: () => string, id: () => number) {
-  return useCiDetail<PipelineDetail>(
+  return useCiDetail(
     projectId,
     id,
-    "pipeline",
+    (project, pipeline, signal) =>
+      workspaceRequest(project, "pipeline", { id: String(pipeline) }, signal),
     "Не удалось открыть pipeline",
-    (data) => ACTIVE.has(data.pipeline.status),
+    (data: PipelineDetail) => ACTIVE.has(data.pipeline.status),
   );
 }
 
 export function useJobDetail(projectId: () => string, id: () => number) {
-  return useCiDetail<PipelineJobDetail>(projectId, id, "job", "Не удалось открыть джоб", (data) =>
-    ACTIVE.has(data.job.status),
+  return useCiDetail(
+    projectId,
+    id,
+    (project, job, signal) => workspaceRequest(project, "job", { id: String(job) }, signal),
+    "Не удалось открыть джоб",
+    (data: PipelineJobDetail) => ACTIVE.has(data.job.status),
   );
 }

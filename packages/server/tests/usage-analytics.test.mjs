@@ -202,6 +202,22 @@ test("limit samples dedupe a cached answer and build a paced series", () => {
   expect(series.projectedPercent).toBeGreaterThan(100);
 });
 
+test("limit pace uses the registered agent's window duration", () => {
+  const now = Date.now();
+  const period = 30 * 86400;
+  const resetsAt = now / 1000 + period / 2;
+  recordAgentLimits("cursor", {
+    status: "ready",
+    checkedAt: now,
+    windows: { total: { usedPercent: 40, resetsAt } },
+  });
+  const definitions = [{ id: "cursor", usageWindows: [{ name: "total", periodSeconds: period }] }];
+  const series = readLimitSeries(0, now, definitions).find((item) => item.agent === "cursor");
+  expect(series.periodSeconds).toBe(period);
+  expect(series.expectedPercent).toBeCloseTo(50);
+  expect(readLimitSeries(0, now).find((item) => item.agent === "cursor").periodSeconds).toBeNull();
+});
+
 test("provider balance samples turn money drops into spend and ignore top-ups", () => {
   const now = new Date(2026, 10, 9, 14, 0, 0).getTime();
   const at = now - 3 * 3600000;

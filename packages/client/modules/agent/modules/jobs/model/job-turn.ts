@@ -9,6 +9,7 @@ const FOLDED = new Set([
   "tool",
   "tool-output",
   "tool-result",
+  "judge",
   "task",
   "session",
   "context",

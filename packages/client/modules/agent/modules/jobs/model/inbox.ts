@@ -3,28 +3,43 @@ import type { HubDevice } from "@ai-projector/core/modules/hub/index.ts";
 import {
   deviceApiUrl,
   fetchJobs,
-  fetchLiveRuns,
+  fetchRunsFeed,
   notifyInbox,
   type AgentJobView,
   type LiveAgentRun,
+  type RecentAgentRun,
 } from "../../../../agent-core/index.ts";
-import { fetchHubDevices } from "../../../../hub/index.ts";
+import { fetchHubPresence, hubNoticeAllowed, type HubPresence } from "../../../../hub/index.ts";
 import {
   FINISHED_TTL_MS,
   inboxGroups,
   inboxHref,
   inboxJobItem,
   inboxNotices,
-  inboxRunItem,
   inboxSourcesFromDevices,
+  mergeRunItems,
   currentDeviceId,
   type InboxItem,
   type InboxProject,
   type InboxSource,
 } from "./inbox-view.ts";
-import { feedJobs, feedRuns, onJobsFeedUpdate, useJobsFeed } from "./jobs-feed.ts";
+import {
+  isItemAttention,
+  isItemUnread,
+  markAllInboxItemsRead,
+  markInboxItemRead,
+  markOldFinishedAsRead,
+} from "./inbox-read.ts";
+import { feedJobs, feedRecentRuns, feedRuns, onJobsFeedUpdate, useJobsFeed } from "./jobs-feed.ts";
+import { trustNoticeUnread, useTrustNotices } from "./trust-notices.ts";
 
 export * from "./inbox-view.ts";
+export {
+  isItemAcknowledgeable,
+  isItemAttention,
+  isItemUnread,
+  markInboxItemRead,
+} from "./inbox-read.ts";
 
 /**
  * The server pushes job and run changes over the page event stream. This timer only keeps the
@@ -72,14 +87,17 @@ const inboxRelevant = (job: AgentJobView) =>
 
 async function loadSource(source: InboxSource, fresh: boolean): Promise<InboxItem[]> {
   const base = source.base || undefined;
-  const [jobs, runs, projects] = await Promise.all([
+  const [jobs, runsFeed, projects] = await Promise.all([
     fetchJobs(undefined, base),
-    fetchLiveRuns(base).catch(() => [] as LiveAgentRun[]),
+    fetchRunsFeed(base).catch(() => ({
+      runs: [] as LiveAgentRun[],
+      recent: [] as RecentAgentRun[],
+    })),
     projectsOf(source, fresh),
   ]);
   return [
     ...jobs.filter(inboxRelevant).map((job) => inboxJobItem(source, job, projects)),
-    ...runs.map((run) => inboxRunItem(source, run, projects)),
+    ...mergeRunItems(source, runsFeed.runs, runsFeed.recent, projects),
   ];
 }
 
@@ -87,18 +105,34 @@ async function loadSource(source: InboxSource, fresh: boolean): Promise<InboxIte
 function localItems(source: InboxSource, projects: readonly InboxProject[]): InboxItem[] {
   return [
     ...feedJobs.value.filter(inboxRelevant).map((job) => inboxJobItem(source, job, projects)),
-    ...feedRuns.value.map((run) => inboxRunItem(source, run, projects)),
+    ...mergeRunItems(source, feedRuns.value, feedRecentRuns.value, projects),
   ];
+}
+
+const hub = ref<HubPresence>({ devices: [], activity: {} });
+
+/**
+ * Reads the device list without failing the work centre. A local page is not served by the Hub,
+ * so it keeps the local source; its device list still answers which machines are reachable.
+ */
+async function readHubPresence(): Promise<HubPresence | undefined> {
+  try {
+    const presence = await fetchHubPresence();
+    hub.value = presence;
+    return presence;
+  } catch {
+    // Without a Hub a local Projector has only its own work.
+    return undefined;
+  }
 }
 
 export async function fetchInboxSources(): Promise<InboxSource[]> {
   const current = currentDeviceId();
+  const presence = await readHubPresence();
   if (!current) return [{ id: "", name: "Это устройство", base: "", current: true }];
-  try {
-    return inboxSourcesFromDevices(await fetchHubDevices(), current);
-  } catch {
-    return [{ id: current, name: "Это устройство", base: "", current: true }];
-  }
+  return presence
+    ? inboxSourcesFromDevices(presence.devices, current)
+    : [{ id: current, name: "Это устройство", base: "", current: true }];
 }
 
 const items = ref<InboxItem[]>([]);
@@ -129,9 +163,19 @@ async function sourcesOf(fresh: boolean): Promise<InboxSource[]> {
 /** Rebuilds the list from the per-source cache; a source that failed keeps its last known items. */
 function publishItems(list: readonly InboxSource[]): void {
   const next = list.flatMap((source) => cache.get(source.id) ?? []);
+  if (firstLook) markOldFinishedAsRead(next);
   items.value = next;
   updatedAt.value = Date.now();
-  const notices = inboxNotices(seen, next, firstLook, (item) => inboxHref(item, list));
+  const current = currentDeviceId();
+  const byKey = new Map(next.map((item) => [item.key, item]));
+  const notices = inboxNotices(seen, next, firstLook, (item) => inboxHref(item, list)).filter(
+    (notice) => {
+      const item = byKey.get(notice.key);
+      return (
+        !item || !item.sourceId || item.sourceId === current || hubNoticeAllowed(item.sourceId)
+      );
+    },
+  );
   firstLook = false;
   for (const notice of notices) notifyInbox(notice.key, notice.title, notice.body, notice.href);
 }
@@ -205,9 +249,8 @@ async function refreshSource(id: string): Promise<void> {
 /** The Hub pushes its device list; pages behind it update sources without polling. */
 function applyHubDevices(event: Event): void {
   const devices = (event as CustomEvent<{ devices?: unknown }>).detail?.devices;
-  const current = currentDeviceId();
-  if (!current || !Array.isArray(devices)) return;
-  const online = devices.filter((item): item is HubDevice => {
+  if (!Array.isArray(devices)) return;
+  const list = devices.filter((item): item is HubDevice => {
     if (!item || typeof item !== "object") return false;
     const value = item as Record<string, unknown>;
     return (
@@ -217,7 +260,11 @@ function applyHubDevices(event: Event): void {
       typeof value.online === "boolean"
     );
   });
-  sources.value = inboxSourcesFromDevices(online, current);
+  hub.value = { ...hub.value, devices: list };
+  const current = currentDeviceId();
+  // A local Projector sees the Hub devices but still reads only its own work.
+  if (!current) return;
+  sources.value = inboxSourcesFromDevices(list, current);
   sourcesAt = Date.now();
   for (const id of Array.from(cache.keys()))
     if (!sources.value.some((source) => source.id === id)) cache.delete(id);
@@ -241,8 +288,16 @@ function start() {
   };
   const onHubDevices = (event: Event) => applyHubDevices(event);
   const onHubActivity = (event: Event) => {
-    const deviceId = (event as CustomEvent<{ deviceId?: unknown }>).detail?.deviceId;
-    if (typeof deviceId === "string") void refreshSource(deviceId);
+    const detail = (event as CustomEvent<{ deviceId?: unknown; at?: unknown }>).detail;
+    const deviceId = detail?.deviceId;
+    if (typeof deviceId !== "string") return;
+    const at =
+      typeof detail?.at === "number" && Number.isFinite(detail.at) ? detail.at : Date.now();
+    hub.value = {
+      ...hub.value,
+      activity: { ...hub.value.activity, [deviceId]: at },
+    };
+    void refreshSource(deviceId);
   };
   if (typeof window !== "undefined") {
     window.addEventListener("projector:hub-devices", onHubDevices);
@@ -266,15 +321,28 @@ function start() {
   };
 }
 
+export const markAllInboxRead = (): void => markAllInboxItemsRead(items.value);
+
 /** The header and the rail icon ask for the same number without starting a second poll. */
 export const inboxAttention = () =>
-  items.value.filter((item) => item.category === "attention").length;
+  items.value.filter(isItemAttention).length + trustNoticeUnread();
+export const inboxUnread = () => items.value.filter(isItemUnread).length;
+export const inboxBadge = () => inboxAttention() + inboxUnread();
+
+/** Requests of other devices, for the Hub section on the right rail. */
+export const inboxRemoteAttention = () => {
+  const current = currentDeviceId();
+  return items.value.filter(
+    (item) => !!item.sourceId && item.sourceId !== current && isItemAttention(item),
+  ).length;
+};
 
 let stopPolling: (() => void) | undefined;
 
 /** The one inbox of the page: the panel and the header bell share its polling and state. */
 export function useAgentInbox() {
   useJobsFeed();
+  const trust = useTrustNotices();
   if (!subscribers) stopPolling = start();
   subscribers++;
   if (getCurrentScope())
@@ -287,9 +355,9 @@ export function useAgentInbox() {
       }
     });
   const groups = computed(() => inboxGroups(items.value));
-  const attention = computed(
-    () => items.value.filter((item) => item.category === "attention").length,
-  );
+  const attention = computed(() => items.value.filter(isItemAttention).length + trust.unread.value);
+  const unread = computed(() => items.value.filter(isItemUnread).length);
+  const badgeCount = computed(() => attention.value + unread.value);
   const working = computed(() => items.value.filter((item) => item.category === "working").length);
   const finished = computed(
     () => items.value.filter((item) => item.category === "finished").length,
@@ -298,12 +366,26 @@ export function useAgentInbox() {
     items,
     groups,
     sources,
+    hub,
     loading,
     error,
     updatedAt,
     attention,
+    unread,
+    badgeCount,
     working,
     finished,
+    notices: trust.notices,
+    noticeUnread: trust.unread,
+    isNoticeRead: trust.isRead,
+    noticeHref: trust.noticeHref,
+    markNoticeRead: trust.markRead,
+    markAllNoticesRead: trust.markAllRead,
+    restoreNotice: trust.restore,
+    isUnread: isItemUnread,
+    isAttention: isItemAttention,
+    markRead: markInboxItemRead,
+    markAllRead: markAllInboxRead,
     refresh: () => refresh(true),
     href: (item: InboxItem) => inboxHref(item, sources.value),
   };

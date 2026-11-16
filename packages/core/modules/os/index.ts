@@ -1,5 +1,5 @@
 export { os, createOs, UnsupportedPlatformError, type OsAdapter } from "./os.ts";
-export { clearSessionEnv } from "./session-env.ts";
+export { clearSessionEnv, PARENT_SESSION_ENV } from "./session-env.ts";
 export { bashShellLaunch } from "./bash.ts";
 export type {
   ProcessInfo,

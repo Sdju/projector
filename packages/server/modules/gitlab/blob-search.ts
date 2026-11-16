@@ -1,5 +1,6 @@
 import { HttpError } from "../http/index.ts";
 import {
+  SEARCH_QUERY_MAX,
   searchMatches,
   type SearchHit,
   type SearchMatch,
@@ -75,7 +76,8 @@ export async function searchGitlabBlobs(repository: string, params: Record<strin
   };
   const ref = params.rev || params.sha || "";
   if (!query.trim()) return { hits: [], truncated: false };
-  if (query.length > 200) throw new HttpError(400, "Запрос длиннее 200 символов");
+  if (query.length > SEARCH_QUERY_MAX)
+    throw new HttpError(400, `Запрос длиннее ${SEARCH_QUERY_MAX} символов`);
   if (ref && !/^[a-f0-9]{7,40}$/i.test(ref)) throw new HttpError(400, "Некорректный хеш коммита");
   if (options.regex) {
     try {

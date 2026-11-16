@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import UiLoader from "../../../common/ui/UiLoader.vue";
+import UiButton from "../../../common/ui/UiButton.vue";
 import UiResizeHandle from "../../../common/ui/UiResizeHandle.vue";
+import IconMinimize from "~icons/lucide/minimize-2";
 import { computed, onBeforeUnmount, ref } from "vue";
 import {
   workspaceProfile,
@@ -20,6 +22,7 @@ import { useOpenFiles } from "../lib/open-files.ts";
 import { ensureTab } from "../lib/service-tabs.ts";
 import { useWorkbenchLayout } from "../lib/workbench-layout.ts";
 import { registerAgentCommands } from "../../agent/index.ts";
+import { onAgentTurnEnd } from "../../agent-core/index.ts";
 import { registerEditorCommands } from "../lib/editor-commands.ts";
 import { useWorkspaceSession } from "../lib/workspace-session.ts";
 import WorkbenchDock from "./WorkbenchDock.vue";
@@ -36,22 +39,27 @@ import {
 import { createPanelHosts } from "../panel-hosts.ts";
 import { TerminalCloseDialog } from "../../terminal/index.ts";
 import { useDocker } from "../../docker/index.ts";
-import { asideSections, sidebarSections, type SidebarViews } from "../lib/sidebar-views.ts";
-import { useWorkspaceAside } from "../lib/aside-panels.ts";
+import { sidebarSections, type SidebarViews } from "../lib/sidebar-views.ts";
+import { provideLastSession } from "../lib/session-launchers.ts";
 import { registerTreeCommands } from "../lib/tree-commands.ts";
 import { provideTabHost, useWorkspaceTabTypes, type TabViews } from "../lib/tab-views.ts";
+import {
+  registerPluginWorkspaceCommands,
+  usePluginWorkspaceViews,
+} from "../lib/plugin-workspace.ts";
 import { useWorkspaceRefresh } from "../lib/workspace-refresh.ts";
 import { useMobileSurfaces, registerMobileCommands } from "../lib/mobile-surfaces.ts";
 import { useSurfaceSwipe } from "../lib/surface-swipe.ts";
+import { registerProjectWidgetCommands } from "../../project-widgets/index.ts";
+import { useWorkspaceZen } from "../lib/zen.ts";
 const props = defineProps<{
   projectId: string;
   projectSettingsDirty?: boolean;
   beforeCloseProjectSettings?: () => boolean;
   saveProjectSettings?: () => void | Promise<void>;
   tabViews?: TabViews; // views of the kinds the embedding page owns
-  /** Views of the sidebar and right-rail sections the embedding page owns. */
+  /** Views of the sidebar sections the embedding page owns. */
   sidebarViews?: SidebarViews;
-  asideViews?: SidebarViews;
 }>();
 const profile = workspaceProfile(props.projectId);
 const capabilities = profileCapabilities(profile);
@@ -68,11 +76,11 @@ const { mobile, mobileSurface, mobileSidebarOpen, sidebarInvisible, showSidebar 
   useMobileSurfaces(sidebarHidden);
 const { treeWidth, sizes, resizeTree, resizeTreeKey } = useSidebarResize(workspaceElement);
 const sidebar = ref<InstanceType<typeof WorkspaceSidebar>>();
-const asidePanel = ref<InstanceType<typeof WorkspaceSidebar>>();
 const editorCommands = useCommandScope(`editor:${props.projectId}`, () => ({
   surface: "editor",
   projectId: props.projectId,
 }));
+const { zenMode, shortcut: zenShortcut } = useWorkspaceZen(editorCommands);
 useSurfaceSwipe({
   workspace: workspaceElement,
   mobile,
@@ -97,6 +105,7 @@ const registerEditor = (
   });
 // The agent chats are tabs that come and go; their commands live as long as this workspace.
 registerAgentCommands(registerEditor, props.projectId);
+registerProjectWidgetCommands(editorCommands.scope, () => props.projectId);
 function treeChanged() {
   revision.value++;
   void loadGit();
@@ -118,23 +127,20 @@ const overview = useGitOverview(() => props.projectId);
 const history = useGitHistory(() => props.projectId);
 const branches = useGitBranches(() => props.projectId);
 const loadGit = () => (capabilities.git ? overview.load() : Promise.resolve());
+/** An answer of the agent may leave edits and commits: the Git panel reads them again. */
+const releaseAgentTurnEnd = onAgentTurnEnd(props.projectId, () => void loadGit());
 const section = ref("files");
 const extraSections = ref<SidebarType[]>([]);
+const { pluginSidebarSections, mergedSidebarViews } = usePluginWorkspaceViews(props.sidebarViews);
+/** The program the header launcher repeats; it travels with the session. */
+const lastSession = ref("shell");
+provideLastSession(lastSession);
 const sections = computed(() =>
-  extendSidebarRegistry(sidebarSections(profile, capabilities), () => extraSections.value),
+  extendSidebarRegistry(sidebarSections(profile, capabilities), () => [
+    ...extraSections.value,
+    ...pluginSidebarSections.value,
+  ]),
 );
-/** Правая полоса: разделы приходят из профиля, их виды — от страницы, встроившей workspace. */
-const asideRegistry = asideSections(profile, capabilities);
-const {
-  visible: asideVisible,
-  hidden: asideHidden,
-  section: asideSection,
-} = useWorkspaceAside({
-  registry: asideRegistry,
-  mobile,
-  register: registerEditor,
-  refresh: () => asidePanel.value?.refreshSection(),
-});
 function openTree(scope: FileScope) {
   if (!capabilities.snapshots) throw new Error("Источник не умеет показывать файлы снимка");
   const id = `tree:${fileScopeKey(scope)}`;
@@ -282,6 +288,7 @@ provideTabHost({
   },
   openSection,
   run: (command, args) => editorCommands.run(command, args),
+  executeCommand: (command, args) => editorCommands.scope.executeCommand(command, args),
 });
 const { tabActions, editorKeydown, editorFocus } = registerEditorCommands({
   projectId: props.projectId,
@@ -317,6 +324,15 @@ const { tabActions, editorKeydown, editorFocus } = registerEditorCommands({
   },
   tabTypes,
 });
+registerPluginWorkspaceCommands({
+  tabTypes,
+  registerEditor,
+  openTab,
+  section,
+  showSidebar,
+});
+// The workspace is the default surface: its commands work even before the first focus.
+editorCommands.scope.activate();
 const docker = useDocker(props.projectId, {
   enabled: capabilities.docker,
   sidebar: () => {
@@ -407,6 +423,7 @@ useWorkspaceSession({
   restoreSections,
   treeWidth,
   sidebarHidden,
+  launcher: lastSession,
   mobile,
   mobileSurface,
   terminals: capabilities.terminals,
@@ -455,7 +472,10 @@ const { refresh, entryMoved } = useWorkspaceRefresh({
   loadGit,
 });
 defineExpose({ openFile, refresh, openTab, openSection });
-onBeforeUnmount(() => overview.cancel());
+onBeforeUnmount(() => {
+  releaseAgentTurnEnd();
+  overview.cancel();
+});
 </script>
 
 <template>
@@ -464,8 +484,7 @@ onBeforeUnmount(() => overview.cancel());
     class="workspace"
     :class="{
       'sidebar-hidden': sidebarInvisible,
-      'has-aside': asideVisible,
-      'aside-hidden': asideHidden,
+      zen: zenMode,
     }"
     :data-surface="mobile ? mobileSurface : undefined"
     :style="sizes"
@@ -473,6 +492,7 @@ onBeforeUnmount(() => overview.cancel());
     <div class="toolbar-host">
       <Teleport to="#header-tools" defer>
         <WorkbenchToolbar
+          :project-id="projectId"
           :capabilities="capabilities"
           :mobile="mobile"
           :sidebar-hidden="sidebarInvisible"
@@ -481,10 +501,13 @@ onBeforeUnmount(() => overview.cancel());
           :layout-groups="layoutGroups"
           :preset="currentPreset"
           :presets-available="presetsAvailable"
-          :inbox="asideRegistry.has('inbox')"
+          :inbox="tabTypes.has('inbox')"
           @command="(id, args) => editorCommands.run(id, args)"
         >
-          <template #terminal-actions><slot name="terminal-actions" /></template>
+          <template v-if="$slots['project-run']" #project-run><slot name="project-run" /></template>
+          <template v-if="$slots['project-repository']" #project-repository
+            ><slot name="project-repository"
+          /></template>
           <template #terminal-status><slot name="terminal-status" /></template>
         </WorkbenchToolbar>
       </Teleport>
@@ -493,10 +516,11 @@ onBeforeUnmount(() => overview.cancel());
       <WorkspaceSidebar
         ref="sidebar"
         v-model:section="section"
+        :inert="zenMode"
         :project-id="projectId"
         :capabilities="capabilities"
         :sections="sections"
-        :views="sidebarViews"
+        :views="mergedSidebarViews"
         :hidden="sidebarInvisible"
         :rail="!mobile"
         :active="active"
@@ -506,6 +530,7 @@ onBeforeUnmount(() => overview.cancel());
         :branches="branches"
         :files="files"
         :git-sync="gitSync"
+        :execute-command="(id, args) => editorCommands.scope.executeCommand(id, args)"
         @command="
           (id, args) =>
             (id.startsWith('ide.docker.') ? docker.commands : editorCommands).run(id, args)
@@ -538,7 +563,7 @@ onBeforeUnmount(() => overview.cancel());
     />
     <section
       class="dock-pane"
-      :inert="mobile && mobileSidebarOpen"
+      :inert="mobile && mobileSidebarOpen && !zenMode"
       aria-label="Блоки редактора и терминалов"
       @focusin="editorFocus"
       @keydown.capture="editorKeydown"
@@ -549,6 +574,7 @@ onBeforeUnmount(() => overview.cancel());
         :workbench="workbench"
         :mobile="mobile"
         :mobile-surface="mobileSurface"
+        :zen="zenMode"
         :files="files"
         :tab-actions="tabActions"
         :panel-hosts="panelHosts"
@@ -559,41 +585,10 @@ onBeforeUnmount(() => overview.cancel());
         @command="(id, args) => editorCommands.run(id, args)"
       />
     </section>
-    <WorkspaceSidebar
-      v-if="asideVisible"
-      ref="asidePanel"
-      class="aside"
-      v-model:section="asideSection"
-      side="right"
-      :project-id="projectId"
-      :capabilities="capabilities"
-      :sections="asideRegistry"
-      :views="asideViews"
-      :hidden="asideHidden"
-      :rail="true"
-      :active="active"
-      :revision="revision"
-      :overview="overview"
-      :history="history"
-      :branches="branches"
-      :files="files"
-      :git-sync="gitSync"
-      toggle-command="ide.workbench.aside.toggle"
-      refresh-command="ide.workbench.aside.refresh"
-      close-command="ide.workbench.aside.section.close"
-      @command="
-        (id, args) =>
-          (id.startsWith('ide.docker.') ? docker.commands : editorCommands).run(id, args)
-      "
-      @open-commit-tree="openCommitTree"
-      @open-search="openSearch"
-      @refresh="refresh"
-      @changed="treeChanged"
-      @deleted="entryDeleted"
-      @moved="entryMoved"
-    />
     <MobileSurfaces
       v-if="mobile"
+      v-show="!zenMode"
+      :inert="zenMode"
       :terminals="capabilities.terminals"
       :surface="mobileSurface"
       @command="(id, args) => editorCommands.run(id, args)"
@@ -604,14 +599,25 @@ onBeforeUnmount(() => overview.cancel());
       @cancel="terminals.cancelClose"
       @confirm="terminals.confirmClose"
     />
-    <StatusBar v-if="!mobile" class="workspace-status" />
+    <StatusBar v-if="!mobile" v-show="!zenMode" :inert="zenMode" class="workspace-status" />
+    <UiButton
+      v-if="zenMode"
+      shape="icon"
+      size="sm"
+      class="zen-exit"
+      :title="`Выйти из режима Zen (${zenShortcut ? `${zenShortcut} · ` : ''}Esc)`"
+      aria-label="Выйти из режима Zen"
+      data-command="ide.workbench.zen.toggle"
+      @click="editorCommands.run('ide.workbench.zen.toggle', { on: false })"
+    >
+      <IconMinimize aria-hidden="true" />
+    </UiButton>
   </div>
 </template>
 
 <style scoped>
 .workspace {
   --rail-w: 40px;
-  --aside-width: clamp(240px, 21vw, 320px);
   display: grid;
   grid-template-columns: var(--tree-width, clamp(240px, 21vw, 320px)) var(--island-gap) minmax(
       0,
@@ -626,31 +632,6 @@ onBeforeUnmount(() => overview.cancel());
 .workspace.sidebar-hidden {
   grid-template-columns: calc(var(--rail-w) - var(--island-gap)) var(--island-gap) minmax(0, 1fr);
   column-gap: 0;
-}
-/* Правая полоса разделов: её колонка остаётся, даже когда панель свёрнута. */
-.workspace.has-aside {
-  grid-template-columns:
-    var(--tree-width, clamp(240px, 21vw, 320px)) var(--island-gap) minmax(0, 1fr)
-    var(--island-gap) var(--aside-width);
-}
-.workspace.sidebar-hidden.has-aside {
-  grid-template-columns:
-    calc(var(--rail-w) - var(--island-gap)) var(--island-gap) minmax(0, 1fr) var(--island-gap)
-    var(--aside-width);
-}
-.workspace.has-aside.aside-hidden {
-  grid-template-columns:
-    var(--tree-width, clamp(240px, 21vw, 320px)) var(--island-gap) minmax(0, 1fr)
-    var(--island-gap) calc(var(--rail-w) - var(--island-gap));
-}
-.workspace.sidebar-hidden.has-aside.aside-hidden {
-  grid-template-columns:
-    calc(var(--rail-w) - var(--island-gap)) var(--island-gap) minmax(0, 1fr) var(--island-gap)
-    calc(var(--rail-w) - var(--island-gap));
-}
-.workspace > .aside {
-  grid-column: 5;
-  grid-row: 3;
 }
 .tree-resize {
   grid-column: 2;
@@ -679,31 +660,10 @@ onBeforeUnmount(() => overview.cancel());
     overflow: auto;
   }
   .workspace {
-    --aside-width: clamp(200px, 24vw, 260px);
     grid-template-columns: 260px var(--island-gap) minmax(0, 1fr);
   }
   .workspace.sidebar-hidden {
     grid-template-columns: calc(var(--rail-w) - var(--island-gap)) var(--island-gap) minmax(0, 1fr);
-  }
-  .workspace.has-aside {
-    grid-template-columns: 260px var(--island-gap) minmax(0, 1fr) var(--island-gap) var(
-        --aside-width
-      );
-  }
-  .workspace.sidebar-hidden.has-aside {
-    grid-template-columns:
-      calc(var(--rail-w) - var(--island-gap)) var(--island-gap) minmax(0, 1fr) var(--island-gap)
-      var(--aside-width);
-  }
-  .workspace.has-aside.aside-hidden {
-    grid-template-columns:
-      260px var(--island-gap) minmax(0, 1fr) var(--island-gap)
-      calc(var(--rail-w) - var(--island-gap));
-  }
-  .workspace.sidebar-hidden.has-aside.aside-hidden {
-    grid-template-columns:
-      calc(var(--rail-w) - var(--island-gap)) var(--island-gap) minmax(0, 1fr) var(--island-gap)
-      calc(var(--rail-w) - var(--island-gap));
   }
 }
 @media (max-width: 700px), (max-width: 1050px) and (max-height: 500px) and (pointer: coarse) {
@@ -752,5 +712,46 @@ onBeforeUnmount(() => overview.cancel());
   grid-column: 1 / -1;
   grid-row: 4;
   margin-top: var(--island-gap);
+}
+.workspace.zen,
+.workspace.zen.sidebar-hidden {
+  position: relative;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+  column-gap: 0;
+}
+.workspace.zen > .sidebar,
+.workspace.zen > .tree-resize,
+.workspace.zen > .sidebar-backdrop,
+.workspace.zen > .workspace-status,
+.workspace.zen > .mobile-surfaces {
+  display: none;
+}
+.workspace.zen .dock-pane {
+  grid-column: 1;
+  grid-row: 1;
+  overflow: hidden;
+  border: 0;
+  border-radius: 0;
+}
+.zen-exit {
+  position: absolute;
+  top: max(var(--sp-2), env(safe-area-inset-top));
+  right: max(var(--sp-2), env(safe-area-inset-right));
+  z-index: var(--z-expanded);
+  border: 1px solid var(--line);
+  background: var(--bg-2);
+  box-shadow: var(--shadow-popover);
+  opacity: 0.45;
+  transition:
+    opacity var(--t-fast),
+    background var(--t-fast),
+    color var(--t-fast);
+}
+.zen-exit:hover,
+.zen-exit:focus-visible {
+  opacity: 1;
+  background: var(--bg-3);
+  color: var(--text);
 }
 </style>

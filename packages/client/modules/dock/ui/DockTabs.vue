@@ -5,8 +5,12 @@ import { computed, nextTick, ref, useId, watch } from "vue";
 import { useCommandScope } from "../../../common/utilities/commands.ts";
 import { tabDrag } from "../../../common/utilities/tab-drag.ts";
 import ContextMenu from "../../../common/ui/ContextMenu.vue";
+import UiIsland from "../../../common/ui/UiIsland.vue";
+import { useIslandMenu } from "../../../common/utilities/island-menu.ts";
 import type { ContextMenuItem } from "../../../common/ui/context-menu.ts";
 import IconClose from "~icons/lucide/x";
+import IconChevron from "~icons/lucide/chevron-down";
+import IconCheck from "~icons/lucide/check";
 import {
   registerTabCommands,
   tabCommandId,
@@ -24,6 +28,8 @@ const props = defineProps<{
   group?: string;
   /** Полоса не в фокусе: выбранная вкладка подсвечивается слабее. */
   dim?: boolean;
+  /** Тесная полоса: видна только выбранная вкладка, остальные — в списке с выбором. */
+  compact?: boolean;
   actions?: (id: string) => ContextMenuItem[];
   closeSaved?: boolean;
   commandNamespace: string;
@@ -47,6 +53,18 @@ const commands = useCommandScope(`tabs:${useId()}`, () => ({
 }));
 const commandId = (action: string) => tabCommandId(props.commandNamespace, action);
 const strip = ref<HTMLElement>();
+const shown = computed(() =>
+  props.compact ? props.tabs.filter((tab) => tab.id === props.activeId) : props.tabs,
+);
+const picker = useIslandMenu({
+  anchor: "right",
+  initialFocus: [".pick-item.current", ".pick-item"],
+  items: ".pick-item",
+});
+function choose(id: string) {
+  picker.close();
+  commands.run(commandId("select"), { id });
+}
 const { findTab } = registerTabCommands({
   props,
   commands,
@@ -55,6 +73,18 @@ const { findTab } = registerTabCommands({
   menu,
   startRename,
 });
+commands.scope.registerCommand({
+  id: commandId("picker"),
+  title: "Показать список вкладок блока",
+  description:
+    "Открывает список всех вкладок блока с выбором. Доступен, когда блок узкий и полоса показывает только выбранную вкладку.",
+  enabled: () => !props.disabled && !!props.compact && props.tabs.length > 1,
+  run: () => void picker.toggle(),
+});
+watch(
+  () => props.compact,
+  (compact) => !compact && picker.close(false),
+);
 const menuItems = computed<ContextMenuItem[]>(() => {
   const tab = findTab();
   if (!tab) return [];
@@ -196,7 +226,7 @@ watch(
   <div
     ref="strip"
     class="workspace-tabs"
-    :class="{ dim }"
+    :class="{ dim, compact }"
     role="tablist"
     :aria-label="label"
     @dragover.self.stop="dragOver($event)"
@@ -204,7 +234,7 @@ watch(
     @dragleave="!strip?.contains($event.relatedTarget as Node) && (target = '')"
   >
     <div
-      v-for="tab in tabs"
+      v-for="tab in shown"
       :key="tab.id"
       class="workspace-tab"
       :class="{
@@ -280,6 +310,49 @@ watch(
       </button>
     </div>
   </div>
+  <span v-if="compact && tabs.length > 1" :ref="picker.trigger" class="tab-picker">
+    <button
+      type="button"
+      class="picker-button"
+      :class="{ open: picker.open.value }"
+      :disabled="disabled"
+      :title="`Все вкладки блока: ${tabs.length}`"
+      :aria-label="`Все вкладки блока: ${tabs.length}`"
+      aria-haspopup="dialog"
+      :aria-expanded="picker.open.value"
+      :aria-controls="picker.open.value ? picker.id : undefined"
+      :data-command="commandId('picker')"
+      @click="commands.run(commandId('picker'))"
+    >
+      <span class="picker-count">{{ tabs.length }}</span>
+      <IconChevron aria-hidden="true" />
+    </button>
+  </span>
+  <UiIsland v-if="compact" :menu="picker" :label="`Вкладки: ${label}`" :width="280">
+    <button
+      v-for="tab in tabs"
+      :key="tab.id"
+      type="button"
+      class="pick-item"
+      :class="{ current: tab.id === activeId }"
+      :aria-current="tab.id === activeId ? 'true' : undefined"
+      :title="tab.title ?? tab.label"
+      @click="choose(tab.id)"
+    >
+      <slot name="icon" :tab="tab" />
+      <span class="pick-label u-truncate">{{ tab.label }}</span>
+      <span
+        v-if="tab.dirty || tab.saving"
+        class="pick-state"
+        :class="{ error: tab.error }"
+        role="status"
+        :aria-label="
+          tab.saving ? 'Сохраняется' : tab.error ? 'Не удалось сохранить' : 'Не сохранено'
+        "
+      />
+      <IconCheck v-if="tab.id === activeId" class="pick-check" aria-hidden="true" />
+    </button>
+  </UiIsland>
   <ContextMenu ref="menu" :items="menuItems" :label="`Действия: ${label}`" />
 </template>
 
@@ -308,6 +381,82 @@ watch(
 }
 .workspace-tab:hover {
   background: var(--bg-2);
+}
+/* Тесная полоса: одна выбранная вкладка занимает всё место, остальные — в списке справа */
+.workspace-tabs.compact {
+  overflow: hidden;
+}
+.compact .workspace-tab {
+  flex: 1;
+  min-width: 0;
+  max-width: none;
+}
+.tab-picker {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  height: 40px;
+  padding: 0 var(--sp-1);
+  border-bottom: 1px solid var(--line);
+  border-left: 1px solid var(--line);
+  background: var(--bg-sunken);
+}
+.picker-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  height: 28px;
+  padding: 0 var(--sp-1);
+  border-radius: var(--r-sm);
+  color: var(--muted);
+  font: var(--fs-2xs) var(--mono);
+}
+.picker-button:hover:not(:disabled),
+.picker-button.open {
+  background: var(--active);
+  color: var(--text);
+}
+.picker-button svg {
+  width: 14px;
+  height: 14px;
+}
+.pick-item {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-height: var(--control-h);
+  padding: 0 var(--sp-3);
+  border-radius: var(--r-md);
+  color: var(--text);
+  text-align: left;
+}
+.pick-item:hover,
+.pick-item:focus-visible {
+  background: var(--hover);
+  outline: none;
+}
+.pick-item.current {
+  background: var(--active);
+}
+.pick-label {
+  flex: 1;
+  min-width: 0;
+}
+.pick-state {
+  width: 8px;
+  height: 8px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: var(--text);
+}
+.pick-state.error {
+  background: var(--err);
+}
+.pick-check {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  color: var(--focus);
 }
 .workspace-tab.selected {
   border-top-color: var(--focus);

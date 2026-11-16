@@ -18,8 +18,19 @@ import type { PluginStatus } from "./client.ts";
 
 const searchId = useId();
 const pathId = useId();
-const { catalog, selected, filtered, query, mode, installPath, busy, error, status, commands } =
-  usePluginSettings();
+const {
+  catalog,
+  selected,
+  filtered,
+  runtimeDiagnostics,
+  query,
+  mode,
+  installPath,
+  busy,
+  error,
+  status,
+  commands,
+} = usePluginSettings();
 const activeAppearance = computed(() => {
   void status.value;
   return currentAppearance();
@@ -59,7 +70,7 @@ function previewStyle(theme: AvailableTheme) {
     <UiInline class="toolbar" align="center" justify="between" wrap>
       <div>
         <UiHeading as="h2" size="sm">Локальные плагины</UiHeading>
-        <UiHint>Декларативные темы и ACP-агенты без исполняемого кода плагина.</UiHint>
+        <UiHint>Декларативные темы, ACP-агенты и доверенный браузерный код плагинов.</UiHint>
       </div>
       <UiInline wrap>
         <UiButton :disabled="busy" @click="commands.run('ide.plugins.refresh')">Обновить</UiButton>
@@ -143,7 +154,7 @@ function previewStyle(theme: AvailableTheme) {
               >Выключить</UiButton
             >
             <UiButton
-              v-else-if="plugin.agents.length && !plugin.trusted"
+              v-else-if="plugin.requiresTrust && !plugin.trusted"
               size="sm"
               appearance="solid"
               :disabled="busy"
@@ -170,7 +181,9 @@ function previewStyle(theme: AvailableTheme) {
           <UiHint>
             {{
               selected.code
-                ? "ACP-агент с доверенным серверным кодом"
+                ? selected.browser
+                  ? "Доверенный браузерный код, панели и вкладки"
+                  : "ACP-агент с доверенным серверным кодом"
                 : selected.agents.length
                   ? "ACP-агент и темы · только данные, без кода"
                   : "Темы интерфейса · только данные, без кода"
@@ -188,14 +201,45 @@ function previewStyle(theme: AvailableTheme) {
             <strong>{{ agent.title }}</strong>
             <UiBadge tone="neutral">{{ agent.id }}</UiBadge>
           </UiInline>
-          <code>{{ [agent.command, ...(agent.args ?? [])].join(" ") }}</code>
+          <code v-if="agent.command">{{ [agent.command, ...(agent.args ?? [])].join(" ") }}</code>
           <UiHint>{{
             agent.caption || `Терминальная программа: ${agent.program || agent.id}`
           }}</UiHint>
         </div>
+      </div>
+      <div v-if="selected.balances.length" class="agent-contributions">
+        <strong>Балансы провайдеров</strong>
+        <div v-for="balance in selected.balances" :key="balance.kind" class="agent-row">
+          <UiInline align="center" wrap>
+            <strong>{{ balance.title }}</strong>
+            <UiBadge tone="neutral">{{ balance.kind }}</UiBadge>
+          </UiInline>
+          <UiHint>{{
+            balance.description || "Плагин читает остаток этого вида провайдера."
+          }}</UiHint>
+        </div>
+      </div>
+      <div
+        v-if="selected.dependencies && Object.keys(selected.dependencies).length"
+        class="agent-contributions"
+      >
+        <strong>Зависимости</strong>
+        <UiInline wrap>
+          <UiBadge v-for="(version, name) in selected.dependencies" :key="name" tone="neutral"
+            >{{ name }}@{{ version }}</UiBadge
+          >
+        </UiInline>
+      </div>
+      <div v-if="selected.requiresTrust" class="agent-contributions">
+        <strong>Исполняемый код</strong>
+        <UiHint>
+          {{ selected.browser ? "Браузерный ESM выполняется на origin страницы Projector." : "" }}
+          {{ selected.server ? "Серверный модуль выполняется в процессе Projector." : "" }}
+          Доверенный код не изолирован песочницей.
+        </UiHint>
         <UiMessage v-if="!selected.trusted" tone="danger" size="xs" wrap>
-          Команда будет запущена на этой машине. Подтвердите доверие к текущему содержимому пакета;
-          после его изменения доверие потребуется снова.
+          Подтвердите доверие к текущему содержимому пакета; после изменения любого файла доверие
+          потребуется снова. На Hub браузерный код получает права страницы Hub.
         </UiMessage>
         <UiInline wrap>
           <UiButton
@@ -214,6 +258,18 @@ function previewStyle(theme: AvailableTheme) {
           >
         </UiInline>
       </div>
+      <div v-if="selected.languages.length || selected.panels.length || selected.tabs.length">
+        <strong>Вклады браузера</strong>
+        <UiHint v-if="selected.languages.length"
+          >Языки: {{ selected.languages.map((item) => item.title).join(", ") }}</UiHint
+        >
+        <UiHint v-if="selected.panels.length"
+          >Панели: {{ selected.panels.map((item) => item.title).join(", ") }}</UiHint
+        >
+        <UiHint v-if="selected.tabs.length"
+          >Вкладки: {{ selected.tabs.map((item) => item.title).join(", ") }}</UiHint
+        >
+      </div>
       <div v-if="selected.diagnostics.length" class="diagnostics">
         <strong>Диагностика</strong>
         <UiMessage
@@ -226,12 +282,31 @@ function previewStyle(theme: AvailableTheme) {
           {{ item.message }}
         </UiMessage>
       </div>
+      <div v-if="runtimeDiagnostics.length" class="diagnostics">
+        <strong>Ошибки браузерного runtime</strong>
+        <UiMessage
+          v-for="(item, index) in runtimeDiagnostics"
+          :key="`runtime-${index}`"
+          tone="danger"
+          size="xs"
+          wrap
+        >
+          {{ item.phase }}: {{ item.message }}
+        </UiMessage>
+      </div>
       <UiEmpty
-        v-if="!selected.themes.length && !selected.agents.length"
+        v-if="
+          !selected.themes.length &&
+          !selected.agents.length &&
+          !selected.balances.length &&
+          !selected.languages.length &&
+          !selected.panels.length &&
+          !selected.tabs.length
+        "
         density="compact"
         align="start"
       >
-        Нет доступных тем или агентов. Проверьте диагностику пакета.
+        Нет доступных вкладов. Проверьте диагностику пакета.
       </UiEmpty>
       <div v-else-if="selected.themes.length" class="theme-grid">
         <article v-for="theme in selected.themes" :key="theme.id" class="theme-card">
@@ -254,7 +329,7 @@ function previewStyle(theme: AvailableTheme) {
           </UiButton>
         </article>
       </div>
-      <UiInline v-if="!selected.agents.length" wrap>
+      <UiInline v-if="!selected.requiresTrust && !selected.agents.length" wrap>
         <UiButton
           size="sm"
           :disabled="busy"

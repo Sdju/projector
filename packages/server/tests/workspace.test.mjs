@@ -16,6 +16,7 @@ import { tmpdir } from "node:os";
 import { execFileSync } from "node:child_process";
 import {
   listProjectDirectory,
+  projectEntryInfo,
   readProjectFile,
   searchProject,
   projectGit,
@@ -138,6 +139,46 @@ test("entry rename moves a file and refuses to overwrite an existing name", asyn
     }
   });
 });
+test("entry info sums sizes and counts without following symlinks", async () => {
+  const base = await mkdtemp(join(tmpdir(), "projector-info-"));
+  try {
+    await mkdir(join(base, "folder/nested"), { recursive: true });
+    await writeFile(join(base, "folder/a.txt"), "12345");
+    await writeFile(join(base, "folder/nested/b.txt"), "123");
+    await symlink(join(base, "folder/a.txt"), join(base, "folder/alias"));
+    const folder = await projectEntryInfo(base, "folder");
+    expect(folder).toMatchObject({
+      path: "folder",
+      name: "folder",
+      directory: true,
+      files: 2,
+      directories: 1,
+      links: 1,
+      skipped: 0,
+      truncated: false,
+    });
+    expect(folder.size).toBeGreaterThanOrEqual(8);
+    expect(folder.modified).toBeTruthy();
+    const file = await projectEntryInfo(base, "folder/a.txt");
+    expect(file).toMatchObject({
+      path: "folder/a.txt",
+      name: "a.txt",
+      directory: false,
+      size: 5,
+      files: 1,
+      directories: 0,
+      links: 0,
+      skipped: 0,
+      truncated: false,
+    });
+    const root = await projectEntryInfo(base);
+    expect(root.directory).toBe(true);
+    expect(root.files).toBeGreaterThanOrEqual(2);
+    await expect(projectEntryInfo(base, "../outside")).rejects.toMatchObject({ status: 403 });
+  } finally {
+    await rm(base, { recursive: true, force: true });
+  }
+});
 test("entry copy preserves contents and never overwrites an existing name", async () => {
   await withDefaultExcludes(async () => {
     const base = await mkdtemp(join(tmpdir(), "projector-entries-"));
@@ -181,7 +222,9 @@ test("entry trash moves deletions aside and refuses a symlinked trash directory"
       }
       execFileSync("git", ["-C", base, "init", "-q"]);
       await mutateProjectEntry(base, "delete", "folder");
-      const trashed = await readdir(join(base, ".projector-trash"));
+      const trashed = (await readdir(join(base, ".projector-trash"))).filter(
+        (name) => name !== ".projector-meta",
+      );
       expect(trashed.length).toBe(1);
       expect(
         (await projectGit(base)).changes.every(
@@ -511,6 +554,10 @@ test("workspace tree, bounded reading, traversal and symlink containment, litera
       expect(search.hits.map((hit) => [hit.path, hit.line, hit.column])).toStrictEqual([
         ["src/code.ts", 1, 22],
       ]);
+      await writeFile(join(root, "src/block.ts"), "alpha\nbeta\ngamma\n");
+      const block = await searchProject(root, "alpha\nbeta");
+      expect(block.hits.map((hit) => [hit.path, hit.line])).toStrictEqual([["src/block.ts", 1]]);
+      expect(block.hits[0]?.text).toContain("alpha\nbeta");
     } finally {
       await rm(root, { recursive: true, force: true });
     }
@@ -692,6 +739,17 @@ test("workspace HTTP routes resolve catalog projects and serve external and proj
         (entry) => entry.path === "sample.ts",
       ),
     ).toBeTruthy();
+    const info = await (await fetch(`${route}/info?path=projector`)).json();
+    expect(info).toMatchObject({
+      path: "projector",
+      name: "projector",
+      directory: true,
+      files: 1,
+      directories: 0,
+      links: 0,
+      truncated: false,
+    });
+    expect(info.size).toBeGreaterThan(0);
     expect((await (await fetch(`${route}/search?q=sample`)).json()).hits[0].path).toBe("sample.ts");
     expect((await (await fetch(`${route}/git`)).json()).available).toBe(false);
     const save = (body) =>
@@ -834,6 +892,7 @@ test("workspace HTTP routes reject invalid input, stale drafts and paths outside
       (await save({ path: "sample.md", original: "# Original\n", content: "stale" })).status,
     ).toBe(409);
     expect((await fetch(`${route}/file?path=../outside`)).status).toBe(403);
+    expect((await fetch(`${route}/info?path=../outside`)).status).toBe(403);
     expect((await fetch(`${base}/api/projects/missing/workspace/tree`)).status).toBe(404);
     const entry = (body) =>
       fetch(`${route}/entry`, {

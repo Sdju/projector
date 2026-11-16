@@ -1,12 +1,14 @@
-import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
-import { dirname, join } from "node:path";
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
 import { dataDir } from "@ai-projector/core/modules/app-paths/index.ts";
 import {
   agentFeatureCatalog,
+  featureAgentIsBuiltin,
   featureAgents,
   hasFeatureAgent,
   type AgentFeature,
 } from "./catalog.ts";
+import { writeFileAtomic, withFileLock } from "../atomic-files/index.ts";
 
 /** Where the user's choices live: `$XDG_DATA_HOME/projector/agent/features.json`. */
 export const featuresFile = () => join(dataDir(), "agent", "features.json");
@@ -14,17 +16,25 @@ export const featuresFile = () => join(dataDir(), "agent", "features.json");
 interface Stored {
   /** Enabled agent ids per feature; a feature missing here uses its defaults. */
   features: Record<string, string[]>;
+  /** Agent ids the user turned off; absent agents stay here so a reinstall does not come back on. */
+  disabled?: Record<string, string[]>;
+}
+
+function stringListMap(value: unknown): Record<string, string[]> {
+  const result: Record<string, string[]> = {};
+  if (value && typeof value === "object")
+    for (const [id, items] of Object.entries(value))
+      if (Array.isArray(items))
+        result[id] = items.filter((agent): agent is string => typeof agent === "string");
+  return result;
 }
 
 function stateOf(text: string): Stored {
   try {
-    const data = JSON.parse(text) as { features?: unknown };
-    const features: Record<string, string[]> = {};
-    if (data?.features && typeof data.features === "object")
-      for (const [id, value] of Object.entries(data.features))
-        if (Array.isArray(value))
-          features[id] = value.filter((agent): agent is string => typeof agent === "string");
-    return { features };
+    const data = JSON.parse(text) as { features?: unknown; disabled?: unknown };
+    const features = stringListMap(data?.features);
+    const disabled = stringListMap(data?.disabled);
+    return Object.keys(disabled).length ? { features, disabled } : { features };
   } catch {
     return { features: {} };
   }
@@ -40,18 +50,22 @@ async function readState(): Promise<Stored> {
 
 /** Writes through a temporary file, so a failed save never leaves half a settings file. */
 async function writeState(state: Stored): Promise<void> {
-  const path = featuresFile();
-  await mkdir(dirname(path), { recursive: true });
-  const temporary = `${path}.${process.pid}.tmp`;
-  await writeFile(temporary, `${JSON.stringify(state, null, 2)}\n`, "utf8");
-  await rename(temporary, path);
+  await writeFileAtomic(featuresFile(), `${JSON.stringify(state, null, 2)}\n`);
 }
 
 /** The agents a feature is on for: the saved choice, or the feature's defaults before the first change. */
 function enabledAgents(feature: AgentFeature, state: Stored): string[] {
+  const disabled = new Set(state.disabled?.[feature.id] ?? []);
   const saved = state.features[feature.id];
-  const agents = saved ?? feature.defaults ?? [];
-  return agents.filter((id) => hasFeatureAgent(id));
+  if (saved === undefined)
+    return (feature.defaults ?? []).filter((id) => !disabled.has(id) && hasFeatureAgent(id));
+  const result = new Set(saved);
+  for (const id of feature.defaults ?? []) {
+    if (disabled.has(id) || !hasFeatureAgent(id)) continue;
+    if (state.disabled?.[feature.id] !== undefined) result.add(id);
+    else if (!featureAgentIsBuiltin(id)) result.add(id);
+  }
+  return [...result].filter((id) => hasFeatureAgent(id));
 }
 
 /** What the island shows: every feature with every agent it can be given to. */
@@ -72,9 +86,6 @@ export async function featureSettings() {
   };
 }
 
-/** One write at a time: two toggles read the same file and must not lose each other's change. */
-let queue: Promise<unknown> = Promise.resolve();
-
 /** Turns one feature on or off for one agent; returns the state the island should show. */
 export async function setFeatureAgent(
   featureId: string,
@@ -84,17 +95,22 @@ export async function setFeatureAgent(
   const feature = agentFeatureCatalog.get(featureId);
   if (!feature) throw new Error(`Неизвестная возможность: ${featureId}`);
   if (!hasFeatureAgent(agentId)) throw new Error(`Неизвестный агент: ${agentId}`);
-  const task = queue.then(async () => {
+  return withFileLock(featuresFile(), async () => {
     const state = await readState();
     const current = enabledAgents(feature, state);
     state.features[feature.id] = enabled
       ? [...new Set([...current, agentId])]
       : current.filter((id) => id !== agentId);
+    const enabledIds = new Set(state.features[feature.id]);
+    const registered = featureAgents().map((agent) => agent.id);
+    const previousDisabled = state.disabled?.[feature.id] ?? [];
+    (state.disabled ??= {})[feature.id] = [
+      ...registered.filter((id) => !enabledIds.has(id)),
+      ...previousDisabled.filter((id) => !registered.includes(id) && !(enabled && id === agentId)),
+    ];
     await writeState(state);
     return featureSettings();
   });
-  queue = task.catch(() => undefined);
-  return task;
 }
 
 /** The ids of the features the agent has on: the chat's choice, or the user's defaults. */
@@ -117,6 +133,16 @@ export async function featureEnabled(
   features?: string[],
 ): Promise<boolean> {
   return (await enabledFeatures(agentId, features)).includes(featureId);
+}
+
+/** One enabled feature's own instruction, without the other features' text; empty when it is off. */
+export async function featureText(
+  agentId: string,
+  featureId: string,
+  features?: string[],
+): Promise<string> {
+  if (!(await featureEnabled(agentId, featureId, features))) return "";
+  return agentFeatureCatalog.get(featureId)?.instruction().trim() ?? "";
 }
 
 /**

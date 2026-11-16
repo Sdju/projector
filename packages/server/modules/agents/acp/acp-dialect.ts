@@ -1,6 +1,12 @@
 import type { AgentTaskPatch } from "@ai-projector/core/modules/agent-task/index.ts";
 
-export type AcpTaskPatch = AgentTaskPatch;
+/**
+ * A task patch for the ACP mapper. When `hold` is `false`, a background task is shown in the chat
+ * but must not block `connection.close` or keep the answer `run` after `done` (completion arrives
+ * on a later turn); the hosted process is kept alive via `keep-alive` instead. Absent or `true`
+ * means the live run stays open for permissions / completion on this connection.
+ */
+export type AcpTaskPatch = AgentTaskPatch & { hold?: boolean };
 
 export type AcpUpdate = Record<string, unknown>;
 
@@ -100,6 +106,11 @@ export interface AcpDialect {
   speak(): AcpTaskPatch[];
   /** The answer ended. */
   finish(): AcpTaskPatch[];
+  /**
+   * While the connection is held after `end_turn`, optional patches that clear background work
+   * when the agent never reports it on the ACP wire (e.g. OpenCode idle_outcome).
+   */
+  poll?(): AcpTaskPatch[];
   /** When a replayed message was written, if its `messageId` tells (ms since the epoch). */
   time(update: AcpUpdate): number | undefined;
   /**
