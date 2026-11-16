@@ -15,6 +15,20 @@
     "pink": "#f5c2e7",
     "mauve": "#cba6f7"
   },
+  "paletteLight": {
+    "text": "#4c4f69",
+    "muted": "#5e5e56",
+    "blue": "#1e5fc2",
+    "lavender": "#5b4bc4",
+    "sapphire": "#116f80",
+    "teal": "#0f6e66",
+    "green": "#2f7a1f",
+    "yellow": "#7a5200",
+    "peach": "#b34200",
+    "red": "#b00030",
+    "pink": "#a63d8a",
+    "mauve": "#6b2fb5"
+  },
   "icons": {
     "file": {
       "src": "/file-icons/icons/file.svg",

@@ -16,6 +16,8 @@ import {
 } from "@ai-projector/core/modules/appearance/index.ts";
 import { writeFileAtomic, withFileLock } from "../atomic-files/index.ts";
 
+export { discoverUserThemes, findUserTheme, userThemesDirectory } from "./user-themes.ts";
+
 const appearancePath = () => join(dataDir(), appearanceFile);
 const legacyTypographyPath = () => join(dataDir(), legacyTypographyFile);
 

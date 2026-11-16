@@ -27,7 +27,6 @@
 - [plugin-storage-settings.md](plugin-storage-settings.md) — настройки и файлы плагина: декларативная схема в манифесте, автоформа в карточке и возможный `api.files` для изменяемых файлов; `api.storage` уже реализован.
 - [plugin-distribution-trust.md](plugin-distribution-trust.md) — поставка и доверие: npm-транспорт, staged install с откатом, curated-каталог, обновления и отзыв.
 - [analytics-agent-logs.md](analytics-agent-logs.md) — расход по нативным журналам Codex, OpenCode, Kimi и Cursor: читатели журналов, нормализация, дедупликация, цена и покрытие.
-- [color-schemes.md](color-schemes.md) — цветовые схемы интерфейса: остались потребители вне CSS (редактор, Markdown, ANSI-палитра терминала, иконки и статика), доводка светлой и контрастной схем и проверки.
 - [file-views.md](file-views.md) — что осталось у файловых снимков: произвольные папки, union-дерево, индекс, поиск по снимку и переименования.
 - [gitlab-client-roadmap.md](gitlab-client-roadmap.md) — что осталось у GitLab после паритета с GitHub: Snippets, Wiki, несколько инстансов и проверки.
 - [npm-release.md](npm-release.md) — что осталось после публикации `0.13.0`: чистая установка, `projector-install-desktop`, 2FA и редкий сбой правки ролей на Windows.

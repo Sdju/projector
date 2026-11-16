@@ -1,2 +1,2 @@
-export type { ResolvedFileIcon } from "./contract.ts";
-export { createFileIconResolver } from "./contract.ts";
+export type { FileIconTheme, ResolvedFileIcon } from "./contract.ts";
+export { createFileIconResolver, fileIconThemeSchema } from "./contract.ts";

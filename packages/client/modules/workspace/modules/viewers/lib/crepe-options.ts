@@ -2,8 +2,9 @@ import { Crepe } from "@milkdown/crepe";
 import { editorViewCtx } from "@milkdown/kit/core";
 import { $remark } from "@milkdown/kit/utils";
 import { languages } from "@codemirror/language-data";
-import { oneDark } from "@codemirror/theme-one-dark";
+import type { EditorTheme } from "@ai-projector/core/modules/editor-themes/index.ts";
 import { createMermaidBlock } from "../../../../markdown/index.ts";
+import { themeExtension } from "./codemirror.ts";
 
 /** A filled comment bubble, like the built-in toolbar icons. */
 const chatIcon = `
@@ -32,6 +33,8 @@ export function createCrepe(options: {
   root: HTMLElement;
   content: string;
   editable: boolean;
+  theme: EditorTheme;
+  fontSize: number;
   imageUrl: (url: string) => string;
   /** Adds the selected Markdown text to the agent chat from the native toolbar. */
   selectionToChat?: (text: string) => void;
@@ -76,7 +79,7 @@ export function createCrepe(options: {
       },
       [Crepe.Feature.CodeMirror]: {
         languages,
-        theme: oneDark,
+        theme: themeExtension(options.theme, options.fontSize),
         searchPlaceholder: "Язык кода",
         copyText: "Копировать",
         noResultText: "Не найдено",

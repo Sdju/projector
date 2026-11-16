@@ -55,14 +55,22 @@ function offline() {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" media="(prefers-color-scheme: light)" content="#efeee8">
+<meta name="theme-color" media="(prefers-color-scheme: dark)" content="#171716">
 <title>Projector недоступен</title>
 <style>
-:root { color-scheme: dark; }
+:root { color-scheme: dark light; }
 body { margin: 0; min-height: 100dvh; display: grid; place-items: center; background: #10100f; color: #ecece6; font: 15px/1.45 system-ui, sans-serif; }
 main { max-width: 32rem; padding: 2rem; }
 h1 { margin: 0 0 .75rem; font-size: 1.25rem; font-weight: 600; letter-spacing: .02em; }
 p { margin: 0 0 .75rem; color: #9a9a92; }
 code { color: #ecece6; }
+@media (prefers-color-scheme: light) {
+  :root { color-scheme: light; }
+  body { background: #f7f6f1; color: #1d1d1a; }
+  p { color: #5e5e56; }
+  code { color: #1d1d1a; }
+}
 </style>
 </head>
 <body>

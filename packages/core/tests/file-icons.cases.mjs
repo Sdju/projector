@@ -29,6 +29,17 @@ test("executable files take priority over names and extensions; directories keep
   expect(() => createFileIconResolver(custom)).toThrow();
 });
 
+test("light palette is optional, validated and keeps resolver colours", () => {
+  expect(theme.paletteLight.blue).toBeTruthy();
+  const custom = structuredClone(theme);
+  custom.paletteLight = { lavender: "#123456" };
+  expect(() => createFileIconResolver(custom)).not.toThrow();
+  custom.paletteLight.lavender = "red";
+  expect(() => createFileIconResolver(custom)).toThrow();
+  delete custom.paletteLight;
+  expect(() => createFileIconResolver(custom)).not.toThrow();
+});
+
 test("shipped theme covers specific names, dotfiles, compound suffixes and common languages", () => {
   for (const [name, id] of [
     ["package.json", "package"],
@@ -66,13 +77,17 @@ test("directories never match file rules; expansion uses configured fallback and
   });
   const resolve = createFileIconResolver(custom).resolve;
   expect(resolve(entry("docs", true), true).color).toBe(theme.palette.lavender);
+  expect(resolve(entry("docs", true), true).colorName).toBe("lavender");
   expect(resolve(entry("docs", true), true).badge.color).toBe(theme.palette.lavender);
+  expect(resolve(entry("docs", true), true).badge.colorName).toBe("lavender");
   custom.rules[0].expandedIcon = "image";
   const expanded = createFileIconResolver(custom).resolve(entry("docs", true), true);
   expect(expanded.id).toBe("folder-open");
   expect(expanded.badge.id).toBe("image");
   expect(expanded.color).toBe(theme.palette.pink);
+  expect(expanded.colorName).toBe("pink");
   expect(expanded.badge.color).toBe(theme.palette.pink);
+  expect(expanded.badge.colorName).toBe("pink");
 });
 
 test("directory badges survive expansion, while ordinary folders and files have no badge", () => {

@@ -1,6 +1,10 @@
 <script setup lang="ts">
 import type { ResolvedFileIcon } from "@ai-projector/core/modules/file-icons/index.ts";
 withDefaults(defineProps<{ icon: ResolvedFileIcon; size?: number }>(), { size: 16 });
+/** Palette colours follow the painted scheme; literal hex keeps its value. */
+function colorOf(icon: { color: string; colorName?: string }) {
+  return icon.colorName ? `var(--file-icon-${icon.colorName}, ${icon.color})` : icon.color;
+}
 </script>
 
 <template>
@@ -11,7 +15,7 @@ withDefaults(defineProps<{ icon: ResolvedFileIcon; size?: number }>(), { size: 1
     :style="{
       '--icon-source': `url('${icon.src}')`,
       '--file-icon-size': `${size}px`,
-      color: icon.color,
+      color: colorOf(icon),
     }"
   >
     <span class="symbol" />
@@ -19,7 +23,7 @@ withDefaults(defineProps<{ icon: ResolvedFileIcon; size?: number }>(), { size: 1
       v-if="icon.badge"
       class="badge"
       :data-icon="icon.badge.id"
-      :style="{ '--icon-source': `url('${icon.badge.src}')`, color: icon.badge.color }"
+      :style="{ '--icon-source': `url('${icon.badge.src}')`, color: colorOf(icon.badge) }"
       ><span class="badge-symbol"
     /></span>
   </span>

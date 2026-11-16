@@ -20,27 +20,35 @@ test("service worker runs in prod only and is removed from dev and insecure orig
   );
 });
 
-test("manifest is installable, points at existing icons and is linked from the shell", async () => {
-  const manifest = JSON.parse(await readFile(`${root}/manifest.webmanifest`, "utf8"));
-  expect(manifest.name).toBe("Projector");
-  expect(manifest.short_name).toBeTruthy();
-  expect(manifest.start_url).toBe("/");
-  expect(manifest.scope).toBe("/");
-  expect(manifest.display).toBe("standalone");
-  const purposes = manifest.icons.map((icon) => icon.purpose);
-  expect(purposes).toContain("any");
-  expect(purposes).toContain("maskable");
-  const sizes = manifest.icons.filter((icon) => icon.purpose === "any").map((icon) => icon.sizes);
-  expect(sizes).toEqual(expect.arrayContaining(["192x192", "512x512"]));
-  for (const icon of manifest.icons) {
-    const file = `${root}${icon.src}`;
-    expect((await stat(file)).isFile()).toBe(true);
-    const [width, height] = await pngSize(file);
-    expect(`${width}x${height}`).toBe(icon.sizes);
+test("manifests are installable, point at existing icons and are linked from the shell", async () => {
+  for (const file of ["manifest.webmanifest", "manifest-light.webmanifest"]) {
+    const manifest = JSON.parse(await readFile(`${root}/${file}`, "utf8"));
+    expect(manifest.name).toBe("Projector");
+    expect(manifest.short_name).toBeTruthy();
+    expect(manifest.start_url).toBe("/");
+    expect(manifest.scope).toBe("/");
+    expect(manifest.display).toBe("standalone");
+    const purposes = manifest.icons.map((icon) => icon.purpose);
+    expect(purposes).toContain("any");
+    expect(purposes).toContain("maskable");
+    const sizes = manifest.icons.filter((icon) => icon.purpose === "any").map((icon) => icon.sizes);
+    expect(sizes).toEqual(expect.arrayContaining(["192x192", "512x512"]));
+    for (const icon of manifest.icons) {
+      const path = `${root}${icon.src}`;
+      expect((await stat(path)).isFile()).toBe(true);
+      const [width, height] = await pngSize(path);
+      expect(`${width}x${height}`).toBe(icon.sizes);
+    }
   }
+  const dark = JSON.parse(await readFile(`${root}/manifest.webmanifest`, "utf8"));
+  const light = JSON.parse(await readFile(`${root}/manifest-light.webmanifest`, "utf8"));
+  expect(dark.theme_color).toBe("#171716");
+  expect(light.theme_color).toBe("#efeee8");
+  expect(light.background_color).toBe("#f7f6f1");
   const html = await readFile(`${repo}/index.html`, "utf8");
-  expect(html).toContain('rel="manifest" href="/manifest.webmanifest"');
-  expect(html).toContain('rel="apple-touch-icon"');
+  expect(html).toContain('id="app-manifest" rel="manifest" href="/manifest.webmanifest"');
+  expect(html).toContain('id="app-favicon" rel="icon"');
+  expect(html).toContain('id="app-touch-icon" rel="apple-touch-icon"');
   expect(html).toContain('name="theme-color"');
 });
 
@@ -49,6 +57,7 @@ test("shell worker keeps API and dev traffic out of its fetch handler", async ()
   expect(worker).toContain('url.pathname.startsWith("/api/")');
   expect(worker).toContain('url.pathname.startsWith("/packages/")');
   expect(worker).toContain('request.mode === "navigate"');
+  expect(worker).toContain("prefers-color-scheme: light");
   expect(worker).not.toContain("cache.put");
   expect(worker).not.toContain("cache.add");
 });

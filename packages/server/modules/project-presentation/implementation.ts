@@ -70,7 +70,7 @@ export function launchHtml(project: Project, target: string): string {
 <link rel="icon" href="${href}">
 <link rel="shortcut icon" href="${href}">
 <meta http-equiv="refresh" content="0;url=${escapeHtml(target)}">
-<style>html,body{margin:0;background:#111;color:#aaa;font:14px sans-serif;height:100%}body{display:grid;place-items:center}</style>
+<style>html{color-scheme:dark light}html,body{margin:0;background:#111;color:#aaa;font:14px sans-serif;height:100%}body{display:grid;place-items:center}@media (prefers-color-scheme: light){html{color-scheme:light}html,body{background:#f7f6f1;color:#5e5e56}}</style>
 </head>
 <body>
 <p>открываю ${title}…</p>

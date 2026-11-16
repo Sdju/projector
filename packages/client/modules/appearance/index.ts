@@ -1,5 +1,6 @@
 export {
   appearanceFonts,
+  appearanceScheme,
   appearanceThemes,
   applyAppearance,
   applyAppearanceFonts,

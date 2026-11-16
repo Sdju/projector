@@ -243,6 +243,7 @@ test("Vite and static resources require LAN authentication, and the session cook
   const login = await send(server, address, "/projects", { ...headers, Accept: "text/html" });
   expect(login.status).toBe(200);
   expect(login.body).toMatch(/Пароль доступа/);
+  expect(login.body).toContain("prefers-color-scheme: light");
   const accepted = await send(server, address, "/api/app/network", {
     ...headers,
     Authorization: "Bearer test-only-password",

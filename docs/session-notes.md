@@ -86,6 +86,7 @@ node --import @zede/vio/register packages/native/app/entry.ts native http://loca
 | `chrome-profile-launcher`, `chrome-profile`                                                    | Отдельные профили app-окон                                                                                                                                                 |
 | `server-mode`, `network-mode`, `lan-password`                                                  | Режим сервера (dev/prod), доступ по сети и scrypt-хеш пароля LAN                                                                                                           |
 | `appearance.json`, `appearance-trust.json`, `editor.json`, `files-exclude.json`, `hotkey.json` | Глобальная схема и шрифты; доверие к `.projector/appearance.json` проектов; тема редактора; исключения дерева; хоткей                                                      |
+| `themes/*.json`, `themes/*.css`                                                                | Пользовательские цветовые схемы с ID `user/<имя файла>`, без пересборки                                                                                                    |
 | `devcontainer-trust.json`, `browser-proxy-key`, `launcher.token`                               | Доверие к Dev Container, ключ прокси браузера, токен резидента                                                                                                             |
 | `agent/`, `worktrees/`                                                                         | История чатов (`history.sqlite`), снимки лимитов и балансов (`analytics.sqlite`), служебные вызовы (`spend.sqlite`), журналы ходов (`runs/`), изолированные копии проектов |
 
@@ -97,7 +98,7 @@ node --import @zede/vio/register packages/native/app/entry.ts native http://loca
 
 ## Редактор кода и dev-сервер
 
-Редактор — CodeMirror 6 (`packages/client/modules/workspace/modules/viewers/ui/CodeViewer.vue`, `.../viewers/lib/codemirror.ts`). Языки подгружаются лениво из `@codemirror/language-data`, workers и ручной `optimizeDeps` не нужны. Темы — `modules/viewers/lib/codemirror.ts` (`themeExtension`) и список в `packages/core/modules/editor-themes`: чтобы добавить тему, допишите её в список и в `themeExtension`.
+Редактор — CodeMirror 6 (`packages/client/modules/workspace/modules/viewers/ui/CodeViewer.vue`, `.../viewers/lib/codemirror.ts`). Языки подгружаются лениво из `@codemirror/language-data`, workers и ручной `optimizeDeps` не нужны. Темы — `modules/viewers/lib/codemirror.ts` (`themeExtension`) и список в `packages/core/modules/editor-themes`: поверхности, выделение и подсветка берутся из токенов схемы (`--syntax-*` — алиасы семантических токенов), а `one-dark` остаётся явной тёмной темой. Crepe использует ту же `themeExtension` для блоков кода. Чтобы добавить тему, допишите её в список и в `themeExtension`.
 
 `504 Outdated Optimize Dep` означает, что браузер и оптимизатор Vite используют разные состояния предсборки. Проверяйте запросы к `node_modules/.vite/deps` и наличие `_metadata.json`; повторная загрузка страницы сама по себе не восстановит отсутствующие файлы кеша. Изменение Vite-конфигурации обновляет dev-сервер в том же Node-процессе: WebSocket переподключается, а существующие PTY сохраняются. Полный `projector restart` завершит процессы и для этой диагностики не нужен.
 

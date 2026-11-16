@@ -46,6 +46,7 @@ test("a project address cannot break out of the launch page script", () => {
   const html = launchHtml({ name: "demo", url }, url);
   expect(html.includes("</script><script>")).toBe(false);
   expect(html).toContain("http://localhost:5173\\u003c/script\\u003e");
+  expect(html).toContain("prefers-color-scheme: light");
 });
 
 test("the terminal folder must exist and stay inside the project, symlinks included", async () => {

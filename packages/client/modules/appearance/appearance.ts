@@ -28,6 +28,8 @@ let activeProjectId: string | null = null;
 
 /** Painted colour scheme (effective: global merged with project). */
 const choice = shallowRef<AppearanceChoice>(defaultAppearance);
+/** Painted scheme ID; non-CSS consumers (xterm) repaint when it changes. */
+export const appearanceScheme = shallowRef<ThemeId>(defaultAppearance);
 /** Painted content font sizes; chat is mirrored to `--chat-fs` on <html>. */
 export const appearanceFonts = shallowRef<AppearanceFonts>({ ...defaultAppearanceFonts });
 const themes = shallowRef<AvailableTheme[]>([]);
@@ -69,6 +71,23 @@ function updateMeta(scheme: ThemeId, mode?: "dark" | "light") {
   if (background)
     document.querySelector('meta[name="theme-color"]')?.setAttribute("content", background);
 }
+/** Brand surfaces follow the painted scheme; the manifest chooses matching PWA icons. */
+function updateBrand(mode: "dark" | "light") {
+  const light = mode === "light";
+  document
+    .getElementById("app-favicon")
+    ?.setAttribute("href", light ? "/favicon-light.svg" : "/favicon.svg");
+  document
+    .getElementById("app-touch-icon")
+    ?.setAttribute(
+      "href",
+      light ? "/icons/apple-touch-icon-light.png" : "/icons/apple-touch-icon.png",
+    );
+  document
+    .getElementById("app-manifest")
+    ?.setAttribute("href", light ? "/manifest-light.webmanifest" : "/manifest.webmanifest");
+  document.getElementById("app-status-bar")?.setAttribute("content", light ? "default" : "black");
+}
 
 /** Paints one colour scheme onto <html>. */
 export function applyAppearance(value: AppearanceChoice): ThemeId {
@@ -80,6 +99,7 @@ export function applyAppearance(value: AppearanceChoice): ThemeId {
   clearExternalTokens(root);
   root.dataset.appearance = value;
   root.dataset.theme = scheme;
+  appearanceScheme.value = scheme;
   if (theme) {
     for (const [name, token] of Object.entries(themeStyleProperties(theme.tokens)))
       root.style.setProperty(name, token);
@@ -88,6 +108,7 @@ export function applyAppearance(value: AppearanceChoice): ThemeId {
     root.style.removeProperty("color-scheme");
   }
   updateMeta(scheme, theme?.mode);
+  updateBrand(schemeMode(scheme, theme?.mode));
   return scheme;
 }
 
@@ -197,13 +218,12 @@ export function initAppearance() {
   globalChoice.value = choice.value;
   const root = document.documentElement;
   root.dataset.appearance = choice.value;
-  root.dataset.theme ??= resolveScheme(
-    choice.value,
-    window.matchMedia("(prefers-color-scheme: light)").matches,
-  );
+  media = window.matchMedia("(prefers-color-scheme: light)");
+  root.dataset.theme ??= resolveScheme(choice.value, media.matches);
+  appearanceScheme.value = root.dataset.theme as ThemeId;
+  updateBrand(getComputedStyle(root).colorScheme.includes("light") ? "light" : "dark");
   if (!root.style.getPropertyValue("--chat-fs"))
     root.style.setProperty("--chat-fs", `${appearanceFonts.value.chat}px`);
-  media = window.matchMedia("(prefers-color-scheme: light)");
   media.addEventListener("change", () => {
     if (choice.value === "auto" || globalChoice.value === "auto") paintEffective();
   });

@@ -21,39 +21,39 @@ import { findLanguage } from "../../../../plugin-runtime/index.ts";
 import { fallbackLanguageOf, pluginLanguageExtension } from "./plugin-language.ts";
 import type { EditorTheme } from "@ai-projector/core/modules/editor-themes/index.ts";
 
-const palette = {
-  bg: "#10100f",
-  fg: "#d8d2c4",
-  line: "#171716",
-  border: "#2c2c28",
-  selection: "#3a3934",
-  gutter: "#73736b",
-};
+/** CodeMirror's base theme only needs to know whether the painted scheme is light. */
+function schemeIsDark(): boolean {
+  if (typeof document === "undefined") return true;
+  return !getComputedStyle(document.documentElement).colorScheme.includes("light");
+}
 function projectorTheme(soft: boolean, fontSize: number): Extension {
   const base = EditorView.theme(
     {
-      "&": { backgroundColor: palette.bg, color: palette.fg, height: "100%" },
-      ".cm-content": { caretColor: palette.fg, padding: "16px 0" },
-      ".cm-cursor": { borderLeftColor: palette.fg },
-      // Полупрозрачный фон: иначе активная строка перекрывает слой выделения.
-      ".cm-activeLine": { backgroundColor: "#ffffff08" },
-      ".cm-activeLineGutter": { backgroundColor: palette.line, color: palette.fg },
-      ".cm-gutters": { backgroundColor: palette.bg, color: palette.gutter, border: "none" },
+      "&": { backgroundColor: "var(--bg)", color: "var(--text)", height: "100%" },
+      ".cm-content": { caretColor: "var(--text)", padding: "16px 0" },
+      ".cm-cursor": { borderLeftColor: "var(--text)" },
+      ".cm-activeLine": { backgroundColor: "var(--hover)" },
+      ".cm-activeLineGutter": { backgroundColor: "var(--bg-2)", color: "var(--text)" },
+      ".cm-gutters": { backgroundColor: "var(--bg)", color: "var(--muted)", border: "none" },
       "&.cm-focused .cm-selectionBackground, .cm-selectionBackground, ::selection": {
-        backgroundColor: palette.selection,
+        backgroundColor: "var(--selection)",
       },
-      ".cm-panels": { backgroundColor: palette.line, color: palette.fg },
-      ".cm-searchMatch": { backgroundColor: "#61533b70" },
-      ".cm-searchMatch-selected": { backgroundColor: "#61533b" },
+      ".cm-panels": { backgroundColor: "var(--bg-2)", color: "var(--text)" },
+      ".cm-searchMatch": {
+        backgroundColor: "color-mix(in srgb, var(--search) 70%, transparent)",
+      },
+      ".cm-searchMatch-selected": { backgroundColor: "var(--search)" },
       "&.cm-focused": { outline: "none" },
-      ".cm-scroller": {
-        fontFamily: '"Noto Sans Mono", monospace',
-        fontSize: `${fontSize}px`,
-      },
+      ".cm-scroller": { fontFamily: "var(--mono)", fontSize: `${fontSize}px` },
     },
-    { dark: true },
+    { dark: schemeIsDark() },
   );
-  if (!soft) return [base, syntaxHighlighting(classic)];
+  if (!soft)
+    return [
+      base,
+      syntaxHighlighting(classic),
+      EditorView.editorAttributes.of({ class: "editor-classic" }),
+    ];
   return [base, syntaxHighlighting(softStyle)];
 }
 
@@ -61,30 +61,32 @@ function editorFontSizeTheme(fontSize: number): Extension {
   return EditorView.theme({ ".cm-scroller": { fontSize: `${fontSize}px` } });
 }
 const classic = HighlightStyle.define([
-  { tag: [t.keyword, t.operatorKeyword], color: "#c678dd" },
-  { tag: [t.string, t.regexp], color: "#98c379" },
-  { tag: [t.number, t.bool, t.null], color: "#d19a66" },
-  { tag: t.comment, color: "#7d8799", fontStyle: "italic" },
-  { tag: [t.typeName, t.className], color: "#e5c07b" },
-  { tag: [t.function(t.variableName), t.propertyName], color: "#61afef" },
-  { tag: [t.tagName, t.angleBracket], color: "#e06c75" },
-  { tag: t.attributeName, color: "#d19a66" },
+  { tag: [t.keyword, t.operatorKeyword], color: "var(--syntax-keyword)" },
+  { tag: [t.string, t.regexp], color: "var(--syntax-string)" },
+  { tag: [t.number, t.bool, t.null], color: "var(--syntax-number)" },
+  { tag: t.comment, color: "var(--syntax-comment)", fontStyle: "italic" },
+  { tag: [t.typeName, t.className], color: "var(--syntax-type)" },
+  { tag: [t.function(t.variableName), t.propertyName], color: "var(--syntax-function)" },
+  { tag: [t.tagName, t.angleBracket], color: "var(--syntax-tag)" },
+  { tag: t.attributeName, color: "var(--syntax-attribute)" },
 ]);
-// Gruvbox Material's muted accents,.
+// Gruvbox Material's muted accents; all colours follow the painted scheme.
 const softStyle = HighlightStyle.define([
-  { tag: t.comment, color: "#8c8c84" },
-  { tag: [t.keyword, t.operatorKeyword, t.modifier, t.controlKeyword], color: "#d8a18f" },
-  { tag: [t.operator, t.punctuation], color: "#aba79b" },
-  { tag: [t.string, t.attributeValue], color: "#a9b985" },
-  { tag: t.escape, color: "#d8b580" },
-  { tag: [t.number, t.bool, t.null, t.atom], color: "#c5a5b8" },
-  { tag: t.regexp, color: "#b5b991" },
-  { tag: [t.typeName, t.className, t.namespace], color: "#d8b580" },
-  { tag: [t.tagName, t.angleBracket], color: "#d8a18f" },
-  { tag: [t.attributeName, t.propertyName], color: "#a0b7aa" },
-  { tag: t.meta, color: "#aba79b" },
-  { tag: t.heading, color: "#d8b580", fontWeight: "bold" },
-  { tag: t.link, color: "#a0b7aa", textDecoration: "underline" },
+  { tag: t.comment, color: "var(--syntax-comment)", fontStyle: "italic" },
+  {
+    tag: [t.keyword, t.operatorKeyword, t.modifier, t.controlKeyword],
+    color: "var(--syntax-keyword)",
+  },
+  { tag: [t.operator, t.punctuation], color: "var(--syntax-punctuation)" },
+  { tag: [t.string, t.attributeValue, t.regexp], color: "var(--syntax-string)" },
+  { tag: t.escape, color: "var(--syntax-number)" },
+  { tag: [t.number, t.bool, t.null, t.atom], color: "var(--syntax-number)" },
+  { tag: [t.typeName, t.className, t.namespace], color: "var(--syntax-type)" },
+  { tag: [t.tagName, t.angleBracket], color: "var(--syntax-tag)" },
+  { tag: [t.attributeName, t.propertyName], color: "var(--syntax-attribute)" },
+  { tag: t.meta, color: "var(--syntax-comment)" },
+  { tag: t.heading, color: "var(--syntax-type)", fontWeight: "bold" },
+  { tag: t.link, color: "var(--syntax-link)", textDecoration: "underline" },
 ]);
 
 export function themeExtension(theme: EditorTheme, fontSize: number): Extension {

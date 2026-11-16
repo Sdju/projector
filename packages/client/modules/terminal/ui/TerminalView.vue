@@ -22,7 +22,7 @@ import type {
   TerminalServerMessage,
   TerminalSession,
 } from "@ai-projector/core/modules/terminal/index.ts";
-import { appearanceFonts, loadAppearanceFonts } from "../../appearance/index.ts";
+import { appearanceFonts, appearanceScheme, loadAppearanceFonts } from "../../appearance/index.ts";
 
 function terminalTheme() {
   const styles = getComputedStyle(document.documentElement);
@@ -350,6 +350,10 @@ watch(
     scheduleFit();
   },
 );
+watch(appearanceScheme, () => {
+  if (!terminal) return;
+  terminal.options.theme = terminalTheme();
+});
 
 onMounted(() => {
   void loadAppearanceFonts().catch(() => undefined);
@@ -358,6 +362,8 @@ onMounted(() => {
     fontFamily: '"DejaVu Sans Mono", monospace',
     fontSize: appearanceFonts.value.terminal,
     scrollback: 5000,
+    // Keep xterm's ANSI palette readable on both light and dark schemes.
+    minimumContrastRatio: 4.5,
     allowProposedApi: false,
     linkHandler: {
       activate: (event, value) => {
@@ -490,6 +496,10 @@ onBeforeUnmount(() => {
 }
 .terminal-view {
   background: var(--bg-2);
+}
+/* xterm.css paints the scroll viewport black; the canvas theme does not cover it on light schemes. */
+.terminal-view :deep(.xterm-viewport) {
+  background-color: var(--bg-2);
 }
 .status {
   margin: 0;

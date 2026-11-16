@@ -36,6 +36,8 @@ export const fileIconThemeSchema = z
     version: z.literal(1),
     name: z.string().min(1),
     palette: z.record(z.string(), z.string().regex(hex)),
+    /** Optional light-scheme variant; missing names fall back to `palette`. */
+    paletteLight: z.record(z.string(), z.string().regex(hex)).optional(),
     icons: z.record(
       z.string(),
       z.strictObject({
@@ -101,8 +103,10 @@ export interface ResolvedFileIcon {
   id: string;
   src: string;
   color: string;
+  /** Palette key for scheme-aware consumers; omitted for literal hex colours. */
+  colorName?: string;
   ruleId?: string;
-  badge?: { id: string; src: string; color: string };
+  badge?: { id: string; src: string; color: string; colorName?: string };
 }
 
 // * and ? stay inside a path segment; ** crosses folders; **/ also matches zero folders.
@@ -153,6 +157,10 @@ export function createFileIconResolver(input: unknown) {
       },
     };
   });
+  const colorOf = (name: string) => ({
+    color: theme.palette[name] ?? name,
+    ...(Object.hasOwn(theme.palette, name) && /^[\w-]+$/.test(name) ? { colorName: name } : {}),
+  });
   return {
     name: theme.name,
     resolve(this: void, entry: IconEntry, expanded = false): ResolvedFileIcon {
@@ -168,18 +176,17 @@ export function createFileIconResolver(input: unknown) {
             ? theme.icons[badgeId]
             : undefined;
         const icon = theme.icons[id];
-        const color = badge?.color ?? icon.color;
         return {
           id,
           src: icon.src,
-          color: theme.palette[color] ?? color,
+          ...colorOf(badge?.color ?? icon.color),
           ruleId: rule?.id,
           ...(badge && badgeId
             ? {
                 badge: {
                   id: badgeId,
                   src: badge.src,
-                  color: theme.palette[badge.color] ?? badge.color,
+                  ...colorOf(badge.color),
                 },
               }
             : {}),
@@ -190,7 +197,7 @@ export function createFileIconResolver(input: unknown) {
       return {
         id,
         src: icon.src,
-        color: theme.palette[icon.color] ?? icon.color,
+        ...colorOf(icon.color),
         ruleId: rule?.id,
       };
     },

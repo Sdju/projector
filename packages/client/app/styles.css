@@ -27,11 +27,11 @@
   --line: #2c2c28;
   --line-strong: #46463f;
 
-  /* Текст: контраст на --bg не ниже 4.5:1 */
+  /* Текст: контраст на --bg…--bg-4 не ниже 4.5:1 */
   --text: #ecece6;
   --text-2: #c9c9bf;
-  --muted: #9a9a92;
-  --faint: #80807a;
+  --muted: #a5a59d;
+  --faint: #92928b;
 
   /* Состояния */
   --focus: #d8d2c4;
@@ -41,6 +41,21 @@
   --warn: #c4b386;
   --info: #7fb0d6;
   --search: #5c4a1e;
+
+  /*
+   * Подсветка кода: алиасы семантических токенов. Они не задают новые цвета,
+   * поэтому внешние темы и светлая/контрастная схемы следуют автоматически.
+   */
+  --syntax-keyword: var(--accent);
+  --syntax-string: var(--run);
+  --syntax-number: var(--warn);
+  --syntax-comment: var(--muted);
+  --syntax-function: var(--info);
+  --syntax-type: var(--warn);
+  --syntax-tag: var(--err);
+  --syntax-attribute: var(--info);
+  --syntax-punctuation: var(--text-2);
+  --syntax-link: var(--info);
 
   /* Интерактивные подложки поверх любой поверхности */
   --hover: color-mix(in srgb, var(--text) 5%, transparent);
@@ -111,15 +126,15 @@
 
   --text: #1d1d1a;
   --text-2: #38382f;
-  --muted: #5e5e56;
-  --faint: #64645b;
+  --muted: #51514a;
+  --faint: #5d5d55;
 
   --focus: #6d5f2c;
-  --accent: #6f5d24;
-  --run: #2f6b34;
-  --err: #a33b2c;
-  --warn: #795812;
-  --info: #276b93;
+  --accent: #6d5b23;
+  --run: #2e6933;
+  --err: #a13a2c;
+  --warn: #785712;
+  --info: #246287;
   --search: #f2dfa0;
 
   --selection: #cfcabc;
@@ -161,6 +176,14 @@
 
   --shadow-popover: 0 12px 32px #000000cc;
   --shadow-modal: 0 18px 60px #000000e6;
+}
+
+/* Классическая тема редактора: другой акцент на тех же токенах схемы. */
+.cm-editor.editor-classic {
+  --syntax-keyword: var(--info);
+  --syntax-function: var(--accent);
+  --syntax-type: var(--accent);
+  --syntax-attribute: var(--warn);
 }
 
 * {

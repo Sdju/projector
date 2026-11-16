@@ -34,7 +34,11 @@ import {
 } from "../lib/codemirror.ts";
 import { useEditorStatusStore } from "../lib/editor-status.ts";
 import { languageRevision } from "../../../../plugin-runtime/index.ts";
-import { appearanceFonts, loadAppearanceFonts } from "../../../../appearance/index.ts";
+import {
+  appearanceFonts,
+  appearanceScheme,
+  loadAppearanceFonts,
+} from "../../../../appearance/index.ts";
 const props = defineProps<{
   path: string;
   content: string;
@@ -368,11 +372,14 @@ watch(
   () => [props.path, props.original, props.editable, sideBySide.value, collapseUnchanged.value],
   render,
 );
-watch([editorTheme, () => appearanceFonts.value.editor], ([theme, fontSize]) => {
-  const effects = { effects: themeCompartment.reconfigure(themeExtension(theme, fontSize)) };
-  merge?.a.dispatch(effects);
-  view?.dispatch(effects);
-});
+watch(
+  [editorTheme, appearanceScheme, () => appearanceFonts.value.editor],
+  ([theme, , fontSize]) => {
+    const effects = { effects: themeCompartment.reconfigure(themeExtension(theme, fontSize)) };
+    merge?.a.dispatch(effects);
+    view?.dispatch(effects);
+  },
+);
 watch(languageRevision, () => {
   if (view) applyLanguage(view);
 });

@@ -22,12 +22,14 @@ import {
 import { markdownPath, renderMarkdown, stripImageAttributes } from "../lib/markdown.ts";
 import { githubEmojiDecorations } from "../lib/markdown-emoji.ts";
 import { createCrepe, normalizeImageAttributes } from "../lib/crepe-options.ts";
+import { editorTheme } from "../lib/editor-theme.ts";
+import { appearanceFonts } from "../../../../appearance/index.ts";
 import UiLoader from "../../../../../common/ui/UiLoader.vue";
 import type { EmojiMap } from "../../../../../common/utilities/github-emoji.ts";
 import { useMarkdownInteractions } from "../lib/markdown-links.ts";
 import { MermaidModal } from "../../../../markdown/index.ts";
 import "@milkdown/crepe/theme/common/style.css";
-import "@milkdown/crepe/theme/classic-dark.css";
+import "@milkdown/crepe/theme/classic.css";
 
 const props = withDefaults(
   defineProps<{
@@ -202,6 +204,8 @@ onMounted(async () => {
     root: root.value,
     content: baselineContent,
     editable: props.editable !== false,
+    theme: editorTheme.value,
+    fontSize: appearanceFonts.value.editor,
     imageUrl,
     selectionToChat,
   });
@@ -542,6 +546,10 @@ onBeforeUnmount(() => {
   --crepe-color-hover: var(--bg-3);
   --crepe-color-selected: var(--selection);
   --crepe-color-inline-area: var(--bg-3);
+  --crepe-color-inverse: var(--bg-4);
+  --crepe-color-on-inverse: var(--text);
+  --crepe-color-inline-code: var(--err);
+  --crepe-color-error: var(--err);
   --crepe-font-title: var(--sans);
   --crepe-font-default: var(--sans);
   --crepe-font-code: var(--mono);

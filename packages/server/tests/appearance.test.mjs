@@ -107,6 +107,62 @@ test("appearance API reads and writes the saved choice", async () => {
   expect(await readAppearanceChoice()).toBe("light");
 });
 
+test("user JSON and CSS themes are discovered and selectable", async () => {
+  const { mkdir, readFile, rm, writeFile } = await import("node:fs/promises");
+  const { join } = await import("node:path");
+  const { discoverUserThemes, userThemesDirectory } =
+    await import("../modules/appearance/index.ts");
+  const directory = userThemesDirectory();
+  await rm(directory, { recursive: true, force: true });
+  await mkdir(directory, { recursive: true });
+  onTestFinished(() => rm(directory, { recursive: true, force: true }));
+
+  const tokens = JSON.parse(
+    await readFile(new URL("./fixtures/theme-plugin/themes/paper.json", import.meta.url), "utf8"),
+  );
+  await writeFile(
+    join(directory, "ocean.json"),
+    JSON.stringify({ title: "Ocean", mode: "light", tokens }),
+  );
+  await writeFile(
+    join(directory, "night.css"),
+    `/* title: Night */\n/* mode: dark */\n:root {\n${Object.entries(tokens)
+      .map(([name, value]) => `--${name}: ${value};`)
+      .join("\n")}\n}\n`,
+  );
+  await writeFile(join(directory, "bad.css"), ":root { --bg: url(https://example.test/x); }");
+  await writeFile(join(directory, "broken.json"), "{");
+
+  const themes = await discoverUserThemes();
+  expect(themes.map((theme) => theme.id)).toStrictEqual(["user/night", "user/ocean"]);
+  expect(themes.find((theme) => theme.id === "user/ocean")?.mode).toBe("light");
+  expect(themes.find((theme) => theme.id === "user/night")?.title).toBe("Night");
+
+  const server = createServer((req, res) => {
+    void handleApi(req, res);
+  });
+  server.listen(0, "127.0.0.1");
+  await once(server, "listening");
+  onTestFinished(() => new Promise((resolve) => server.close(resolve)));
+  const base = `http://127.0.0.1:${server.address().port}`;
+
+  const listed = await (await fetch(`${base}/api/appearance`)).json();
+  expect(listed.themes.map((theme) => theme.id)).toEqual(
+    expect.arrayContaining(["user/night", "user/ocean"]),
+  );
+  const saved = await fetch(`${base}/api/appearance`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", Origin: base },
+    body: JSON.stringify({ choice: "user/ocean" }),
+  });
+  expect(saved.status).toBe(200);
+  expect(await readAppearanceChoice()).toBe("user/ocean");
+  const bootstrap = await (await fetch(`${base}/api/appearance/bootstrap.js`)).text();
+  expect(bootstrap).toContain('const choice = "user/ocean"');
+  expect(bootstrap).toContain('"--bg":"#f4ecd8"');
+  expect(bootstrap).toContain('const mode = "light"');
+});
+
 test("bootstrap script follows the saved choice on every request", async () => {
   await writeAppearanceChoice("auto");
   const server = createServer((req, res) => {
@@ -126,6 +182,10 @@ test("bootstrap script follows the saved choice on every request", async () => {
   expect(script).toContain('matchMedia("(prefers-color-scheme: light)")');
   expect(script).toContain("root.dataset.theme = scheme");
   expect(script).toContain('root.style.setProperty("--chat-fs", "13px")');
+  expect(script).toContain(
+    'const themeColors = {"dark":"#171716","light":"#efeee8","contrast":"#080808"}',
+  );
+  expect(script).toContain('meta[name="theme-color"]');
 
   await writeAppearanceChoice("light");
   const changed = await (await fetch(`${base}/api/appearance/bootstrap.js`)).text();

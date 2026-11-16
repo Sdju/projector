@@ -23,6 +23,16 @@
         "pattern": "^#[\\da-f]{6}$"
       }
     },
+    "paletteLight": {
+      "type": "object",
+      "propertyNames": {
+        "type": "string"
+      },
+      "additionalProperties": {
+        "type": "string",
+        "pattern": "^#[\\da-f]{6}$"
+      }
+    },
     "icons": {
       "type": "object",
       "propertyNames": {
