@@ -11,6 +11,8 @@ const props = defineProps<{
   jobs: AgentJobView[];
   /** API prefix when the job belongs to another device of the Hub. */
   base?: string;
+  /** The narrow works panel: keep the question form to the point. */
+  compact?: boolean;
 }>();
 const emit = defineEmits<{ answered: [] }>();
 
@@ -73,5 +75,5 @@ async function answer(id: string, answers: Record<string, string[]> | null): Pro
 
 <template>
   <AgentPermissions :permissions="permissions" @decide="decide" />
-  <AgentQuestions :requests="questions" @answer="answer" />
+  <AgentQuestions :requests="questions" :compact="compact" @answer="answer" />
 </template>

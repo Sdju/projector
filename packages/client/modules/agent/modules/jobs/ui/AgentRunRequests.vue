@@ -16,6 +16,8 @@ const props = defineProps<{
   pending: AgentRunPending[];
   agent: string;
   base?: string;
+  /** The narrow works panel: keep the question form to the point. */
+  compact?: boolean;
 }>();
 const emit = defineEmits<{ answered: [] }>();
 
@@ -84,6 +86,6 @@ async function answerSecretRequest(id: string, value: string | null): Promise<vo
 
 <template>
   <AgentPermissions :permissions="permissions" @decide="decide" />
-  <AgentQuestions :requests="questions" @answer="answer" />
+  <AgentQuestions :requests="questions" :compact="compact" @answer="answer" />
   <AgentSecrets :requests="secrets" @answer="answerSecretRequest" />
 </template>

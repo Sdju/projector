@@ -123,6 +123,7 @@ const requestNote = computed(() => {
     <AgentJobRequests
       v-if="item.job && item.pending.length"
       class="requests"
+      compact
       :jobs="[item.job]"
       :base="item.sourceBase || undefined"
       @answered="emit('answered')"
@@ -130,6 +131,7 @@ const requestNote = computed(() => {
     <AgentRunRequests
       v-else-if="item.kind === 'run' && item.pending.length"
       class="requests"
+      compact
       :pending="item.pending"
       :agent="item.agent"
       :base="item.sourceBase || undefined"
@@ -240,7 +242,6 @@ const requestNote = computed(() => {
 .requests :deep(.tool) {
   position: static;
 }
-.requests :deep(.question.ui-card),
 .requests :deep(.secret.ui-card) {
   font-size: var(--fs-xs);
 }
