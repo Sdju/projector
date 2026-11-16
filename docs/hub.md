@@ -183,6 +183,28 @@ Hub проверяет Host и Origin, не передаёт на устройс
 нужно монтировать томом, иначе recreate контейнера снова спросит пароль. TLS завершает
 внешний reverse proxy (например, Caddy), который передаёт исходный Host и поддерживает
 WebSocket и SSE.
+
+```yaml
+services:
+  projector-hub:
+    build: .
+    env_file: hub.env
+    environment:
+      PROJECTOR_HUB_DATA: /data # каталог данных внутри контейнера
+    volumes:
+      - ./data:/data # переживает recreate и docker compose down
+```
+
+Bind mount выбран намеренно: `docker compose down -v` удаляет именованные тома, но не
+каталоги хоста, а `refresh.json` остаётся доступным для бэкапа. Каталог держите с правами
+`0700`, файл Hub создаёт сам с `0600`. Если контейнер уже работал без тома, перенесите файл
+до пересоздания, иначе текущий вход пропадёт вместе с writable-слоем:
+
+```bash
+mkdir -p data && chmod 700 data
+docker cp projector-hub:<каталог данных внутри контейнера>/refresh.json data/
+```
+
 Hub по умолчанию остаётся на loopback за ним. Канал устройства к такому Hub — WSS.
 VPS с завершением TLS может читать трафик; сквозного шифрования от браузера до устройства нет.
 
