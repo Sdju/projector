@@ -44,7 +44,8 @@ import {
   useWorktreePanel,
 } from "../modules/panels/index.ts";
 import { useAutoCompact } from "../model/use-auto-compact.ts";
-import { useChatInputActions, useChatRetry } from "../model/use-chat-input-actions.ts";
+import { bannerErrorOf } from "../model/banner-error.ts";
+import { useChatInputActions } from "../model/use-chat-input-actions.ts";
 import { useStartPreset } from "../model/start-preset.ts";
 import { useAnswerForm } from "../model/answer-form.ts";
 import { useAnswerDoctor } from "../model/answer-doctor.ts";
@@ -473,7 +474,7 @@ function dismissError() {
   error.value = "";
   copyError.value = "";
 }
-const { retryableError, retryFailed } = useChatRetry(turns, busy, error, copyError, retryMessage);
+const bannerError = computed(() => bannerErrorOf(error.value, copyError.value, turns.value));
 // Components in the answers write back into this chat; a busy agent queues the message.
 provide(widgetReplyKey, (text) => {
   void toBottom();
@@ -747,18 +748,16 @@ onBeforeUnmount(() => release());
       :commands="slashCommands"
       :busy="busy"
       :started-at="turns.findLast((turn) => turn.role === 'assistant')?.at"
-      :error="error || copyError"
+      :error="bannerError"
       :copied="!!copied"
       :form="composerForm"
       :editing="!!editing"
-      :retryable="retryableError"
       :dropping="chatDrop.over.value"
       @submit="submit"
       @form-submit="submitComposerPreset"
       @open="openChip"
       @fail="(message) => (error = message)"
       @dismiss="dismissError"
-      @retry="retryFailed"
       @stop="stop"
     >
       <template v-if="latestContext" #status>

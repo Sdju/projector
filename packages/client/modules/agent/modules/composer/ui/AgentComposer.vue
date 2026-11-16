@@ -12,7 +12,6 @@ import IconSquare from "~icons/lucide/square";
 import IconAlert from "~icons/lucide/circle-alert";
 import IconType from "~icons/lucide/type";
 import IconListChecks from "~icons/lucide/list-checks";
-import IconRefresh from "~icons/lucide/refresh-cw";
 import IconX from "~icons/lucide/x";
 
 const draft = defineModel<string>({ required: true });
@@ -31,8 +30,6 @@ const props = defineProps<{
   form?: string;
   /** A message is being edited: the text field wins over the pending form. */
   editing?: boolean;
-  /** The last answer failed and the same request can be sent again. */
-  retryable?: boolean;
   /** Files dragged over the chat: highlight this field, not the whole tab. */
   dropping?: boolean;
 }>();
@@ -143,16 +140,6 @@ defineExpose({
       </p>
       <button v-if="long" type="button" class="chat-error-toggle" @click="expanded = !expanded">
         {{ expanded ? "Свернуть" : "Развернуть" }}
-      </button>
-      <button
-        v-if="retryable && !busy"
-        type="button"
-        class="chat-error-retry"
-        title="Повторить ответ"
-        aria-label="Повторить ответ"
-        @click="emit('retry')"
-      >
-        <IconRefresh aria-hidden="true" />
       </button>
       <button
         type="button"
@@ -417,10 +404,6 @@ defineExpose({
   font-size: inherit;
 }
 .chat-error-close {
-  display: grid;
-  place-items: center;
-}
-.chat-error-retry {
   display: grid;
   place-items: center;
 }

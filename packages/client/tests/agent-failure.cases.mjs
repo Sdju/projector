@@ -3,6 +3,7 @@ import { createState } from "../modules/agent-core/model/chat-state.ts";
 import { useChatActions } from "../modules/agent-core/model/chat-actions.ts";
 import { loadHistory, INTERRUPTED } from "../modules/agent-core/model/load-history.ts";
 import { applyAgentEvent } from "../modules/agent-core/model/turn-events.ts";
+import { bannerErrorOf } from "../modules/agent/model/banner-error.ts";
 
 const turn = (id, role, text = id, extra = {}) => ({ id, role, text, tools: [], ...extra });
 
@@ -49,6 +50,26 @@ test("retry sends the same message again and keeps the failed attempt as a versi
   expect(state.stash.versions[0].map((item) => item.id)).toEqual(["u1", "a1"]);
   expect(state.stash.versions[0][1].failure).toBe("overloaded");
   expect(state.error).toBe("");
+});
+
+test("the failed answer is not repeated in the composer banner", () => {
+  const failed = turn("a1", "assistant", "", { failure: "overloaded" });
+  const turns = [turn("u1", "user", "почини"), failed];
+
+  expect(bannerErrorOf("overloaded", "", turns)).toBe("");
+  expect(bannerErrorOf("overloaded", "Не удалось скопировать", turns)).toBe(
+    "Не удалось скопировать",
+  );
+  expect(bannerErrorOf("Не удалось сохранить чат", "", turns)).toBe("Не удалось сохранить чат");
+  expect(bannerErrorOf("Не удалось сохранить чат", "Не удалось скопировать", turns)).toBe(
+    "Не удалось сохранить чат",
+  );
+});
+
+test("an error without a failed answer stays in the banner", () => {
+  const turns = [turn("u1", "user", "почини"), turn("a1", "assistant", "ответ")];
+
+  expect(bannerErrorOf("Не удалось сохранить чат", "", turns)).toBe("Не удалось сохранить чат");
 });
 
 test("a failed answer survives reload and still offers retry", async () => {

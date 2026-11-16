@@ -2,8 +2,6 @@ import { nextTick, type Ref } from "vue";
 import type { SideQuestion } from "../modules/panels/index.ts";
 import type { MessagePart } from "../../agent-core/index.ts";
 
-export { useChatRetry } from "./use-chat-retry.ts";
-
 /** What the composer and the welcome suggestions do to the chat, without the chat's layout. */
 export function useChatInputActions(options: {
   draft: Ref<string>;
