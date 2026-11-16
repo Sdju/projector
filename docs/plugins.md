@@ -37,11 +37,12 @@ Projector поддерживает локальные плагины: цвето
 - `version` обязателен и должен быть semver `x.y.z`, с необязательными prerelease/build-частями.
 - `description`, `engines.projector`, `dependencies` и `optionalDependencies` необязательны. Для `engines.projector` проверяется совместимость с текущей версией Projector; поддерживаются `*`, `latest`, сравнения, `^`, `~`, пробелы между условиями и `||`. В `dependencies` и `optionalDependencies` запрещены локальные протоколы `workspace:`, `catalog:`, `file:`, `link:`, `portal:`.
 - `projector.apiVersion` обязателен и сейчас равен только `1`; это версия контракта автора.
-- `projector.server` необязателен и указывает на собранный CommonJS-модуль; он допустим вместе с `contributes.agents` или `contributes.balances`.
+- `projector.server` необязателен и указывает на собранный CommonJS-модуль; он допустим вместе с `contributes.agents`, `contributes.balances` или `contributes.http`.
 - `projector.browser` необязателен и указывает на собранный ESM-модуль, например `dist/browser.js`. Entry обязан лежать в подкаталоге артефактов (не в корне пакета), а все относительные chunks и ассеты — рядом с ним.
-- `projector.contributes` содержит хотя бы один непустой вклад: `themes`, `agents`, `balances`, `languages`, `panels` или `tabs`.
+- `projector.contributes` содержит хотя бы один непустой вклад: `themes`, `agents`, `balances`, `http`, `languages`, `panels` или `tabs`.
 - `projector.contributes.themes` необязателен; если он есть, каждая тема проверяется по правилам ниже.
 - `projector.contributes.agents` необязателен; агент описывается декларативно и запускается через ACP.
+- `projector.contributes.http` объявляет HTTP-маршруты доверенного серверного кода: `id`, необязательные `path` и `methods`. Подробности — ниже.
 - `projector.contributes.languages` объявляет метаданные языка без исполнения JS: `id`, `title`, необязательные `description`, `extensions`, `filenames` и `priority` (от -1000 до 1000). Нужен хотя бы один из `extensions`/`filenames`; расширения и имена файлов ограничены безопасным алфавитом.
 - `projector.contributes.panels` объявляет панели: `id`, `title`, необязательное `description` и `placement` — `sidebar` или `aside`.
 - `projector.contributes.tabs` объявляет служебные вкладки: `id`, `title`, необязательное `description`.
@@ -209,6 +210,49 @@ exports.createPlugin = (api) => ({
 
 Код выполняется **в процессе сервера с его правами**, без песочницы. Поэтому он загружается только после явного доверия и включения пакета, а изменение любого файла пакета снимает доверие. Этот API не выдаёт браузерный UI и внутренние модули клиента: для UI есть отдельный `projector.browser`, а для изоляции всё ещё нужен будущий отдельный runtime/процесс. Hosted-ход плагина идёт отдельным процессом `server/app/plugin-runner.ts`: сервер передаёт в окружении entry и хеш пакета и id агента, раннер загружает тот же плагин, регистрирует его бэкенды и возможности и вызывает прямой `backend.run` без повторного hosting.
 
+## HTTP-маршруты
+
+Доверенный серверный плагин может объявить собственные HTTP-маршруты — webhook, OAuth callback, healthcheck. Они живут под префиксом `/api/plugins/<package-key>/` и доступны только после доверия и включения пакета.
+
+```json
+{
+  "projector": {
+    "apiVersion": 1,
+    "server": "dist/server.cjs",
+    "contributes": {
+      "http": [{ "id": "webhook", "path": "hook", "methods": ["POST"] }, { "id": "status" }]
+    }
+  }
+}
+```
+
+```js
+exports.createPlugin = (api) => {
+  api.http.register({
+    id: "status",
+    handle: (context) => context.json(200, { ok: true }),
+  });
+  api.http.register({
+    id: "webhook",
+    handle: async (context) => {
+      const body = await context.readJson(); // до 1 МБ
+      context.json(202, { received: body });
+    },
+  });
+  return { agents: [], balances: [] };
+};
+```
+
+`id` уникален внутри пакета, `path` по умолчанию равен `id`, `methods` — `["GET"]`; допустимы `GET`, `HEAD`, `POST`, `PUT`, `PATCH`, `DELETE` и `OPTIONS`. Путь — шаблон rou3: статические сегменты, `:param`, `:param?`, `*`, `**`, группы и regex-ограничения; статический сегмент имеет приоритет над параметром, параметр — над wildcard. Запрещены только `.`/`..` сегменты, `%`, `#`, литеральный `\` вне regex-группы и управляющие символы: URL-парсер разрешает или отбрасывает их до маршрутизации. Количество маршрутов ограничено только размером манифеста (1 МБ).
+
+`access` задаёт режим доступа: `projector` (по умолчанию) требует `Origin` для мутаций, как остальные API; `local` полагается на базовую проверку loopback/LAN и пускает локальные сервисы и webhook без `Origin`. Подпись или токен такого webhook проверяет сам плагин: Projector не подменяет его аутентификацию.
+
+Handler получает `req`, `res`, `url`, `method`, `path`, `params`, `signal`, `header(name)`, `readBody(maxBytes)`, `readJson(maxBytes)` и `json(status, body)`. `params` содержит захваты `:param`, `*` и `**`. `readBody`/`readJson` по умолчанию читают до 4 МБ; это защита от случайного буфера, а не политика — передайте больший `maxBytes`, `Infinity` или читайте `req` потоком сами. Жёсткого таймаута нет: `signal` прерывается при обрыве соединения, а долгий ответ и SSE остаются на усмотрение плагина. Если handler не завершил ответ, сервер отвечает `204`.
+
+Код, который объявил маршрут, но не зарегистрировал его, делает пакет ошибочным: карточка показывает диагностику, маршруты не публикуются. При выключении, удалении и смене хеша обработчики снимаются. Встроенные `/api/*` маршруты имеют приоритет, поэтому плагин не может занять чужой путь.
+
+Из браузерного кода URL строит `api.httpUrl(path)`: он проверяет безопасную форму пути и учитывает устройство на Hub (`/api/devices/<id>/...`), а существование маршрута решает сервер.
+
 ## Браузерный код и UI
 
 `projector.browser` — готовый ESM-модуль, собранный автором отдельно. Установка копирует артефакт и не запускает `install`/`build` скрипты. Модуль экспортирует `default` (или `plugin`) с `apiVersion: 1` и `activate(api)`. Хост передаёт реализацию API аргументом; глобального объекта Projector нет. Публичные типы автора — пакет `@ai-projector/plugin-api` (`packages/plugin-api/modules/api/index.ts`), он не импортирует клиентские или серверные реализации.
@@ -243,7 +287,7 @@ export default definePlugin({
 
 `activate` может быть async и возвращать `Disposable` или функцию очистки. Все регистрации принадлежат scope активации: `api.signal` прерывается, `api.onDispose` и возвращённый disposer вызываются при disable, remove, смене хеша, уходе со страницы или HMR. Частично упавшая активация снимает уже созданные вклады; исключение в одном disposer не мешает остальным. Повторный enable создаёт новый scope; модуль может остаться в кеше браузера, поэтому обязательные регистрации нужно делать в `activate`, а не на верхнем уровне.
 
-Собственные команды плагина живут в reserved-пространстве `api.commands.prefix` (`ide.plugin.command.<package-key>.`): так пакет не может занять встроенную команду или команду открытия чужой панели/вкладки. `title` и `description` обязательны.
+Собственные команды плагина живут в reserved-пространстве `api.commands.prefix` (`ide.plugin.command.<package-key>.`): так пакет не может занять встроенную команду или команду открытия чужой панели/вкладки. `title` и `description` обязательны. `api.httpUrl(path)` возвращает device-aware адрес объявленного маршрута из `contributes.http`; путь, которого нет в манифесте, отклоняется.
 
 ### Языки
 
@@ -366,6 +410,7 @@ JSON токенов — плоский объект. Обязательны `bg`
 - `POST /api/plugins` с `{"action":"remove","id":"<package>"}` — удаляет управляемую установку и её состояние. Пакет, положенный вручную, нужно удалить из его папки.
 - `POST /api/plugins` с `{"action":"install","path":"/absolute/or/relative/folder"}` — проверяет и копирует локальную папку в versioned managed-layout. Theme-only пакет включается сразу, пакет с кодом ждёт доверия; ответ — новый каталог.
 - `GET|HEAD /api/plugins/assets/<package-key>/<hash>/<relative-path>` — ассет доверенного включённого browser-пакета с текущим хешем. Ответы 404 для disabled/untrusted/stale/HTML/symlink/traversal; `Cache-Control: no-store` и `nosniff`.
+- `GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS /api/plugins/<package-key>/<path>` — объявленный маршрут включённого доверенного серверного пакета. 404 для выключенного или неизвестного, 405 для необъявленного метода с заголовком `Allow`.
 - `GET /api/plugins/<package-key>/storage` — `{"data":{...}}` для известного пакета, включая выключенный и временно отсутствующий.
 - `PUT /api/plugins/<package-key>/storage` с `{"key":"<name>","value":<json>}` — записывает один ключ; 400 при недопустимом ключе, 413 при превышении квоты, 409 при недоступном каталоге данных. Требует `Origin`, как остальные мутации.
 - `DELETE /api/plugins/<package-key>/storage?key=<name>` — удаляет один ключ; без `key` — 400.
@@ -413,6 +458,7 @@ vp run build:plugin:example-ui
 Фактические ограничения:
 
 - Нет изолированного runtime или sandbox: браузерный и серверный код доверенный и получает права страницы/процесса. Для чужого кода нужен отдельный origin/iframe и RPC.
+- Маршруты плагина выполняются в процессе сервера и не имеют отдельной изоляции: долгий ответ или падение кода — ответственность плагина, а не общий таймаут ядра.
 - Нет установки и обновления из npm/реестра, подписи пакетов, curated-каталога и автоматического обновления установленной версии.
 - Нет shared dependencies для Vue/CodeMirror: UI монтируется в обычный DOM, языки описываются декларативной грамматикой. Произвольные CodeMirror extensions и Vue-компоненты хосту не передаются.
 - Плагин не получает собственной схемы настроек, автоформы в карточке и доступа к настройкам приложения. `api.storage` даёт только ключ-значение; `projector.server` — доверенный код в процессе сервера: он и так имеет Node, а `api.require` разрешает пакет из собственного `node_modules` плагина; изолированного Node API нет.

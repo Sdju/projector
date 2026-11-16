@@ -6,6 +6,8 @@ import {
   isSafePluginPath,
   pluginApiVersion,
   pluginAssetPath,
+  pluginHttpMethodsOf,
+  pluginHttpPath,
   pluginPackageKey,
   pluginPackageName,
   sanitizePluginIconSvg,
@@ -685,5 +687,97 @@ describe("plugin balance contribution", () => {
         projector: { apiVersion: 1, contributes: { balances: [] } },
       }),
     ).toThrow(/хотя бы один вид баланса/);
+  });
+});
+
+describe("plugin HTTP routes", () => {
+  const route = { id: "webhook", path: "api/webhook", methods: ["POST"] };
+  const httpManifest = {
+    name: "@scope/http-pack",
+    version: "1.0.0",
+    projector: {
+      apiVersion: 1,
+      server: "server.cjs",
+      contributes: { http: [route] },
+    },
+  };
+
+  test("a route-only server plugin is a valid contribution", () => {
+    expect(validatePluginManifest(httpManifest).projector.contributes.http).toEqual([route]);
+    expect(pluginHttpPath(route)).toBe("api/webhook");
+    expect(pluginHttpPath({ id: "status" })).toBe("status");
+    expect(pluginHttpMethodsOf(route)).toEqual(["POST"]);
+    expect(pluginHttpMethodsOf({ id: "status" })).toEqual(["GET"]);
+  });
+
+  test("the server entry and safe static paths are required", () => {
+    expect(() =>
+      validatePluginManifest({
+        ...structuredClone(httpManifest),
+        projector: { apiVersion: 1, contributes: { http: [route] } },
+      }),
+    ).toThrow(/требуют projector\.server/);
+
+    for (const path of [
+      "../secret",
+      "/api/status",
+      "api/%2e%2e",
+      "api\\x",
+      "api//x",
+      "api/./x",
+      "api#x",
+    ]) {
+      const broken = structuredClone(httpManifest);
+      broken.projector.contributes.http[0].path = path;
+      expect(() => validatePluginManifest(broken)).toThrow(/Небезопасный путь|неизвестные поля/);
+    }
+
+    for (const path of ["api/:id", "api/:id?", "api/*", "api/**", "api/:id(\\d+)"]) {
+      const pattern = structuredClone(httpManifest);
+      pattern.projector.contributes.http[0].path = path;
+      expect(validatePluginManifest(pattern).projector.contributes.http[0].path).toBe(path);
+    }
+  });
+
+  test("ids, paths, methods and fields are validated", () => {
+    const duplicateId = structuredClone(httpManifest);
+    duplicateId.projector.contributes.http.push({ id: "webhook", path: "other" });
+    expect(() => validatePluginManifest(duplicateId)).toThrow(/Повторяющийся идентификатор/);
+
+    const duplicatePath = structuredClone(httpManifest);
+    duplicatePath.projector.contributes.http.push({ id: "other", path: "api/webhook" });
+    expect(() => validatePluginManifest(duplicatePath)).toThrow(/Повторяющийся путь/);
+
+    const badMethod = structuredClone(httpManifest);
+    badMethod.projector.contributes.http[0].methods = ["TRACE"];
+    expect(() => validatePluginManifest(badMethod)).toThrow(/недопустимый метод/);
+
+    const emptyMethods = structuredClone(httpManifest);
+    emptyMethods.projector.contributes.http[0].methods = [];
+    expect(() => validatePluginManifest(emptyMethods)).toThrow(/непустым массивом/);
+
+    const unknownField = structuredClone(httpManifest);
+    unknownField.projector.contributes.http[0].handler = "x";
+    expect(() => validatePluginManifest(unknownField)).toThrow(/неизвестные поля/);
+
+    const tooMany = structuredClone(httpManifest);
+    tooMany.projector.contributes.http = Array.from({ length: 30 }, (_, index) => ({
+      id: `route${index}`,
+    }));
+    expect(validatePluginManifest(tooMany).projector.contributes.http).toHaveLength(30);
+
+    const optionsOnly = structuredClone(httpManifest);
+    optionsOnly.projector.contributes.http[0].methods = ["OPTIONS"];
+    expect(validatePluginManifest(optionsOnly).projector.contributes.http[0].methods).toEqual([
+      "OPTIONS",
+    ]);
+
+    const localAccess = structuredClone(httpManifest);
+    localAccess.projector.contributes.http[0].access = "local";
+    expect(validatePluginManifest(localAccess).projector.contributes.http[0].access).toBe("local");
+
+    const badAccess = structuredClone(httpManifest);
+    badAccess.projector.contributes.http[0].access = "public";
+    expect(() => validatePluginManifest(badAccess)).toThrow(/режим доступа/);
   });
 });

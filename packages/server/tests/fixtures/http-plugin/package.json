@@ -1,0 +1,63 @@
+{
+  "name": "@projector-tests/http-plugin",
+  "version": "1.0.0",
+  "description": "Тестовые HTTP-маршруты плагина",
+  "projector": {
+    "apiVersion": 1,
+    "server": "server.cjs",
+    "contributes": {
+      "http": [
+        {
+          "id": "status",
+          "path": "status",
+          "methods": [
+            "GET"
+          ]
+        },
+        {
+          "id": "echo",
+          "path": "api/echo",
+          "methods": [
+            "POST"
+          ]
+        },
+        {
+          "id": "limited",
+          "path": "limited",
+          "methods": [
+            "POST"
+          ]
+        },
+        {
+          "id": "local",
+          "path": "local/echo",
+          "methods": [
+            "POST"
+          ],
+          "access": "local"
+        },
+        {
+          "id": "item",
+          "path": "items/:id",
+          "methods": [
+            "POST"
+          ]
+        },
+        {
+          "id": "me",
+          "path": "items/me",
+          "methods": [
+            "GET"
+          ]
+        },
+        {
+          "id": "files",
+          "path": "files/**",
+          "methods": [
+            "GET"
+          ]
+        }
+      ]
+    }
+  }
+}

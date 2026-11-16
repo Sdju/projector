@@ -14,6 +14,7 @@ import type { PluginDiagnostic } from "./types.ts";
 type Contributions = PluginManifest["projector"]["contributes"];
 type AgentContributions = NonNullable<Contributions["agents"]>;
 type BalanceContributions = NonNullable<Contributions["balances"]>;
+type HttpContributions = NonNullable<Contributions["http"]>;
 type LanguageContributions = NonNullable<Contributions["languages"]>;
 type PanelContributions = NonNullable<Contributions["panels"]>;
 type TabContributions = NonNullable<Contributions["tabs"]>;
@@ -35,6 +36,7 @@ export interface LoadedPluginPackage {
   themes: AvailableTheme[];
   agents: AgentContributions;
   balances: BalanceContributions;
+  http: HttpContributions;
   languages: LanguageContributions;
   panels: PanelContributions;
   tabs: TabContributions;
@@ -116,6 +118,7 @@ export async function loadPluginPackage(
     themes,
     agents: manifest.projector.contributes.agents ?? [],
     balances: manifest.projector.contributes.balances ?? [],
+    http: manifest.projector.contributes.http ?? [],
     languages: manifest.projector.contributes.languages ?? [],
     panels: manifest.projector.contributes.panels ?? [],
     tabs: manifest.projector.contributes.tabs ?? [],

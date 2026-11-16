@@ -27,6 +27,11 @@ import {
   type PluginCodeDiagnostic,
 } from "../modules/plugins/index.ts";
 import { registerUsageLogReader, unregisterUsageLogReader } from "../modules/usage-log/index.ts";
+import {
+  beginPluginRoutes,
+  dropPluginRoutes,
+  pluginRoutePlugins,
+} from "../modules/plugin-routes/index.ts";
 import { registerBuiltinAgentFeatures } from "./features.ts";
 
 /** Plugin agent id → package id. Built-ins are everything else in the registry. */
@@ -127,9 +132,11 @@ async function applyPluginCatalog(candidates: PluginCandidate[]): Promise<Plugin
       continue;
     }
     try {
+      beginPluginRoutes(plugin);
       const backends = await loadCodeAgents(candidate.server, candidate.hash, {
         plugin,
         balances: candidate.balances,
+        http: candidate.http,
       });
       if (candidate.balances.length) pluginBalances.add(plugin);
       const declared = new Map(candidate.agents.map((agent) => [agent.id, agent]));
@@ -156,11 +163,13 @@ async function applyPluginCatalog(candidates: PluginCandidate[]): Promise<Plugin
     } catch (error) {
       clearPluginBalances(plugin);
       pluginBalances.delete(plugin);
+      dropPluginRoutes(plugin);
       const message = error instanceof Error ? error.message : "Не удалось загрузить код плагина";
       for (const agent of candidate.agents)
         diagnostics.push({ plugin, subject: agent.id, message });
       for (const balance of candidate.balances)
         diagnostics.push({ plugin, subject: balance.kind, message });
+      for (const route of candidate.http) diagnostics.push({ plugin, subject: route.id, message });
     }
   }
 
@@ -170,6 +179,10 @@ async function applyPluginCatalog(candidates: PluginCandidate[]): Promise<Plugin
     if (active.has(plugin)) continue;
     clearPluginBalances(plugin);
     pluginBalances.delete(plugin);
+  }
+  for (const plugin of pluginRoutePlugins()) {
+    if (active.has(plugin)) continue;
+    dropPluginRoutes(plugin);
   }
 
   const builtins = listAgentBackends().filter(({ id }) => !pluginAgents.has(id));

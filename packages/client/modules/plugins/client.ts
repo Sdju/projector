@@ -3,6 +3,7 @@ import type {
   PluginAgentContribution,
   PluginBalanceContribution,
   PluginBrowserEntry,
+  PluginHttpContribution,
   PluginLanguageContribution,
   PluginPanelContribution,
   PluginTabContribution,
@@ -27,6 +28,7 @@ export interface PluginInfo {
   themes: AvailableTheme[];
   agents: PluginAgentContribution[];
   balances: PluginBalanceContribution[];
+  http: PluginHttpContribution[];
   languages: PluginLanguageContribution[];
   panels: PluginPanelContribution[];
   tabs: PluginTabContribution[];
@@ -66,6 +68,7 @@ function normalizeCatalog(catalog: PluginCatalog): PluginCatalog {
       code: plugin.code === true,
       agents: Array.isArray(plugin.agents) ? plugin.agents : [],
       balances: Array.isArray(plugin.balances) ? plugin.balances : [],
+      http: Array.isArray(plugin.http) ? plugin.http : [],
       languages: Array.isArray(plugin.languages) ? plugin.languages : [],
       panels: Array.isArray(plugin.panels) ? plugin.panels : [],
       tabs: Array.isArray(plugin.tabs) ? plugin.tabs : [],

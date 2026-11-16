@@ -19,7 +19,7 @@
 - [agent-roadmap.md](agent-roadmap.md) — открытые пункты штатного агента Projector и проверки Судьи в браузере.
 - [plugin-agents.md](plugin-agents.md) — что осталось у агентов-плагинов: hosted-жизненный цикл, статусы исчезнувшего агента, пресеты диалектов и изолированный runtime.
 - [plugin-concept/concept.md](plugin-concept/concept.md) — будущее плагинов: npm-поставка, browser runtime, UI и Node capabilities; текущие вклады и доверие — [plugins](../plugins.md).
-- [plugin-server-routes.md](plugin-server-routes.md) — серверные HTTP-маршруты плагина: живой реестр, префикс `/api/plugins/<key>/`, лимиты и жизненный цикл.
+- [plugin-server-routes.md](plugin-server-routes.md) — маршруты плагинов: вариант A с `contributes.http` и rou3-шаблонами реализован; остались изоляция, стриминг и внешние webhook.
 - [plugin-provider-usage.md](plugin-provider-usage.md) — расход и квоты провайдеров из плагина: `registerUsageResolver` против декларативного HTTP-маппинга, адаптеры Zen и Z.AI.
 - [plugin-subagent-spawn.md](plugin-subagent-spawn.md) — запуск субагентов из плагина: `api.jobs` поверх agent-jobs против workflow-вклада и оркестратора в ядре.
 - [plugin-tool-guards.md](plugin-tool-guards.md) — перехват тул-вызовов: policy-engine в ядре, `api.agents.guards`, декларативные правила и предел для чужих ACP-агентов.

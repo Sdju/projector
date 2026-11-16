@@ -3,6 +3,7 @@ import type {
   PluginAgentContribution,
   PluginBalanceContribution,
   PluginBrowserEntry,
+  PluginHttpContribution,
   PluginLanguageContribution,
   PluginPanelContribution,
   PluginTabContribution,
@@ -39,6 +40,8 @@ export interface PluginInfo {
   agents: PluginAgentContribution[];
   /** Provider kinds whose money balance the plugin knows how to read. */
   balances: PluginBalanceContribution[];
+  /** HTTP routes served under `/api/plugins/<key>/...` by the trusted server code. */
+  http: PluginHttpContribution[];
   languages: PluginLanguageContribution[];
   panels: PluginPanelContribution[];
   tabs: PluginTabContribution[];
@@ -61,6 +64,7 @@ export interface PluginCandidate {
   hash?: string;
   agents: PluginAgentContribution[];
   balances: PluginBalanceContribution[];
+  http: PluginHttpContribution[];
 }
 
 /** A collision or an invalid contribution found while applying the catalog; shown on the card. */

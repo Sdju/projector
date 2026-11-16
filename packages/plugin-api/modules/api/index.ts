@@ -215,6 +215,11 @@ export interface PluginApi {
   readonly commands: CommandApi;
   readonly agents: AgentClientApi;
   readonly storage: PluginStorageApi;
+  /**
+   * Device-aware URL under this package's `/api/plugins/<key>/` prefix. The server matches the
+   * path against the declared routes; a missing route answers 404.
+   */
+  httpUrl(path: string): string;
   /** Registers cleanup of this activation scope. */
   onDispose(dispose: PluginDisposer): void;
   readonly signal: AbortSignal;

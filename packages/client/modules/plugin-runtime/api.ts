@@ -1,4 +1,5 @@
 import {
+  isPluginHttpPath,
   pluginCommandPrefix,
   pluginPackageKey,
   pluginStorageFits,
@@ -184,6 +185,11 @@ export function createApi(plugin: RuntimePluginInfo, scope: Scope): PluginApi {
         scope.add(remove);
         return { dispose: remove };
       },
+    },
+    httpUrl(path) {
+      assertActive();
+      if (!isPluginHttpPath(path)) throw new Error("Некорректный путь маршрута плагина");
+      return deviceUrl(`/api/plugins/${pluginPackageKey(plugin.id)}/${path}`);
     },
     storage: {
       async get(key) {

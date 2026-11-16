@@ -100,6 +100,7 @@ export async function discoverPlugins(): Promise<PluginCatalog> {
         themes: [],
         agents: [],
         balances: [],
+        http: [],
         languages: [],
         panels: [],
         tabs: [],
@@ -135,6 +136,7 @@ export async function discoverPlugins(): Promise<PluginCatalog> {
         themes: [],
         agents: [],
         balances: [],
+        http: [],
         languages: [],
         panels: [],
         tabs: [],
@@ -183,6 +185,7 @@ export async function discoverPlugins(): Promise<PluginCatalog> {
         themes: loaded.themes,
         agents,
         balances,
+        http: loaded.http,
         languages: loaded.languages,
         panels: loaded.panels,
         tabs: loaded.tabs,
@@ -206,6 +209,7 @@ export async function discoverPlugins(): Promise<PluginCatalog> {
         themes: [],
         agents: [],
         balances: [],
+        http: [],
         languages: [],
         panels: [],
         tabs: [],
@@ -226,6 +230,7 @@ export async function discoverPlugins(): Promise<PluginCatalog> {
         themes: [],
         agents: [],
         balances: [],
+        http: [],
         languages: [],
         panels: [],
         tabs: [],
@@ -245,7 +250,9 @@ async function applyPluginCatalog(
 ): Promise<void> {
   const candidates = plugins
     .filter((plugin) => plugin.status === "enabled" && plugin.trusted)
-    .filter((plugin) => plugin.agents.length > 0 || plugin.balances.length > 0)
+    .filter(
+      (plugin) => plugin.agents.length > 0 || plugin.balances.length > 0 || plugin.http.length > 0,
+    )
     .map((plugin) => ({
       plugin: plugin.id,
       ...(plugin.path ? { path: plugin.path } : {}),
@@ -253,6 +260,7 @@ async function applyPluginCatalog(
       ...(plugin.hash ? { hash: plugin.hash } : {}),
       agents: plugin.agents,
       balances: plugin.balances,
+      http: plugin.http,
     }));
   let diagnostics: PluginCodeDiagnostic[] = [];
   try {
@@ -260,7 +268,8 @@ async function applyPluginCatalog(
   } catch (error) {
     const message = error instanceof Error ? error.message : "Не удалось применить плагины";
     for (const candidate of candidates) {
-      const subject = candidate.agents[0]?.id ?? candidate.balances[0]?.kind;
+      const subject =
+        candidate.agents[0]?.id ?? candidate.balances[0]?.kind ?? candidate.http[0]?.id;
       diagnostics.push({
         plugin: candidate.plugin,
         ...(subject ? { subject } : {}),

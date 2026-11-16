@@ -6,6 +6,7 @@ import {
   type PluginAgentContribution,
 } from "./agent.ts";
 import { validateBalanceContribution, type PluginBalanceContribution } from "./balance.ts";
+import { validateHttpContributions, type PluginHttpContribution } from "./http.ts";
 import {
   assertBrowserEntry,
   validateBrowserContributions,
@@ -21,6 +22,17 @@ export type {
   PluginAgentUsageCommand,
 } from "./agent.ts";
 export type { PluginBalanceContribution } from "./balance.ts";
+export {
+  isPluginHttpPath,
+  pluginHttpAccessOf,
+  pluginHttpMethods,
+  pluginHttpMethodsOf,
+  pluginHttpPath,
+  validateHttpContributions,
+  type PluginHttpAccess,
+  type PluginHttpContribution,
+  type PluginHttpMethod,
+} from "./http.ts";
 export type {
   PluginBrowserContributions,
   PluginBrowserEntry,
@@ -85,6 +97,7 @@ export interface PluginManifest {
       themes?: PluginThemeContribution[];
       agents?: PluginAgentContribution[];
       balances?: PluginBalanceContribution[];
+      http?: PluginHttpContribution[];
       languages?: PluginLanguageContribution[];
       panels?: PluginPanelContribution[];
       tabs?: PluginTabContribution[];
@@ -259,7 +272,7 @@ export function validatePluginManifest(
   const contributes = value.projector.contributes;
   assertAllowedKeys(
     contributes,
-    ["themes", "agents", "balances", "languages", "panels", "tabs"],
+    ["themes", "agents", "balances", "http", "languages", "panels", "tabs"],
     "projector.contributes",
   );
   if (contributes.themes !== undefined && !Array.isArray(contributes.themes))
@@ -268,19 +281,24 @@ export function validatePluginManifest(
     throw new Error("projector.contributes.agents должен быть массивом");
   if (contributes.balances !== undefined && !Array.isArray(contributes.balances))
     throw new Error("projector.contributes.balances должен быть массивом");
+  if (contributes.http !== undefined && !Array.isArray(contributes.http))
+    throw new Error("projector.contributes.http должен быть массивом");
   const themes = contributes.themes as unknown[] | undefined;
   const agents = contributes.agents as unknown[] | undefined;
   const balances = contributes.balances as unknown[] | undefined;
+  const http = contributes.http as unknown[] | undefined;
   const browserContributions = validateBrowserContributions(contributes);
   if (value.projector.server !== undefined) {
-    if (!agents?.length && !balances?.length)
+    if (!agents?.length && !balances?.length && !http?.length)
       throw new Error(
-        "projector.server допустим только вместе с contributes.agents или contributes.balances",
+        "projector.server допустим только вместе с contributes.agents, balances или http",
       );
     assertServerEntry(value.projector.server);
   }
   if (balances?.length && value.projector.server === undefined)
     throw new Error("Вклады balances требуют projector.server");
+  if (http?.length && value.projector.server === undefined)
+    throw new Error("Вклады http требуют projector.server");
   if (balances && balances.length > 20)
     throw new Error("projector.contributes.balances: не более 20 видов");
   if (value.projector.browser !== undefined) assertBrowserEntry(value.projector.browser);
@@ -295,16 +313,19 @@ export function validatePluginManifest(
     !themes?.length &&
     !agents?.length &&
     !balances?.length &&
+    !http?.length &&
     !browserContributions.languages?.length &&
     !browserContributions.panels?.length &&
     !browserContributions.tabs?.length
   ) {
-    if (themes && !agents && !balances)
+    if (themes && !agents && !balances && !http)
       throw new Error("Плагин должен содержать хотя бы одну тему");
-    if (agents && !themes && !balances)
+    if (agents && !themes && !balances && !http)
       throw new Error("Плагин должен содержать хотя бы одного агента");
-    if (balances && !themes && !agents)
+    if (balances && !themes && !agents && !http)
       throw new Error("Плагин должен содержать хотя бы один вид баланса");
+    if (http && !themes && !agents && !balances)
+      throw new Error("Плагин должен содержать хотя бы один маршрут");
     throw new Error("Плагин должен содержать хотя бы одну тему или агента");
   }
   if (themes) {
@@ -339,5 +360,6 @@ export function validatePluginManifest(
     const kinds = new Set<string>();
     for (const balance of balances) validateBalanceContribution(balance, kinds);
   }
+  if (http) validateHttpContributions(http);
   return value as unknown as PluginManifest;
 }

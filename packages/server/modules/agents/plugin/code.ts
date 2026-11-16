@@ -21,6 +21,8 @@ import {
   type McpServerConfig,
 } from "../../agent-mcp/index.ts";
 import { trustedProjectWidgets } from "../../project-widgets/index.ts";
+import { addPluginRoute, type PluginRouteRegistration } from "../../plugin-routes/index.ts";
+import { type PluginHttpContribution } from "@ai-projector/core/modules/plugins/index.ts";
 import { renderWidgetGuide } from "@ai-projector/core/modules/widget-catalog/index.ts";
 import { clearSessionEnv } from "@ai-projector/core/modules/os/index.ts";
 import { ideMcpServer } from "../ide-mcp/index.ts";
@@ -119,6 +121,11 @@ export interface PluginProviderApi {
   registerBalance(provider: PluginBalanceProvider): void;
 }
 
+/** HTTP routes a trusted plugin serves under its own `/api/plugins/<key>/` prefix. */
+export interface PluginHttpApi {
+  register(route: PluginRouteRegistration): void;
+}
+
 /** The narrow runtime a trusted server-side plugin receives; types are its own business. */
 export interface PluginCodeApi {
   version: 1;
@@ -140,6 +147,7 @@ export interface PluginCodeApi {
   widgets: PluginWidgetApi;
   mcp: PluginMcpApi;
   providers: PluginProviderApi;
+  http: PluginHttpApi;
 }
 
 /** A balance kind declared by the package; the runtime checks registrations against it. */
@@ -156,6 +164,8 @@ export interface PluginCodeLoadOptions {
   plugin?: string;
   /** `contributes.balances` of the package. */
   balances?: readonly PluginBalanceDeclaration[];
+  /** `contributes.http` of the package; routes are served only in the server process. */
+  http?: readonly PluginHttpContribution[];
 }
 
 const requirePlugin = createRequire(import.meta.url);
@@ -201,6 +211,24 @@ export async function loadCodeAgents(
   if (typeof factory !== "function")
     throw new Error("Плагин не экспортирует createPlugin(api) или createAgents(api)");
   const declared = new Map((options.balances ?? []).map((item) => [item.kind, item]));
+  const declaredRoutes = new Map((options.http ?? []).map((route) => [route.id, route]));
+  const registeredRoutes = new Set<string>();
+  const registerRoute = (registration: PluginRouteRegistration): void => {
+    if (
+      !registration ||
+      typeof registration.id !== "string" ||
+      typeof registration.handle !== "function"
+    )
+      throw new Error("Плагин вернул некорректный маршрут");
+    if (registeredRoutes.has(registration.id))
+      throw new Error(`Маршрут ${registration.id} уже зарегистрирован`);
+    registeredRoutes.add(registration.id);
+    // The isolated runner loads the same package for one agent answer; it serves no HTTP.
+    if (!options.plugin) return;
+    const declaration = declaredRoutes.get(registration.id);
+    if (!declaration) throw new Error(`Маршрут ${registration.id} не объявлен в contributes.http`);
+    addPluginRoute(options.plugin, declaration, registration.handle);
+  };
   const registeredKinds = new Set<string>();
   const registerBalance = (provider: PluginBalanceProvider): void => {
     if (!provider || typeof provider.kind !== "string" || typeof provider.read !== "function")
@@ -279,6 +307,7 @@ export async function loadCodeAgents(
       ide: ideMcpServer,
     },
     providers: { registerBalance },
+    http: { register: registerRoute },
   };
   const result = (await factory(api)) as unknown;
   const moduleResult =
@@ -287,8 +316,8 @@ export async function loadCodeAgents(
       : null;
   const agents = Array.isArray(result)
     ? result
-    : usesCreatePlugin && moduleResult
-      ? (moduleResult.agents ?? [])
+    : usesCreatePlugin || (options.http?.length && result === undefined)
+      ? ((moduleResult?.agents as unknown) ?? [])
       : undefined;
   const balances = Array.isArray(result) ? [] : moduleResult?.balances;
   if (!Array.isArray(agents))
@@ -300,6 +329,9 @@ export async function loadCodeAgents(
   const missing = [...declared.keys()].filter((kind) => !registeredKinds.has(kind));
   if (missing.length)
     throw new Error(`Плагин не зарегистрировал баланс для видов: ${missing.join(", ")}`);
+  const missingRoutes = [...declaredRoutes.keys()].filter((id) => !registeredRoutes.has(id));
+  if (missingRoutes.length)
+    throw new Error(`Плагин не зарегистрировал маршруты: ${missingRoutes.join(", ")}`);
   for (const item of agents) {
     const backend = item as Partial<AgentBackend> | null;
     if (

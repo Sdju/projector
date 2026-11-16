@@ -2,6 +2,7 @@ import { routes as hubRoutes } from "../routes/api/hub.ts";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { HttpError } from "../modules/http/index.ts";
 import { createRouteDispatcher, json } from "../modules/transport/index.ts";
+import { handlePluginRoute } from "../modules/plugin-routes/index.ts";
 import { localOrigin } from "../middlewares/local-origin.ts";
 import { routes as integrationsActionsRoutes } from "../routes/api/integrations/[...action].ts";
 import { routes as githubBrowseRoutes } from "../routes/api/integrations/github-browse.ts";
@@ -162,6 +163,7 @@ export async function handleApi(req: IncomingMessage, res: ServerResponse): Prom
   try {
     if (!localOrigin(context)) return true;
     if (await dispatch(context)) return true;
+    if (await handlePluginRoute(context)) return true;
     json(res, 404, { error: "Не найден" });
   } catch (error) {
     json(res, error instanceof HttpError ? error.status : 400, {
