@@ -1,4 +1,5 @@
 import { restoredQueue, savedQueue, type ChatState } from "./chat-state.ts";
+import { interruptedAnswer, previousSession } from "./session-tail.ts";
 import { normalizeRoleSnapshot } from "@ai-projector/core/modules/agent-role/index.ts";
 import { applyRoleSnapshot } from "./role-apply.ts";
 
@@ -42,14 +43,12 @@ export function loadHistory(url: string, state: ChatState, quiet = false): Promi
       // One with a live agent process behind it is rejoined instead (`resumeRun`).
       const last = state.turns.at(-1);
       // A failed answer keeps its reason and offers retry: it is not an interrupted one.
-      if (
-        last?.role === "assistant" &&
-        !last.run &&
-        !last.failure &&
-        !last.text.trim() &&
-        !last.tools.length
-      )
-        last.text = INTERRUPTED;
+      if (last && interruptedAnswer(last, INTERRUPTED)) {
+        // The lost answer never started its own session: it belongs to the previous answer's,
+        // which is what lets the chat go on and bring the text back from the agent's transcript.
+        last.session ??= previousSession(state.turns, last);
+        if (!last.text.trim()) last.text = INTERRUPTED;
+      }
       // Without a live agent process behind the chat nothing reports any more: a task still shown
       // as running was cut off with its process (older chats kept such rows forever). A turn that
       // still has `run` is rejoined (`resumeRun`); leave its chips spinning until that replay.

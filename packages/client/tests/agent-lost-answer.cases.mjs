@@ -5,6 +5,7 @@ import {
   restoreLostAnswer,
 } from "../modules/agent-core/model/lost-answer.ts";
 import { INTERRUPTED } from "../modules/agent-core/model/load-history.ts";
+import { sessionIdOf } from "../modules/agent-core/model/session-tail.ts";
 
 const user = (text) => ({ id: `u${text}`, role: "user", text, tools: [] });
 const answer = (text, extra = {}) => ({
@@ -118,6 +119,28 @@ test("nothing is restored without the agent's own session", () => {
   const turns = [user("вопрос"), { id: "a", role: "assistant", text: "", tools: [] }];
   expect(restoreLostAnswer(turns, [])).toBe(false);
   expect(turns[1].text).toBe("");
+});
+
+test("the chat continues the session of the last finished answer, not a lost one", () => {
+  const turns = [
+    user("первый"),
+    answer("готово", { session: { backend: "opencode", id: "ses_one" } }),
+    user("второй"),
+    { id: "a2", role: "assistant", text: INTERRUPTED, tools: [] },
+  ];
+  expect(sessionIdOf(turns)).toBe("ses_one");
+  expect(sessionIdOf(turns.slice(0, 2))).toBe("ses_one");
+  expect(sessionIdOf(turns.slice(0, 1))).toBeUndefined();
+});
+
+test("a detached answer stops the chat from continuing any session", () => {
+  const turns = [
+    user("первый"),
+    answer("готово", { detached: true, session: { backend: "opencode", id: "ses_one" } }),
+    user("второй"),
+    { id: "a2", role: "assistant", text: INTERRUPTED, tools: [] },
+  ];
+  expect(sessionIdOf(turns)).toBeUndefined();
 });
 
 test("an answer split by harness reminders and many messages comes back whole", () => {

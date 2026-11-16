@@ -148,6 +148,19 @@ describe("Projector agent chat history", () => {
       index,
     );
     expect(readRecentChats("sessions-project", "opencode")[0].session).toBeUndefined();
+
+    // An answer saved at its start has no session of its own: the chat keeps the previous one.
+    await writeAgentHistory(
+      chat,
+      [
+        turn("1", "user", "вопрос"),
+        answer,
+        turn("3", "user", "и ещё"),
+        { id: "4", role: "assistant", text: "", tools: [] },
+      ],
+      index,
+    );
+    expect(readRecentChats("sessions-project", "opencode")[0].session).toBe("ses_one");
   });
 
   it("deleting a session forgets the chats that continued it", async () => {

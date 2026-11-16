@@ -135,7 +135,10 @@ export function currentSession(turns: HistoryTurn[]): string | undefined {
   for (let index = turns.length - 1; index >= 0; index--) {
     const turn = turns[index]!;
     if (turn.role !== "assistant") continue;
-    return turn.detached ? undefined : turn.session?.id;
+    if (turn.detached) return undefined;
+    // An answer saved at its start never got its own session: the question went on in the
+    // previous one, and keeping that id is what lets the chat be continued later.
+    if (turn.session?.id) return turn.session.id;
   }
   return undefined;
 }

@@ -99,6 +99,68 @@ test("an empty answer without a failure is still shown as interrupted", async ()
   expect(state.turns[1].text).toBe(INTERRUPTED);
 });
 
+test("a lost answer takes the session of the previous answer", async () => {
+  vi.stubGlobal("fetch", async () => ({
+    ok: true,
+    json: async () => ({
+      turns: [
+        turn("u1", "user", "почини"),
+        turn("a1", "assistant", "готово", { session: { backend: "opencode", id: "ses_one" } }),
+        turn("u2", "user", "а теперь тесты"),
+        turn("a2", "assistant", ""),
+      ],
+    }),
+  }));
+  const state = createState();
+
+  await loadHistory("/h", state);
+
+  expect(state.turns[3].text).toBe(INTERRUPTED);
+  expect(state.turns[3].session).toEqual({ backend: "opencode", id: "ses_one" });
+});
+
+test("an already interrupted answer is repaired from the previous session", async () => {
+  vi.stubGlobal("fetch", async () => ({
+    ok: true,
+    json: async () => ({
+      turns: [
+        turn("u1", "user", "почини"),
+        turn("a1", "assistant", "готово", { session: { backend: "opencode", id: "ses_one" } }),
+        turn("u2", "user", "а теперь тесты"),
+        turn("a2", "assistant", INTERRUPTED),
+      ],
+    }),
+  }));
+  const state = createState();
+
+  await loadHistory("/h", state);
+
+  expect(state.turns[3].text).toBe(INTERRUPTED);
+  expect(state.turns[3].session).toEqual({ backend: "opencode", id: "ses_one" });
+});
+
+test("a detached chat does not lend its session to a lost answer", async () => {
+  vi.stubGlobal("fetch", async () => ({
+    ok: true,
+    json: async () => ({
+      turns: [
+        turn("u1", "user", "почини"),
+        turn("a1", "assistant", "готово", {
+          session: { backend: "opencode", id: "ses_one" },
+          detached: true,
+        }),
+        turn("u2", "user", "а теперь тесты"),
+        turn("a2", "assistant", ""),
+      ],
+    }),
+  }));
+  const state = createState();
+
+  await loadHistory("/h", state);
+
+  expect(state.turns[3].session).toBeUndefined();
+});
+
 test("a saved run is not settled: the page will rejoin it", async () => {
   vi.stubGlobal("fetch", async () => ({
     ok: true,
