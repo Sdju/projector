@@ -118,6 +118,16 @@ async function setup({ connector = true } = {}) {
               req.on("end", () => res.end(String(bytes)));
               return;
             }
+            if (req.url === "/api/large") {
+              // The history API writes a whole chat as one JSON chunk, far above the tunnel frame.
+              const body = JSON.stringify({ data: "x".repeat(2 * 1024 * 1024) });
+              res.writeHead(200, {
+                "Content-Type": "application/json",
+                "Content-Length": Buffer.byteLength(body),
+              });
+              res.end(body);
+              return;
+            }
             res.setHeader("Content-Type", "application/json");
             res.end(
               JSON.stringify({
@@ -217,6 +227,9 @@ describe("Hub reverse connection", () => {
       body: Buffer.alloc(2 * 1024 * 1024, 0xa5),
     });
     expect(await upload.text()).toBe(String(2 * 1024 * 1024));
+    const large = await fetch(`${origin}/api/devices/desk/large`, { headers: { Cookie: cookie } });
+    expect(large.status).toBe(200);
+    expect((await large.json()).data).toHaveLength(2 * 1024 * 1024);
     const ws = new WebSocket(`${origin.replace("http", "ws")}/api/devices/desk/terminal/socket`, {
       headers: { Cookie: cookie, Origin: origin },
     });

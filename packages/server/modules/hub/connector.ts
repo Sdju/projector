@@ -6,6 +6,7 @@ import {
   type HubConnection,
   type HubDevice,
 } from "@ai-projector/core/modules/hub/index.ts";
+import { chunkedStream } from "./stream.ts";
 import { markHubSocket } from "../access/index.ts";
 import { broadcastEvent } from "../events/index.ts";
 import {
@@ -158,7 +159,7 @@ export function connectHub(
         peer.on("error", () => peer.terminate());
         peer.once("close", () => peers.delete(peer));
         peer.once("open", () => {
-          const stream = createWebSocketStream(peer);
+          const stream = chunkedStream(createWebSocketStream(peer));
           stream.on("error", () => stream.destroy());
           markHubSocket(stream, origin);
           ingress.emit("connection", stream);

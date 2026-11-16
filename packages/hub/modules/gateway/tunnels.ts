@@ -3,6 +3,7 @@ import type { IncomingMessage, Server } from "node:http";
 import { Duplex } from "node:stream";
 import { WebSocket, WebSocketServer, createWebSocketStream } from "ws";
 import { HUB_PROTOCOL, isDeviceId, type HubDevice } from "@ai-projector/core/modules/hub/index.ts";
+import { chunkedStream } from "./stream.ts";
 
 interface Device {
   info: HubDevice;
@@ -81,7 +82,7 @@ export class Tunnels {
       if (pending && ticket) {
         clearTimeout(pending.timer);
         this.pending.delete(ticket);
-        const stream = createWebSocketStream(ws);
+        const stream = chunkedStream(createWebSocketStream(ws));
         stream.on("error", () => stream.destroy());
         pending.device.streams.add(stream);
         stream.once("close", () => pending.device.streams.delete(stream));
