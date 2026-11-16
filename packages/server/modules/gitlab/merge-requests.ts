@@ -45,7 +45,7 @@ const STATES: Record<string, string> = {
   merged: "merged",
   all: "all",
 };
-const FILE_PAGE = 100;
+const FILE_PAGE = 30; // GitLab may answer 500 above 30 files per page
 const DRAFT_TITLE = /^\s*(draft|wip)\s*:/i;
 const FILE_STATUS: Record<string, PullRequestFile["status"]> = {
   A: "added",
@@ -218,8 +218,8 @@ async function mergeRequestDiffs(reader: GitlabReader, id: string, iid: number) 
       if (!next) return { files, truncated: files.length > DIFF_LIMIT };
       if (fetched === DIFF_LIMIT / FILE_PAGE - 1) return { files, truncated: true };
     } catch (error) {
-      // Instances older than 16.0 have no `/diffs`; the whole diff comes from `/changes`.
-      if (page === 1 && error instanceof HttpError && error.status === 404)
+      // Older GitLab has no `/diffs`; some answer 5xx for a page size they consider too large.
+      if (error instanceof HttpError && (error.status === 404 || error.status >= 500))
         return await changesFallback(reader, id, iid);
       throw error;
     }

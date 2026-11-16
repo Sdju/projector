@@ -28,7 +28,7 @@ async function setup(url = "https://gitlab.com") {
 function mockFetch(handler) {
   vi.spyOn(globalThis, "fetch").mockImplementation(async (url, init) => {
     expect(init.redirect, "GitLab redirects are forbidden").toBe("error");
-    return handler(String(url));
+    return handler(url instanceof URL ? url.href : typeof url === "string" ? url : url.url);
   });
 }
 
@@ -102,6 +102,37 @@ test("GitLab merge request files keep the pinned diff refs and cap changes_count
       tooLarge: true,
     },
   ]);
+});
+
+test("GitLab merge request files request a small diff page and fall back on 5xx", async () => {
+  await setup();
+  const pages = [];
+  mockFetch((address) => {
+    const url = new URL(address);
+    const path = url.pathname;
+    if (path.endsWith("/merge_requests/9"))
+      return Response.json(mergeRequest({ iid: 9, changes_count: "2" }));
+    if (path.endsWith("/merge_requests/9/diffs")) {
+      pages.push(url.searchParams.get("per_page"));
+      return Response.json({ message: "500 Internal Server Error" }, { status: 500 });
+    }
+    if (path.endsWith("/merge_requests/9/changes"))
+      return Response.json({
+        changes: [
+          { old_path: "a.ts", new_path: "a.ts", diff: "@@\n-a\n+b" },
+          { old_path: "b.ts", new_path: "b.ts", diff: "@@\n-a\n+b" },
+        ],
+      });
+    return Response.json({}, { status: 404 });
+  });
+  const { browseGitlabMergeRequestFiles } = await import("../modules/gitlab/index.ts");
+  const changes = await browseGitlabMergeRequestFiles(repository, 9);
+  expect(pages).toStrictEqual(["30"]);
+  expect(changes.files).toStrictEqual([
+    { path: "a.ts", previousPath: "", status: "modified", additions: 1, deletions: 1 },
+    { path: "b.ts", previousPath: "", status: "modified", additions: 1, deletions: 1 },
+  ]);
+  expect(changes.changedFiles).toBe(2);
 });
 
 test("GitLab merge request files treat changes_count 1000+ as capped", async () => {

@@ -26,7 +26,7 @@ async function setup(url = "https://gitlab.com", token = "") {
 function mockFetch(handler) {
   vi.spyOn(globalThis, "fetch").mockImplementation(async (url, init) => {
     expect(init.redirect, "GitLab redirects are forbidden").toBe("error");
-    return handler(String(url), init);
+    return handler(url instanceof URL ? url.href : typeof url === "string" ? url : url.url, init);
   });
 }
 
@@ -368,7 +368,7 @@ test("GitLab merge request detail maps notes, approvals, files and diff counts",
   });
   const { browseGitlabMergeRequest } = await import("../modules/gitlab/index.ts");
   const detail = await browseGitlabMergeRequest(repository, 7);
-  expect(diffQueries).toStrictEqual([{ per_page: "100", page: "1" }]);
+  expect(diffQueries).toStrictEqual([{ per_page: "30", page: "1" }]);
   expect(detail.pull.number).toBe(7);
   expect(detail.pull.reactions).toStrictEqual([
     { content: "+1", count: 1 },
@@ -551,9 +551,10 @@ test("GitLab merge request files stop at 300 and report truncation", async () =>
     if (path.endsWith("/merge_requests/10/notes")) return Response.json([]);
     if (path.endsWith("/merge_requests/10/diffs")) {
       const page = Number(url.searchParams.get("page"));
+      const perPage = Number(url.searchParams.get("per_page"));
       pages.push(page);
       return Response.json(
-        Array.from({ length: 100 }, (_, index) => ({
+        Array.from({ length: perPage }, (_, index) => ({
           old_path: `src/file-${page}-${index}.ts`,
           new_path: `src/file-${page}-${index}.ts`,
           diff: "@@\n-a\n+b",
@@ -565,7 +566,7 @@ test("GitLab merge request files stop at 300 and report truncation", async () =>
   });
   const { browseGitlabMergeRequest } = await import("../modules/gitlab/index.ts");
   const detail = await browseGitlabMergeRequest(repository, 10);
-  expect(pages).toStrictEqual([1, 2, 3]);
+  expect(pages).toStrictEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
   expect(detail.files).toHaveLength(300);
   expect(detail.filesTruncated).toBe(true);
   expect(detail.changedFiles).toBe(300);
