@@ -10,8 +10,9 @@
 | ------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------- |
 | `packages/core/modules/widget-catalog`                             | Контракт `WidgetDefinition` и каталог: из определений собирает инструкцию агенту (`guide()`) и справку по компоненту (`describe(name)`)       |
 | `packages/core/modules/agent-widgets/<имя>/index.ts`               | Определение виджета: имя, группа, описание, свойства с типами, `v-model`, примечания, `special`, пример. Без Vue                              |
+| `packages/core/modules/agent-answer`                               | Разбор ответа на markdown и блоки-виджеты; текстовая выжимка без разметки для уведомлений и списка работ                                      |
 | `packages/client/modules/agent-widgets/<имя>/`                     | Реализация: `ui/<Имя>.vue` и `index.ts`, который отдаёт `{ definition, component }`. Общее ядро контейнера (`_/`) — контексты формы и вкладок |
-| `packages/client/modules/widget-runtime`                           | Реестр (`registerWidget`), команды `ide.chat.widgets.*`, разбор сообщения, автозакрытие, компиляция, хост, контекст ответа, мост `reply`      |
+| `packages/client/modules/widget-runtime`                           | Реестр (`registerWidget`), команды `ide.chat.widgets.*`, автозакрытие, компиляция, хост, контекст ответа, мост `reply`                        |
 | `packages/server/modules/project-widgets`                          | `.projector/widgets.json`, доверие по хешу, данные виджетов и фильтр для промпта                                                              |
 | `packages/client/modules/project-widgets`                          | Настройки и доверие, постоянная project-scope команда `ide.project.widgets.list`                                                              |
 | `packages/client/app/widgets.ts`, `packages/server/app/widgets.ts` | Единственные места, где встроенные виджеты названы: клиент регистрирует определение с компонентом, сервер — определение для промпта           |

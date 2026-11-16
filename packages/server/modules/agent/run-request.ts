@@ -23,6 +23,7 @@ import { driveRun, isRunDriven, joinRun, type RunViewer } from "./run-hub.ts";
 import { broadcastEvent, hasEventClient } from "../events/index.ts";
 import { asString, json } from "../transport/index.ts";
 import { resolveJudgeSettings } from "@ai-projector/core/modules/agent-judge/index.ts";
+import { answerPreview } from "@ai-projector/core/modules/agent-answer/index.ts";
 import { createJudgedApproval, readJudgeSettings } from "../judge/index.ts";
 
 /**
@@ -210,6 +211,7 @@ export async function handleAgentRun({
   if (run && !request.chat?.startsWith(JOB_CHAT)) {
     const status = abort.signal.aborted ? "stopped" : failure !== undefined ? "error" : "done";
     const answerText = (finalText ?? collectedText).trim();
+    const preview = answerPreview(answerText, 300);
     const session = lastSession ?? request.sessionId;
     await recordRecentRun({
       id: run.id,
@@ -219,7 +221,7 @@ export async function handleAgentRun({
       topic: request.message.trim().slice(0, 120),
       status,
       ...(status === "error" && failure ? { error: failure } : {}),
-      ...(answerText ? { resultPreview: answerText.slice(0, 300) } : {}),
+      ...(preview ? { resultPreview: preview } : {}),
       ...(status === "done" && hasAnswerForm(answerText) ? { awaitingReply: true } : {}),
       ...(session ? { session } : {}),
       startedAt: stored?.startedAt ?? startedAt,

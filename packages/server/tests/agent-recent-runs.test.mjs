@@ -34,6 +34,11 @@ registerAgentBackend({
       options.emit("error", { error: "boom" });
       return;
     }
+    if (options.message === "markup") {
+      const text = `<Card title="Причина"><Bars unit=" КБ" :items="[{label:'828a', value:300}]" /></Card>\n\nКадр больше лимита.`;
+      options.emit("done", { text });
+      return;
+    }
     options.emit("session", { id: "s-chat-1", backend: "fake-chat-run" });
     options.emit("text", { text: "Готово, всё обновлено." });
     options.emit("done", { text: "Готово, всё обновлено." });
@@ -101,6 +106,14 @@ test("completed chat runs appear in /api/agent/runs recent list with awaitingRep
   });
   await failRes.text();
 
+  const markupRes = await post({
+    projectId: "p1",
+    chat: "fake-chat-run:p1:c4",
+    backend: "fake-chat-run",
+    message: "markup",
+  });
+  await markupRes.text();
+
   const feed = await (await fetch(`${base}/api/agent/runs`)).json();
   expect(feed.runs).toEqual([]);
   const byChat = new Map(feed.recent.map((item) => [item.chat, item]));
@@ -116,5 +129,9 @@ test("completed chat runs appear in /api/agent/runs recent list with awaitingRep
   expect(byChat.get("fake-chat-run:p1:c3")).toMatchObject({
     status: "error",
     error: "boom",
+  });
+  expect(byChat.get("fake-chat-run:p1:c4")).toMatchObject({
+    status: "done",
+    resultPreview: "Кадр больше лимита.",
   });
 });

@@ -12,6 +12,7 @@ import type { AgentSelection } from "./controls.ts";
 import type { AgentRoleSnapshot } from "@ai-projector/core/modules/agent-role/index.ts";
 import { changedSince, snapshotGit } from "./jobs-files.ts";
 import { resolveJudgeSettings } from "@ai-projector/core/modules/agent-judge/index.ts";
+import { answerPreview } from "@ai-projector/core/modules/agent-answer/index.ts";
 import { createJudgedApproval, readJudgeSettings } from "../judge/index.ts";
 import { readChatJudge } from "./judge-store.ts";
 import {
@@ -274,7 +275,7 @@ export interface JobSummary extends Omit<AgentJob, "result" | "history"> {
 
 const summarize = (job: AgentJob): JobSummary => {
   const { result, history: _history, ...rest } = job;
-  return { ...rest, resultPreview: result.slice(0, 300) };
+  return { ...rest, resultPreview: answerPreview(result, 300) };
 };
 
 /** The jobs of all projects (or one), newest first, without their journals. */

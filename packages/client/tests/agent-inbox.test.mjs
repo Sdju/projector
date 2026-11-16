@@ -280,6 +280,39 @@ test("live runs with judge/question/secret requests and finished runs produce in
   expect(merged.map((item) => item.id)).toEqual(["r-live", "r-other-done"]);
 });
 
+test("a finished answer is announced as prose, not as widget markup", () => {
+  const src = source("", "Это устройство", true);
+  const answer = `<Card title="Причина" hint="кадр больше лимита">
+<Bars unit=" КБ" :items="[{label:'828a', value:300}]" />
+</Card>
+
+Кадр больше лимита, поэтому туннель рвёт соединение.`;
+  const item = inboxRecentRunItem(
+    src,
+    {
+      id: "r-markup",
+      backend: "opencode",
+      projectId: "p1",
+      chat: "p1:chat",
+      topic: "разобраться с пушами",
+      status: "done",
+      resultPreview: answer,
+      startedAt: 10,
+      endedAt: Date.now(),
+    },
+    [project],
+  );
+  expect(item.resultPreview).toBe("Кадр больше лимита, поэтому туннель рвёт соединение.");
+  // The running state was seen before, so the finished state is a new notice.
+  const known = new Map([["|run|r-markup", "running|"]]);
+  expect(inboxNotices(known, [item], false)).toMatchObject([
+    {
+      title: "OpenCode закончил работу",
+      body: "Кадр больше лимита, поэтому туннель рвёт соединение.",
+    },
+  ]);
+});
+
 test("fresh completions stay unread until acknowledged, while stale ones are auto-read", () => {
   const src = source("", "Это устройство", true);
   const now = Date.now();

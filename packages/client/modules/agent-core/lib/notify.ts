@@ -1,3 +1,5 @@
+import { answerPreview } from "@ai-projector/core/modules/agent-answer/index.ts";
+
 /**
  * Tells the user, outside the page, that an agent finished or is waiting for a decision. Only a
  * page the user is not looking at notifies, and only after they allowed notifications.
@@ -32,7 +34,12 @@ export async function requestNotifications(): Promise<void> {
 }
 
 export function notifyAnswer(text: string, failed: boolean): void {
-  show(failed ? "Агент остановился с ошибкой" : "Агент закончил", text.trim(), "agent-answer");
+  const preview = answerPreview(text.trim(), 200);
+  show(
+    failed ? "Агент остановился с ошибкой" : "Агент закончил",
+    preview || "Откройте чат, чтобы посмотреть ответ.",
+    "agent-answer",
+  );
 }
 
 export function notifyQuestion(what: string): void {

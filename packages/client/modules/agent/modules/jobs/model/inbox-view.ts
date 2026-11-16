@@ -1,4 +1,5 @@
 import type { HubDevice } from "@ai-projector/core/modules/hub/index.ts";
+import { answerPreview } from "@ai-projector/core/modules/agent-answer/index.ts";
 import {
   agentLabel,
   type AgentBackendId,
@@ -119,7 +120,7 @@ export function inboxJobItem(
   projects: readonly InboxProject[] = [],
 ): InboxItem {
   const project = projectOf(projects, job.projectId);
-  const resultPreview = (job.resultPreview ?? job.result ?? "").trim().slice(0, 300);
+  const resultPreview = answerPreview(job.resultPreview ?? job.result ?? "", 300);
   return {
     key: `${source.id}|job|${job.id}`,
     kind: "job",
@@ -199,7 +200,7 @@ export function inboxRecentRunItem(
     category: attention ? "attention" : "finished",
     pending: [],
     error: run.error,
-    resultPreview: run.resultPreview,
+    resultPreview: run.resultPreview ? answerPreview(run.resultPreview, 300) : undefined,
     awaitingReply: run.awaitingReply,
     createdAt: run.startedAt,
     startedAt: run.startedAt,
