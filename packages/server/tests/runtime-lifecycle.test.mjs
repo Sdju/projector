@@ -48,6 +48,7 @@ test("config reload replaces the exit hook and releases the previous module call
     else delete globalThis.projectorRuntimeMode;
   });
   let old;
+  let clearInstance;
   for (let i = 0; i < 6; i++) {
     vi.resetModules();
     vi.doMock("../modules/instance/index.ts", () => ({
@@ -55,16 +56,19 @@ test("config reload replaces the exit hook and releases the previous module call
       writeInstance: vi.fn().mockResolvedValue(undefined),
     }));
     const { bindRuntime } = await import("../app/plugin.ts");
-    const { clearInstance } = await import("../modules/instance/index.ts");
+    clearInstance = (await import("../modules/instance/index.ts")).clearInstance;
     const server = new EventEmitter();
     server.address = () => ({ port: 4321 });
     bindRuntime(server, "dev");
     server.emit("listening");
     expect(process.listenerCount("exit")).toBe(initial.length + (previousHook ? 0 : 1));
-    expect(globalThis.projectorExitHook).toBe(clearInstance);
+    // The hook wraps `clearInstance` with the shutdown log, so it is a fresh function per reload.
+    const hook = globalThis.projectorExitHook;
+    expect(hook).toEqual(expect.any(Function));
+    expect(hook).not.toBe(clearInstance);
     if (old) expect(process.listeners("exit")).not.toContain(old);
-    old = clearInstance;
+    old = hook;
   }
-  old();
-  expect(old).toHaveBeenCalledOnce();
+  old?.();
+  expect(clearInstance).toHaveBeenCalledOnce();
 });
