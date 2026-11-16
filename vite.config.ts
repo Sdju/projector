@@ -80,6 +80,21 @@ export default defineConfig({
     host: networkHost(readNetworkMode()),
     port: APP_PORT,
     strictPort: true,
+    watch: {
+      // Build scripts of the published packages copy generated trees into the workspace (dist,
+      // emitted packages, bin, resources). Vite ignores only its own outDir, so a copied
+      // `packages/hub/dist/hub.html` reloaded every open page — a chat mid-answer included.
+      ignored: [
+        "**/packages/ide/dist/**",
+        "**/packages/ide/packages/**",
+        "**/packages/ide/resources/**",
+        "**/packages/ide/bin/**",
+        "**/packages/native/dist/**",
+        "**/packages/hub/dist/**",
+        "**/packages/hub/packages/**",
+        "**/artifacts/**",
+      ],
+    },
   },
   preview: {
     host: networkHost(readNetworkMode()),
