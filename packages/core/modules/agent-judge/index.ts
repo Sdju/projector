@@ -13,6 +13,9 @@ export interface JudgeVerdict {
   effect?: string;
 }
 
+/** How an action was resolved: by Judge itself or by the user after the card. */
+export type JudgeDecision = "auto" | "allowed" | "always" | "denied";
+
 /** The judge settings that apply to a chat after the global value and its override are merged. */
 export interface JudgeSettings {
   /** Show the score and the explanation in the permission card. */
@@ -51,8 +54,20 @@ const TONES: Record<JudgeScore, "info" | "neutral" | "warning" | "danger"> = {
   5: "danger",
 };
 
+const DECISIONS: Record<JudgeDecision, string> = {
+  auto: "Разрешено автоматически",
+  allowed: "Разрешено вами",
+  always: "Разрешено вами навсегда",
+  denied: "Отклонено вами",
+};
+
 export function judgeScoreLabel(score: JudgeScore): string {
   return LABELS[score];
+}
+
+/** How the action ended, in the words of the chat. */
+export function judgeDecisionLabel(decision: JudgeDecision): string {
+  return DECISIONS[decision];
 }
 
 export function judgeScoreTone(score: JudgeScore): "info" | "neutral" | "warning" | "danger" {

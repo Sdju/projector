@@ -83,7 +83,7 @@ test("Judge allows a low-risk action without a card and explains it in the chat"
   );
 });
 
-test("Judge shows the score in the card and never automates a failure", async () => {
+test("Judge shows the score in the card and records the user's choice", async () => {
   const approve = vi.fn(async () => "always");
   const emit = vi.fn();
   const judged = createJudgedApproval({
@@ -96,7 +96,31 @@ test("Judge shows the score in the card and never automates a failure", async ()
   expect(approve).toHaveBeenCalledWith(
     expect.objectContaining({ judge: expect.objectContaining({ score: 4, confidence: "low" }) }),
   );
-  expect(emit).not.toHaveBeenCalled();
+  expect(emit).toHaveBeenCalledWith(
+    "judge",
+    expect.objectContaining({
+      decision: "always",
+      verdict: expect.objectContaining({ score: 4 }),
+    }),
+  );
+});
+
+test("Judge records a denied manual choice in the work block", async () => {
+  const emit = vi.fn();
+  const judged = createJudgedApproval({
+    approve: async () => false,
+    emit,
+    settings: { ...JUDGE_DEFAULTS, auto: false, maxRisk: 1 },
+    judge: async () => verdict(3),
+  });
+  await expect(judged({ tool: "bash", input: {} })).resolves.toBe(false);
+  expect(emit).toHaveBeenCalledWith(
+    "judge",
+    expect.objectContaining({
+      decision: "denied",
+      verdict: expect.objectContaining({ score: 3 }),
+    }),
+  );
 });
 
 test("The card tone follows the score and never remembers a high-risk permission", () => {

@@ -2,6 +2,7 @@ import { inputHint } from "../../agent-core/index.ts";
 import { skillCallName, toolLabel } from "../../agent-core/index.ts";
 import { legacyParts } from "../../agent-core/index.ts";
 import type { AgentTurn } from "../../agent-core/index.ts";
+import { judgeDecisionLabel } from "@ai-projector/core/modules/agent-judge/index.ts";
 
 /** The chat as a Markdown document: who said what, with the tool calls between the words. */
 export function chatMarkdown(turns: AgentTurn[], title: string): string {
@@ -26,7 +27,7 @@ export function chatMarkdown(turns: AgentTurn[], title: string): string {
       }
       if (part.type === "judge") {
         body.push(
-          `> Судья: риск ${part.verdict.score}/5 · ${part.verdict.label} — ${part.verdict.reason}`,
+          `> Судья: риск ${part.verdict.score}/5 · ${part.verdict.label} — ${part.verdict.reason}. ${judgeDecisionLabel(part.decision)}.`,
         );
         continue;
       }

@@ -25,6 +25,7 @@ const emit = defineEmits<{ open: [path: string] }>();
       :tool="item.tool"
       :title="item.title"
       :verdict="item.verdict"
+      :decision="item.decision"
     />
     <AgentActivity v-else :tools="item.tools" :root="root" @open="emit('open', $event)" />
   </template>

@@ -41,6 +41,19 @@ const html = `<!doctype html>
     parts: [
       { type: "tool", id: "call-1" },
       { type: "thought", text: "Проверяю тесты." },
+      {
+        type: "judge",
+        tool: "bash",
+        title: "Запуск тестов",
+        verdict: {
+          score: 2,
+          label: "низкий",
+          reason: "Запускает только тесты проекта",
+          confidence: "high",
+        },
+        decision: "allowed",
+        at: Date.now() - 3000,
+      },
       { type: "text", text },
       { type: "tool", id: "call-2" },
     ],
@@ -130,12 +143,28 @@ test.concurrent(
       await browser.evaluate(`(() => {
         const body = document.querySelector(".work .work-body");
         return [...body.children].map((element) =>
-          element.classList.contains("activity") ? "activity" : "thought",
+          element.classList.contains("activity")
+            ? "activity"
+            : element.classList.contains("judge-note")
+              ? "judge"
+              : "thought",
         );
       })()`),
-    ).toEqual(["activity", "thought"]);
-    const opened = await browser.evaluate('document.querySelectorAll("#fixture *").length');
-    expect(opened).toBeGreaterThan(collapsed + 10);
+    ).toEqual(["activity", "thought", "judge"]);
+    // The judge reads as a shield with the score, not as another tool row: the manual choice too.
+    expect(await browser.evaluate('document.querySelectorAll(".judge-note").length')).toBe(1);
+    expect(
+      await browser.evaluate('document.querySelector(".judge-note .judge-mark svg") !== null'),
+    ).toBe(true);
+    expect(
+      await browser.evaluate('document.querySelector(".judge-note .judge-score").textContent'),
+    ).toBe("2/5");
+    expect(
+      await browser.evaluate('document.querySelector(".judge-note .judge-text").textContent'),
+    ).toContain("Разрешено вами");
+    expect(
+      await browser.evaluate('document.querySelectorAll("#fixture *").length'),
+    ).toBeGreaterThan(collapsed + 10);
 
     // Closing takes the body out of the DOM again.
     await browser.click(".work summary");

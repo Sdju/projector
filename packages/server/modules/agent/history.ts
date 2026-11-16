@@ -142,7 +142,7 @@ const turnSchema: z.ZodType<StoredTurn> = z.lazy(() =>
               confidence: z.enum(["high", "medium", "low"]),
               effect: z.string().optional(),
             }),
-            decision: z.literal("auto"),
+            decision: z.enum(["auto", "allowed", "always", "denied"]),
             at: z.number(),
           }),
         ]),

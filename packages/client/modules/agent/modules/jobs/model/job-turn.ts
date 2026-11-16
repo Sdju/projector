@@ -24,6 +24,13 @@ const FOLDED = new Set([
 export function jobTurn(journal: AgentJobEntry[], id: string, at: number): AgentTurn {
   const state = createState();
   const turn: AgentTurn = { id, role: "assistant", text: "", at, tools: [], parts: [] };
+  // A permission answered through the judge card reads as that card's note; the plain answer
+  // note would repeat it.
+  const judged = journal.some(
+    (entry) =>
+      entry.event === "judge" &&
+      (entry.data as { decision?: unknown } | undefined)?.decision !== "auto",
+  );
   for (const entry of journal) {
     if (FOLDED.has(entry.event))
       applyAgentEvent(
@@ -34,7 +41,13 @@ export function jobTurn(journal: AgentJobEntry[], id: string, at: number): Agent
         entry.at,
       );
     else if (entry.event === "answer") {
-      const data = entry.data as { auto?: boolean; summary?: string; title?: string };
+      const data = entry.data as {
+        auto?: boolean;
+        kind?: string;
+        summary?: string;
+        title?: string;
+      };
+      if (data.kind === "permission" && judged) continue;
       turn.parts!.push({
         type: "note",
         text: data.auto

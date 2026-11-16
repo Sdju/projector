@@ -1,5 +1,6 @@
 import {
   judgeAllows,
+  type JudgeDecision,
   type JudgeSettings,
   type JudgeVerdict,
 } from "@ai-projector/core/modules/agent-judge/index.ts";
@@ -29,9 +30,16 @@ export interface JudgedApprovalOptions {
   judge?: (action: JudgeAction) => Promise<JudgeVerdict>;
 }
 
+/** The manual answer as it reads in the work block. */
+function manualDecision(answer: JudgeAnswer): JudgeDecision {
+  if (answer === false) return "denied";
+  return answer === "always" ? "always" : "allowed";
+}
+
 /**
  * Wraps the user's approval: the judge explains the action in the card, or lets a low-risk action
- * run and leaves a visible note. A failed judge never allows anything by itself.
+ * run and leaves a visible note. A manual choice leaves the same note, so the work block keeps
+ * both kinds of decisions. A failed judge never allows anything by itself.
  */
 export function createJudgedApproval(options: JudgedApprovalOptions) {
   return async (request: JudgeApprovalRequest): Promise<JudgeAnswer> => {
@@ -45,19 +53,20 @@ export function createJudgedApproval(options: JudgedApprovalOptions) {
       backend: options.backend,
       signal: options.signal,
     });
+    const note = {
+      tool: request.tool,
+      title: request.title,
+      verdict,
+    };
     if (judgeAllows(options.settings, verdict)) {
-      options.emit("judge", {
-        tool: request.tool,
-        title: request.title,
-        verdict,
-        decision: "auto",
-        at: Date.now(),
-      });
+      options.emit("judge", { ...note, decision: "auto", at: Date.now() });
       return true;
     }
-    return options.approve({
+    const answer = await options.approve({
       ...request,
       ...(options.settings.show ? { judge: verdict } : {}),
     });
+    options.emit("judge", { ...note, decision: manualDecision(answer), at: Date.now() });
+    return answer;
   };
 }

@@ -62,6 +62,27 @@ test("the journal of a job reads as one answer of the agent", () => {
   expect(turn.parts.at(-1)).toEqual({ type: "note", text: "Ответ на запрос: разрешено" });
 });
 
+test("a judged permission reads as a judge note instead of a plain answer", () => {
+  const verdict = { score: 3, label: "умеренный", reason: "Удаление", confidence: "high" };
+  const turn = jobTurn(
+    [
+      {
+        at: 1,
+        event: "judge",
+        data: { tool: "bash", verdict, decision: "allowed", at: 2 },
+      },
+      { at: 2, event: "answer", data: { kind: "permission", summary: "разрешено" } },
+      { at: 3, event: "answer", data: { kind: "question", summary: '{"q1":["A"]}' } },
+    ],
+    "job-y",
+    1,
+  );
+  expect(turn.parts).toEqual([
+    { type: "judge", tool: "bash", verdict, decision: "allowed", at: 2 },
+    { type: "note", text: 'Ответ на запрос: {"q1":["A"]}' },
+  ]);
+});
+
 test("only a job in the project itself continues in a chat", () => {
   expect(canContinueInChat(job("a", "done", { sessionId: "s" }))).toBe(true);
   expect(canContinueInChat(job("a", "done"))).toBe(false);

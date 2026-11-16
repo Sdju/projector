@@ -170,6 +170,7 @@ const segments = computed(() => {
         tool: part.tool,
         ...(part.title ? { title: part.title } : {}),
         verdict: part.verdict,
+        decision: part.decision,
       });
       continue;
     }
