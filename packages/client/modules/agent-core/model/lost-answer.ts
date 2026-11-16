@@ -1,12 +1,16 @@
 import { INTERRUPTED } from "./load-history.ts";
 import type { AgentPart, AgentTurn } from "./types.ts";
 
-/** The last answer was cut off before it reached the chat: only a placeholder stands there. */
+/**
+ * The last answer was cut off before its text reached the chat. Tool cards may already be saved:
+ * they arrive before the final text and say nothing about whether it was received. A stopped
+ * answer is intentionally incomplete, and a live one still has its run to rejoin.
+ */
 export function answerLost(turn: AgentTurn | undefined): boolean {
   return (
     turn?.role === "assistant" &&
     !turn.run &&
-    !turn.tools.length &&
+    !turn.stopped &&
     (!turn.text.trim() || turn.text === INTERRUPTED)
   );
 }
@@ -89,6 +93,13 @@ export function restoreLostAnswer(turns: AgentTurn[], native: AgentTurn[]): bool
 }
 
 /**
+ * Turns whose transcript was already read in this page. A tool-only answer stays text-less after
+ * a successful merge, so without this guard every chat sync would load the whole session again.
+ * A failed load is not remembered: the session may still be busy and become readable later.
+ */
+const attempted = new WeakSet<AgentTurn>();
+
+/**
  * Brings back an answer the page never received: the agent keeps its own transcript, so the
  * finished answer is copied from there. `save` stores the repaired chat.
  */
@@ -98,13 +109,16 @@ export async function recoverTurn(
   load: (session: string) => Promise<AgentTurn[]>,
   save: () => void,
 ): Promise<boolean> {
-  if (!turn?.session?.id || !answerLost(turn)) return false;
+  if (!turn?.session?.id || !answerLost(turn) || attempted.has(turn)) return false;
+  let native: AgentTurn[];
   try {
-    if (!restoreLostAnswer(turns, await load(turn.session.id))) return false;
+    native = await load(turn.session.id);
   } catch {
-    // The session is gone or busy in another agent process: the placeholder is all that is left.
+    // The session is gone or busy in another agent process: try again when it is available.
     return false;
   }
+  attempted.add(turn);
+  if (!restoreLostAnswer(turns, native)) return false;
   save();
   return true;
 }

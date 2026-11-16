@@ -10,7 +10,7 @@ import {
   loadSessionTurns,
   streamAgent,
 } from "../api/client.ts";
-import { fetchLiveRuns } from "../api/runs.ts";
+import { findRejoinRun } from "../api/runs.ts";
 import { addVersion } from "./branches.ts";
 import { chatHistory } from "./chat-state.ts";
 import { chatKeyOf } from "./chat-key.ts";
@@ -28,6 +28,7 @@ import { INTERRUPTED, loadHistory } from "./load-history.ts";
 import { recoverTurn } from "./lost-answer.ts";
 import { isBuiltinAgent } from "./modes.ts";
 import { streamAnswer } from "./run-turn.ts";
+import { createStreamSaver } from "./stream-save.ts";
 import { watchChat } from "./chat-sync.ts";
 import { saveChat } from "./save-chat.ts";
 import { useExternalAgent } from "./external.ts";
@@ -88,6 +89,7 @@ export function useAgent(
   /** The agent's own transcript still has an answer the page never received. */
   const recover = (turn: AgentTurn | undefined) =>
     recoverTurn(state.turns, turn, (id) => loadSessionTurns(backend, projectId, id), persist);
+  const rejoined = new WeakSet<AgentTurn>();
   const catalog = useProjects();
   const { draftParts, draft, busy, loading, error, phase, permissions, questions, secrets } =
     useChatView(state);
@@ -157,13 +159,14 @@ export function useAgent(
     state.phase = "думает";
     state.abort = new AbortController();
     const { signal } = state.abort;
+    const streamSave = createStreamSaver(persist);
     const onEvent = (event: AgentEvent) => {
       if (event.event === "question-request")
         notifyQuestion(event.data.questions[0]?.question ?? "");
       if (event.event === "permission-request")
         notifyPermission(event.data.title || event.data.tool);
       if (event.event === "secret-request") notifyQuestion(event.data.label);
-      if (applyAgentEvent(state, assistant, event, catalog.ingest)) persist();
+      streamSave.event(event, applyAgentEvent(state, assistant, event, catalog.ingest));
       if (["status", "controls", "tool-result"].includes(event.event)) void actions.deliverQueue();
     };
     try {
@@ -174,6 +177,7 @@ export function useAgent(
         if (!(await recover(assistant)) && !assistant.text.trim()) assistant.text = INTERRUPTED;
       } else if (!signal.aborted) markAnswerFailed(state, assistant, err);
     } finally {
+      streamSave.stop();
       const stopped = signal.aborted;
       state.abort?.abort();
       // User stop() already dropped `run` and cancelled the process. A remount, HMR or reload
@@ -281,11 +285,12 @@ export function useAgent(
     await ready;
     const assistant = state.turns.at(-1);
     if (state.busy || assistant?.role !== "assistant") return;
-    if (!assistant.run && answerLooksOpen(assistant)) {
-      const live = (await fetchLiveRuns().catch(() => [])).find(
-        (item) => item.chat === key && item.backend === backend,
-      );
-      if (live) assistant.run = live.id;
+    if (!assistant.run && answerLooksOpen(assistant) && !rejoined.has(assistant)) {
+      const run = await findRejoinRun(key, backend, assistant.at, assistant.session?.id);
+      if (run) {
+        assistant.run = run;
+        rejoined.add(assistant);
+      }
     }
     if (!assistant.run) return;
     await runTurn(

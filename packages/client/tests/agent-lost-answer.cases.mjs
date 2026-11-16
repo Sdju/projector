@@ -44,12 +44,60 @@ test("a finished answer is never replaced by the transcript", () => {
   expect(turns[1].text).toBe("свой ответ");
 });
 
-test("an answer with tool calls is a real one even without text", () => {
+test("tool cards saved before the text do not hide a lost answer", () => {
   const turns = [
     user("вопрос"),
     answer("", { tools: [{ id: "t", name: "bash", status: "done", detail: "ok" }] }),
   ];
-  expect(answerLost(turns[1])).toBe(false);
+  const native = [
+    user("вопрос"),
+    answer("Готово: снизил лимит.", {
+      tools: [
+        { id: "t", name: "bash", status: "done", detail: "ok" },
+        { id: "t2", name: "edit", status: "done", detail: "ok" },
+      ],
+    }),
+  ];
+  expect(answerLost(turns[1])).toBe(true);
+  expect(restoreLostAnswer(turns, native)).toBe(true);
+  expect(turns[1].text).toBe("Готово: снизил лимит.");
+  expect(turns[1].tools.map((tool) => tool.id)).toEqual(["t", "t2"]);
+});
+
+test("a stopped or a live answer is not replaced by the transcript", () => {
+  const tools = [{ id: "t", name: "bash", status: "done", detail: "ok" }];
+  expect(answerLost(answer("", { tools, stopped: "steps" }))).toBe(false);
+  expect(answerLost(answer("", { tools, run: "run-live" }))).toBe(false);
+});
+
+test("a transcript is read once per turn, even when it has no text to add", async () => {
+  const turns = [
+    user("вопрос"),
+    answer("", { tools: [{ id: "t", name: "bash", status: "done" }] }),
+  ];
+  let loads = 0;
+  const load = async () => {
+    loads += 1;
+    return [user("вопрос")];
+  };
+  expect(await recoverTurn(turns, turns[1], load, () => {})).toBe(false);
+  expect(await recoverTurn(turns, turns[1], load, () => {})).toBe(false);
+  expect(loads).toBe(1);
+});
+
+test("a busy session is asked again when it becomes readable", async () => {
+  const turns = [
+    user("вопрос"),
+    answer("", { tools: [{ id: "t", name: "bash", status: "done" }] }),
+  ];
+  let loads = 0;
+  const busy = async () => {
+    loads += 1;
+    throw new Error("session is in use");
+  };
+  expect(await recoverTurn(turns, turns[1], busy, () => {})).toBe(false);
+  expect(await recoverTurn(turns, turns[1], busy, () => {})).toBe(false);
+  expect(loads).toBe(2);
 });
 
 test("a session continued elsewhere does not lend a later answer to a lost question", () => {
