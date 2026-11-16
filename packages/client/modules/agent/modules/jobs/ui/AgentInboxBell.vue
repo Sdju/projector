@@ -1,20 +1,17 @@
 <script setup lang="ts">
-import { ref } from "vue";
 import UiButton from "../../../../../common/ui/UiButton.vue";
-import UiDialog from "../../../../../common/ui/UiDialog.vue";
 import { useCommandScope } from "../../../../../common/utilities/commands.ts";
-import { useCompactViewport } from "../../../../../common/utilities/compact-viewport.ts";
 import { useAgentInbox } from "../model/inbox.ts";
-import AgentInbox from "./AgentInbox.vue";
 import IconBell from "~icons/lucide/bell";
 
-/** The one counter of work that waits for the user on every project and connected device. */
+/**
+ * The one counter of work that waits for the user on every project and connected device.
+ * The bell always opens the «Работы» tab: panels do not stack over the workspace, and the tab
+ * carries its own close action on every screen size.
+ */
 const props = withDefaults(defineProps<{ scopeId?: string }>(), { scopeId: "inbox" });
 const emit = defineEmits<{ open: [] }>();
 const { attention, unread, badgeCount, working, noticeUnread } = useAgentInbox();
-const compact = useCompactViewport();
-const dialog = ref<InstanceType<typeof UiDialog>>();
-const open = ref(false);
 const commands = useCommandScope(props.scopeId, () => ({
   surface: "inbox",
   attention: attention.value,
@@ -24,21 +21,9 @@ commands.scope.registerCommand({
   id: "ide.inbox.open",
   title: "Открыть работы и уведомления",
   description:
-    "Открывает панель с фоновыми заданиями, живыми ходами, завершениями и запросами агентов всех проектов и подключённых устройств Hub.",
-  run: () => {
-    if (compact.value) {
-      open.value = true;
-      dialog.value?.open();
-    } else emit("open");
-  },
+    "Открывает вкладку «Работы»: фоновые задания, живые ходы, завершения и запросы агентов всех проектов и подключённых устройств Hub.",
+  run: () => emit("open"),
 });
-function closed() {
-  open.value = false;
-}
-function close() {
-  open.value = false;
-  dialog.value?.close();
-}
 const summary = () => {
   const parts: string[] = [];
   const waiting = Math.max(0, attention.value - noticeUnread.value);
@@ -69,18 +54,6 @@ const summary = () => {
     }}</span>
     <span v-else-if="working" class="dot" aria-hidden="true" />
   </UiButton>
-  <UiDialog
-    v-if="compact"
-    ref="dialog"
-    label="Работы агентов"
-    align="top"
-    width="440px"
-    fullscreen
-    flush
-    @close="closed"
-  >
-    <AgentInbox v-if="open" :scope-id="`agent-inbox:${scopeId}`" @navigate="close" />
-  </UiDialog>
 </template>
 
 <style scoped>

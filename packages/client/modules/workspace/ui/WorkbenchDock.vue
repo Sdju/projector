@@ -157,7 +157,7 @@ const hostOf = (key: string) => props.panelHosts.hosts[key] ?? null;
       </template>
     </template>
     <template #trailing>
-      <AgentInboxBell scope-id="inbox:mobile" />
+      <AgentInboxBell scope-id="inbox:mobile" @open="emit('command', 'ide.workbench.inbox.open')" />
       <ActivityIsland scope-id="activity:mobile" />
     </template>
     <template #empty="{ group }">

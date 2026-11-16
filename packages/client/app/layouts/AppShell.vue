@@ -259,7 +259,8 @@ const zen = computed(() => zenMode.value && !!props.currentProject);
   max-width: none;
   margin: 0;
   padding: var(--island-gap);
-  height: 100dvh;
+  /* A phone keyboard shrinks only the visual viewport; the variable carries that height. */
+  height: var(--app-viewport-height, 100dvh);
   min-height: 0;
   display: flex;
   flex-direction: column;
@@ -350,7 +351,6 @@ const zen = computed(() => zenMode.value && !!props.currentProject);
       max(var(--island-gap), env(safe-area-inset-right))
       max(var(--island-gap), min(env(safe-area-inset-bottom), var(--sp-3)))
       max(var(--island-gap), env(safe-area-inset-left));
-    height: 100dvh;
     display: flex;
     flex-direction: column;
     background: var(--canvas);

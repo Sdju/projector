@@ -8,10 +8,12 @@ import { disposePluginRuntime, initPluginRuntime } from "../modules/plugin-runti
 import { authedFetch } from "../common/utilities/lan-auth.ts";
 import { initAppearance } from "../modules/appearance/index.ts";
 import { initPwa } from "../modules/pwa/index.ts";
+import { initAppViewport } from "../common/utilities/app-viewport.ts";
 import "./styles.css";
 
 window.fetch = authedFetch as typeof fetch;
 initAppearance();
+const disposeViewport = initAppViewport();
 registerBuiltinWidgets();
 registerBuiltinClientAgents();
 initPwa();
@@ -23,4 +25,8 @@ void initPluginRuntime();
 
 createApp(App).use(router).mount("#app");
 
-if (import.meta.hot) import.meta.hot.dispose(() => disposePluginRuntime());
+if (import.meta.hot)
+  import.meta.hot.dispose(() => {
+    disposePluginRuntime();
+    disposeViewport();
+  });

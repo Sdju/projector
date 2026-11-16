@@ -72,6 +72,10 @@ node --import @zede/vio/register packages/native/app/entry.ts native http://loca
 
 Общий распознаватель — `packages/client/common/utilities/swipe-gesture.ts`. Он фиксирует одну ось после 8 px, не вызывает `preventDefault` до этого, отдаёт жест длинному нажатию и прокручиваемому предку, который ещё может двигаться в сторону свайпа. `packages/client/modules/workspace/lib/surface-swipe.ts` двигает активную поверхность и передаёт смену штатным переходам, `packages/client/common/utilities/sheet-dismiss.ts` двигает нижнюю шторку и гасит scrim через `--sheet-scrim`. Не добавляйте вторые touch-обработчики: области с собственным панорамированием помечайте `data-swipe-ignore`.
 
+Экранная клавиатура не меняет layout viewport: `100dvh` и `position: fixed` остаются под ней. Поэтому `packages/client/common/utilities/app-viewport.ts` следит за `window.visualViewport`, и пока скрыто больше 120 px (это клавиатура, а не панель браузера), пишет видимую высоту в `--app-viewport-height`; `.shell.workspace` читает её вместо `100dvh`. Для нового полноэкранного поля ввода на телефоне берите эту переменную, а не `dvh`, и проверяйте высоту при открытой клавиатуре.
+
+Полноэкранных диалогов поверх рабочей области нет: панель открывается вкладкой в доке (колокольчик → вкладка «Работы»), на телефоне — с тем же крестиком во вкладке, а поверх приложения допускается только остров-шторка (`UiIsland` → `mobile-sheet`). Не добавляйте полноэкранные `UiDialog` для разделов, у которых уже есть вкладка.
+
 ## Данные и проверки
 
 Данные находятся в `$XDG_DATA_HOME/projector`, по умолчанию `~/.local/share/projector`:
