@@ -227,21 +227,6 @@ const requestNote = computed(() => {
   grid-column: 1 / -1;
   margin: 0 var(--sp-3) var(--sp-3);
 }
-.requests :deep(.risk-box) {
-  width: 44px;
-  height: 44px;
-}
-.requests :deep(.risk-box svg) {
-  width: 18px;
-  height: 18px;
-}
-.requests :deep(.title-row) {
-  padding-right: 0;
-  flex-wrap: wrap;
-}
-.requests :deep(.tool) {
-  position: static;
-}
 .requests :deep(.secret.ui-card) {
   font-size: var(--fs-xs);
 }

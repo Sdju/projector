@@ -1,19 +1,16 @@
 <script setup lang="ts">
-import UiCard from "../../../common/ui/UiCard.vue";
-import UiInline from "../../../common/ui/UiInline.vue";
 import UiButton from "../../../common/ui/UiButton.vue";
-import {
-  canRememberPermission,
-  permissionRiskClass,
-  permissionTone,
-} from "../lib/permission-risk.ts";
+import { canRememberPermission, permissionRiskClass } from "../lib/permission-risk.ts";
 import { isEditTool } from "../../agent-core/index.ts";
 import AgentCodeBlock from "./AgentCodeBlock.vue";
 import type { AgentPermission } from "../../agent-core/index.ts";
+import IconCheck from "~icons/lucide/check";
+import IconCheckCheck from "~icons/lucide/check-check";
 import IconShield from "~icons/lucide/shield";
 import IconShieldAlert from "~icons/lucide/shield-alert";
 import IconShieldCheck from "~icons/lucide/shield-check";
 import IconShieldX from "~icons/lucide/shield-x";
+import IconX from "~icons/lucide/x";
 
 defineProps<{ permissions: AgentPermission[] }>();
 const emit = defineEmits<{ decide: [id: string, allow: boolean, always?: boolean] }>();
@@ -26,47 +23,36 @@ const emit = defineEmits<{ decide: [id: string, allow: boolean, always?: boolean
     role="alertdialog"
     aria-label="Запрос разрешения"
   >
-    <UiCard
+    <section
       v-for="item in permissions"
       :key="item.id"
       class="permission"
       :class="permissionRiskClass(item.judge)"
-      :tone="permissionTone(item.judge)"
-      density="notice"
     >
       <div class="head">
-        <div
-          class="risk-box"
+        <span
+          class="risk"
           :class="permissionRiskClass(item.judge)"
-          :aria-label="
+          :title="
             item.judge
-              ? `Риск ${item.judge.score} из 5: ${item.judge.label}`
+              ? `Риск ${item.judge.score}/5 · ${item.judge.label}`
               : 'Оценка риска недоступна'
           "
-          :title="item.judge ? `Риск ${item.judge.score}/5 · ${item.judge.label}` : undefined"
         >
           <IconShieldCheck v-if="item.judge && item.judge.score <= 2" aria-hidden="true" />
           <IconShieldAlert v-else-if="item.judge && item.judge.score === 3" aria-hidden="true" />
           <IconShieldX v-else-if="item.judge" aria-hidden="true" />
           <IconShield v-else aria-hidden="true" />
           <span v-if="item.judge" class="risk-score">{{ item.judge.score }}/5</span>
-        </div>
-        <div class="head-text">
-          <div class="title-row">
-            <span class="title" :title="item.title">{{ item.title }}</span>
-            <code class="tool">{{ item.tool }}</code>
-          </div>
-          <div v-if="item.judge" class="judge-copy" role="note">
-            <p>
-              <span class="judge-label">Почему</span>
-              {{ item.judge.reason }}
-            </p>
-            <p v-if="item.judge.effect">
-              <span class="judge-label">Что изменится</span>
-              {{ item.judge.effect }}
-            </p>
-          </div>
-        </div>
+        </span>
+        <span class="title" :title="item.title">{{ item.title }}</span>
+        <code v-if="item.tool" class="tool" :title="item.tool">{{ item.tool }}</code>
+      </div>
+      <div v-if="item.judge" class="judge-copy" role="note">
+        <p>{{ item.judge.reason }}</p>
+        <p v-if="item.judge.effect" class="effect">
+          <span aria-hidden="true">→</span> {{ item.judge.effect }}
+        </p>
       </div>
       <AgentCodeBlock
         v-if="item.detail"
@@ -74,21 +60,41 @@ const emit = defineEmits<{ decide: [id: string, allow: boolean, always?: boolean
         :text="item.detail"
         :diff="isEditTool(item.tool)"
       />
-      <UiInline align="stretch">
-        <UiButton appearance="solid" size="sm" @click="emit('decide', item.id, true)">
-          Разрешить
+      <div class="actions">
+        <UiButton
+          shape="icon"
+          size="sm"
+          appearance="quiet"
+          tone="danger"
+          title="Отклонить"
+          aria-label="Отклонить"
+          @click="emit('decide', item.id, false)"
+        >
+          <IconX aria-hidden="true" />
         </UiButton>
         <UiButton
           v-if="canRememberPermission(item)"
+          shape="icon"
           size="sm"
+          appearance="quiet"
           title="Разрешить и больше не спрашивать про этот инструмент"
+          aria-label="Разрешить и больше не спрашивать"
           @click="emit('decide', item.id, true, true)"
         >
-          Всегда разрешать
+          <IconCheckCheck aria-hidden="true" />
         </UiButton>
-        <UiButton size="sm" @click="emit('decide', item.id, false)"> Отклонить </UiButton>
-      </UiInline>
-    </UiCard>
+        <UiButton
+          shape="icon"
+          size="sm"
+          appearance="solid"
+          title="Разрешить"
+          aria-label="Разрешить"
+          @click="emit('decide', item.id, true)"
+        >
+          <IconCheck aria-hidden="true" />
+        </UiButton>
+      </div>
+    </section>
   </div>
 </template>
 
@@ -98,63 +104,64 @@ const emit = defineEmits<{ decide: [id: string, allow: boolean, always?: boolean
   gap: 8px;
 }
 .permission {
-  position: relative;
+  display: grid;
+  gap: 8px;
+  padding: 10px 12px 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  background: var(--bg-2);
+  color: var(--text-2);
+  font-size: var(--fs-xs);
+  line-height: 1.5;
+}
+.permission.risk-1 {
+  background: color-mix(in srgb, var(--run) 7%, var(--bg-2));
+  border-color: color-mix(in srgb, var(--run) 32%, var(--line));
+}
+.permission.risk-2 {
+  background: color-mix(in srgb, var(--info) 7%, var(--bg-2));
+  border-color: color-mix(in srgb, var(--info) 32%, var(--line));
+}
+.permission.risk-3 {
+  background: color-mix(in srgb, var(--warn) 8%, var(--bg-2));
+  border-color: color-mix(in srgb, var(--warn) 40%, var(--line));
+}
+.permission.risk-4,
+.permission.risk-5 {
+  background: color-mix(in srgb, var(--err) 8%, var(--bg-2));
+  border-color: color-mix(in srgb, var(--err) 48%, var(--line));
 }
 .head {
   display: flex;
-  align-items: flex-start;
-  gap: var(--sp-2);
-}
-.risk-box {
-  display: grid;
-  place-items: center;
-  flex-shrink: 0;
-  width: 56px;
-  height: 56px;
-  border: 1px solid transparent;
-  border-radius: var(--r-md);
-  gap: 2px;
-}
-.risk-box svg {
-  width: 24px;
-  height: 24px;
-}
-.risk-score {
-  font: 600 11px/1 var(--mono);
-  letter-spacing: 0.02em;
-}
-.risk-box.risk-1 {
-  color: var(--run);
-  background: color-mix(in srgb, var(--run) 16%, var(--bg-2));
-  border-color: color-mix(in srgb, var(--run) 40%, var(--line));
-}
-.risk-box.risk-2 {
-  color: var(--info);
-  background: color-mix(in srgb, var(--info) 15%, var(--bg-2));
-  border-color: color-mix(in srgb, var(--info) 40%, var(--line));
-}
-.risk-box.risk-3 {
-  color: var(--warn);
-  background: color-mix(in srgb, var(--warn) 16%, var(--bg-2));
-  border-color: color-mix(in srgb, var(--warn) 45%, var(--line));
-}
-.risk-box.risk-4,
-.risk-box.risk-5 {
-  color: var(--err);
-  background: color-mix(in srgb, var(--err) 16%, var(--bg-2));
-  border-color: color-mix(in srgb, var(--err) 45%, var(--line));
-}
-.head-text {
-  display: grid;
-  min-width: 0;
-  gap: var(--sp-1);
-}
-.title-row {
-  display: flex;
   align-items: center;
   min-width: 0;
-  padding-right: 64px;
-  gap: var(--sp-2);
+  gap: 7px;
+}
+.risk {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 2px;
+}
+.risk svg {
+  width: 14px;
+  height: 14px;
+}
+.risk-score {
+  font: 600 10px/1 var(--mono);
+}
+.risk.risk-1 {
+  color: var(--run);
+}
+.risk.risk-2 {
+  color: var(--info);
+}
+.risk.risk-3 {
+  color: var(--warn);
+}
+.risk.risk-4,
+.risk.risk-5 {
+  color: var(--err);
 }
 .title {
   min-width: 0;
@@ -162,39 +169,43 @@ const emit = defineEmits<{ decide: [id: string, allow: boolean, always?: boolean
   text-overflow: ellipsis;
   white-space: nowrap;
   color: var(--text);
-  font-size: var(--fs-sm);
 }
 .tool {
-  position: absolute;
-  top: 10px;
-  right: 12px;
-  color: var(--muted);
+  flex-shrink: 0;
+  max-width: 40%;
+  overflow: hidden;
+  margin-left: auto;
+  color: var(--faint);
   font-family: var(--mono);
+  font-size: var(--fs-2xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .judge-copy {
   display: grid;
   gap: 2px;
   color: var(--muted);
-  font-size: var(--fs-xs);
-  line-height: 1.5;
+  line-height: 1.45;
 }
 .judge-copy p {
   margin: 0;
   overflow-wrap: anywhere;
 }
-.judge-label {
+.effect {
   color: var(--text-2);
-  font-weight: 600;
+}
+.effect span {
+  margin-right: 3px;
+  color: var(--faint);
 }
 .permission :deep(.code) {
+  max-height: 180px;
+  margin: 0;
   background: var(--bg-sunken);
 }
-.permission.risk-1 {
-  background: color-mix(in srgb, var(--run) 7%, var(--bg-2));
-  border-color: color-mix(in srgb, var(--run) 32%, var(--bg-2));
-}
-.permission.risk-2 {
-  background: color-mix(in srgb, var(--info) 7%, var(--bg-2));
-  border-color: color-mix(in srgb, var(--info) 32%, var(--bg-2));
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
 }
 </style>

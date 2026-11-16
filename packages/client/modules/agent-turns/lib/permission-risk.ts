@@ -1,11 +1,11 @@
 import type { JudgeVerdict } from "@ai-projector/core/modules/agent-judge/index.ts";
 
-/** A CSS suffix for the risk tint, shared by the card and its large score box. */
+/** A CSS suffix for the risk tint, shared by the permission shield and the judge note. */
 export function permissionRiskClass(judge?: JudgeVerdict): string {
   return judge ? `risk-${judge.score}` : "risk-0";
 }
 
-/** Card tone by the judge's score; without a verdict the card keeps the old warning style. */
+/** A tone for surfaces that tint by risk; the permission card itself stays neutral. */
 export function permissionTone(judge?: JudgeVerdict): "neutral" | "warning" | "danger" {
   if (!judge) return "warning";
   if (judge.score >= 4) return "danger";
