@@ -23,6 +23,7 @@ export * from "./lib/tool-input.ts";
 export * from "./lib/tool-labels.ts";
 export * from "./lib/tool-visual.ts";
 export * from "./lib/turn-changes.ts";
+export * from "./lib/turn-end.ts";
 export * from "./lib/work-items.ts";
 export * from "./model/branches.ts";
 export * from "./model/chat-actions.ts";

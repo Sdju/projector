@@ -22,6 +22,7 @@ import { useOpenFiles } from "../lib/open-files.ts";
 import { ensureTab } from "../lib/service-tabs.ts";
 import { useWorkbenchLayout } from "../lib/workbench-layout.ts";
 import { registerAgentCommands } from "../../agent/index.ts";
+import { onAgentTurnEnd } from "../../agent-core/index.ts";
 import { registerEditorCommands } from "../lib/editor-commands.ts";
 import { useWorkspaceSession } from "../lib/workspace-session.ts";
 import WorkbenchDock from "./WorkbenchDock.vue";
@@ -126,6 +127,8 @@ const overview = useGitOverview(() => props.projectId);
 const history = useGitHistory(() => props.projectId);
 const branches = useGitBranches(() => props.projectId);
 const loadGit = () => (capabilities.git ? overview.load() : Promise.resolve());
+/** An answer of the agent may leave edits and commits: the Git panel reads them again. */
+const releaseAgentTurnEnd = onAgentTurnEnd(props.projectId, () => void loadGit());
 const section = ref("files");
 const extraSections = ref<SidebarType[]>([]);
 const { pluginSidebarSections, mergedSidebarViews } = usePluginWorkspaceViews(props.sidebarViews);
@@ -469,7 +472,10 @@ const { refresh, entryMoved } = useWorkspaceRefresh({
   loadGit,
 });
 defineExpose({ openFile, refresh, openTab, openSection });
-onBeforeUnmount(() => overview.cancel());
+onBeforeUnmount(() => {
+  releaseAgentTurnEnd();
+  overview.cancel();
+});
 </script>
 
 <template>

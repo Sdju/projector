@@ -33,6 +33,7 @@ import { saveChat } from "./save-chat.ts";
 import { useExternalAgent } from "./external.ts";
 import { answerLooksOpen, applyAgentEvent, closeAnswer, markAnswerFailed } from "./turn-events.ts";
 import { hasChips, messageText, normalizeParts } from "../lib/message-parts.ts";
+import { announceAgentTurnEnd } from "../lib/turn-end.ts";
 import { restoreFormSnapshot } from "./form-reply.ts";
 import { userTurnOf } from "./user-turn.ts";
 import { applyRoleSnapshot } from "./role-apply.ts";
@@ -188,6 +189,8 @@ export function useAgent(
       state.secrets = [];
       persist();
       if (!stopped) notifyAnswer(assistant.text, !!state.error);
+      // The answer is over and its edits are on disk: the workspace rereads Git.
+      announceAgentTurnEnd(projectId);
       void drainQueue(stopped && !state.interrupting);
     }
   }
