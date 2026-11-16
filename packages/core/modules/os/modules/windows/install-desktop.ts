@@ -1,4 +1,11 @@
-import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import {
+  chmodSync,
+  copyFileSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  writeFileSync,
+} from "node:fs";
 import { join } from "node:path";
 import { dataHome, desktopPaths } from "./directories.ts";
 import { runPowerShellSync } from "./ps.ts";
@@ -6,6 +13,14 @@ import { runPowerShellSync } from "./ps.ts";
 /** Quote a path for VBScript string literals: wrap in " and double inner quotes. */
 function vbsQuote(value: string) {
   return `"${value.replace(/"/g, '""')}"`;
+}
+
+/** `/c/Users/...` form for the bash shim. */
+function posixPath(value: string) {
+  return value
+    .replace(/\\/g, "/")
+    .replace(/^([A-Za-z]):\/?/, (_, drive: string) => `/${drive.toLowerCase()}/`)
+    .replace(/\/+$/, "");
 }
 
 /**
@@ -103,6 +118,11 @@ export function installDesktop(root: string) {
 
   const command = join(bin, "projector.cmd");
   writeFileSync(command, `@echo off\r\n"${node}" "${launch}" %*\r\n`);
+
+  // Git Bash resolves commands by name, not by PATHEXT: an extensionless shim runs the repo script.
+  const bash = join(bin, "projector");
+  writeFileSync(bash, `#!/usr/bin/env bash\nexec "${posixPath(root)}/bin/projector" "$@"\n`);
+  chmodSync(bash, 0o755);
 
   // Start Menu must not flash a console: node.exe is a console-subsystem binary.
   // wscript + Run(..., 0) hides the window the way Linux .desktop uses Terminal=false.
