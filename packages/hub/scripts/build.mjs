@@ -2,6 +2,7 @@ import { rm } from "node:fs/promises";
 import { join } from "node:path";
 import {
   addShebang,
+  closeEmit,
   copy,
   emit,
   ensureAppBuild,
@@ -22,4 +23,5 @@ await emit(join(root, "packages/core"), join(pkg, "packages/core"));
 await copy("dist", join(pkg, "dist"));
 await copy("LICENSE", join(pkg, "LICENSE"));
 await addShebang(join(pkg, "packages/hub/app/main.js"));
+await closeEmit();
 console.log("@ai-projector/hub собран в packages/hub");

@@ -2,6 +2,7 @@ import { rm } from "node:fs/promises";
 import { join } from "node:path";
 import {
   addShebang,
+  closeEmit,
   copy,
   emit,
   ensureAppBuild,
@@ -23,4 +24,5 @@ for (const name of ["core", "server", "cli"])
 for (const path of ["dist", "resources", "bin", "LICENSE"]) await copy(path, join(pkg, path));
 await addShebang(join(pkg, "packages/cli/app/launch.js"));
 await addShebang(join(pkg, "packages/cli/app/install-desktop.js"));
+await closeEmit();
 console.log("@ai-projector/ide собран в packages/ide");

@@ -9,7 +9,13 @@ import { versionsOf, type ForkMode } from "../../agent-core/index.ts";
 import { legacyParts } from "../../agent-core/index.ts";
 import { failureTitle, isAgentFailure } from "@ai-projector/core/modules/agent-failure/index.ts";
 import type { AgentLens } from "../model/lens.ts";
-import type { AgentToolChip, AgentTurn, ChatUsage, MessageChip } from "../../agent-core/index.ts";
+import type {
+  AgentToolChip,
+  AgentTurn,
+  ChatUsage,
+  MessageChip,
+  MessagePart,
+} from "../../agent-core/index.ts";
 import type { AgentDoctorProgress, AgentDoctorReport } from "../../agent-core/index.ts";
 import AgentMessage from "./AgentMessage.vue";
 import AgentDoctorNote from "./AgentDoctorNote.vue";
@@ -81,6 +87,11 @@ const emit = defineEmits<{
   /** The doctor mark was clicked: run another repair attempt for this answer. */
   doctorRetry: [id: string];
 }>();
+
+/** A message part that is plain text: the template asks this, so the renderer narrows the union once. */
+function isTextPart(part: MessagePart): part is Extract<MessagePart, { type: "text" }> {
+  return part.type === "text";
+}
 
 const failure = computed(() =>
   isAgentFailure(props.turn.failureInfo) ? props.turn.failureInfo : undefined,
@@ -325,7 +336,7 @@ const lastWork = computed(
       <p v-else class="user-message">
         <template v-if="turn.content?.length">
           <template v-for="(part, index) in turn.content" :key="index">
-            <template v-if="part.type === 'text'">{{ part.text }}</template>
+            <template v-if="isTextPart(part)">{{ part.text }}</template>
             <span
               v-else
               class="chip"

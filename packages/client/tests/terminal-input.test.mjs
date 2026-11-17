@@ -6,7 +6,8 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import ts from "typescript";
+import { API, ModuleKind } from "typescript/async";
+import { ScriptTarget } from "typescript/ast";
 import { chromium, createChromium } from "../../../tests/fixtures/chromium-driver.mjs";
 import { terminalTextForPaths } from "../modules/terminal/lib/drop.ts";
 import { terminalLinks } from "../modules/terminal/lib/links.ts";
@@ -102,10 +103,15 @@ test(
   },
   async () => {
     const directory = await mkdtemp(join(tmpdir(), "projector-input-browser-"));
-    const keyboard = ts.transpileModule(
-      await readFile(new URL("../modules/terminal/lib/keyboard.ts", import.meta.url), "utf8"),
-      { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 } },
-    ).outputText;
+    const api = new API();
+    onTestFinished(() => api.close());
+    const transpile = async (file) =>
+      (
+        await api.transpileModule(await readFile(new URL(file, import.meta.url), "utf8"), {
+          compilerOptions: { module: ModuleKind.ESNext, target: ScriptTarget.ES2022 },
+        })
+      ).outputText;
+    const keyboard = await transpile("../modules/terminal/lib/keyboard.ts");
     const xterm = await readFile(
       new URL(
         "../../../node_modules/.pnpm/@xterm+xterm@6.0.0/node_modules/@xterm/xterm/lib/xterm.js",
@@ -119,30 +125,16 @@ test(
       ),
       "utf8",
     );
-    const forwarding = ts.transpileModule(
-      await readFile(new URL("../modules/terminal/lib/input.ts", import.meta.url), "utf8"),
-      { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 } },
-    ).outputText;
-    const links = ts.transpileModule(
-      await readFile(new URL("../modules/terminal/lib/links.ts", import.meta.url), "utf8"),
-      { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 } },
-    ).outputText;
-    const dropPaths = ts.transpileModule(
-      await readFile(new URL("../modules/path-drop/drop-paths.ts", import.meta.url), "utf8"),
-      { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 } },
-    ).outputText;
-    const projectorDrag = ts.transpileModule(
-      await readFile(new URL("../modules/path-drop/projector-drag.ts", import.meta.url), "utf8"),
-      { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 } },
-    ).outputText;
+    const forwarding = await transpile("../modules/terminal/lib/input.ts");
+    const links = await transpile("../modules/terminal/lib/links.ts");
+    const dropPaths = await transpile("../modules/path-drop/drop-paths.ts");
+    const projectorDrag = await transpile("../modules/path-drop/projector-drag.ts");
     // Один вход path-drop для тестового браузера: внешние пути и внутренний drag Projector.
     const pathDrop = 'export * from "/drop-paths.js";\nexport * from "/projector-drag.js";';
-    const drop = ts
-      .transpileModule(
-        await readFile(new URL("../modules/terminal/lib/drop.ts", import.meta.url), "utf8"),
-        { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 } },
-      )
-      .outputText.replace("../../path-drop/index.ts", "/path-drop.js");
+    const drop = (await transpile("../modules/terminal/lib/drop.ts")).replace(
+      "../../path-drop/index.ts",
+      "/path-drop.js",
+    );
     const html = `<!doctype html><style>${css}</style><div id="terminal"></div><pre id="result">WAITING</pre>
     <script src="/xterm.js"></script><script type="module">
     import { deferTerminalText } from '/keyboard.js';

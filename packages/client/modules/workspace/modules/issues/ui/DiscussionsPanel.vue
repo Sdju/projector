@@ -64,12 +64,7 @@ defineExpose({ refresh: () => list.load() });
         "
       >
         <template #icon>
-          <IconAnswered
-            v-if="discussion.answered"
-            class="answered"
-            title="Есть ответ"
-            aria-hidden="true"
-          />
+          <IconAnswered v-if="discussion.answered" class="answered" aria-label="Есть ответ" />
         </template>
         <template #meta>
           <span v-if="discussion.category.name" class="category"

@@ -41,7 +41,7 @@ vp run check                         # полный gate перед коммит
 vp run test:gtk                      # реальные GTK-виджеты; нужен display
 ```
 
-`vp run check`: architecture → gtk:types → vue-tsc → тесты → build. Для повторных детерминированных шагов можно использовать `vp run --cache architecture|types|build`.
+`vp run check`: architecture → gtk:types → tsc (Vue Content Mapper) → тесты → build. Для повторных детерминированных шагов можно использовать `vp run --cache architecture|types|build`.
 
 ## Документация
 
