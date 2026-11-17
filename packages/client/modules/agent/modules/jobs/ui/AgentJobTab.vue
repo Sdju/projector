@@ -6,6 +6,7 @@ import UiButton from "../../../../../common/ui/UiButton.vue";
 import UiDisclosureSummary from "../../../../../common/ui/UiDisclosureSummary.vue";
 import UiLoader from "../../../../../common/ui/UiLoader.vue";
 import { jobFinished } from "../../../../agent-core/index.ts";
+import { failureTitle } from "@ai-projector/core/modules/agent-failure/index.ts";
 import { jobDuration, jobStatusLabel } from "../lib/job-labels.ts";
 import { useElapsedClock } from "../../../../agent-core/index.ts";
 import { useJobFollow } from "../model/job-follow.ts";
@@ -161,7 +162,9 @@ useTabReadout(() => ({
       </details>
       <p v-if="error" class="note error" role="alert">{{ error }}</p>
       <p v-if="actionError" class="note error" role="alert">{{ actionError }}</p>
-      <p v-if="job?.error" class="note error" role="alert">{{ job.error }}</p>
+      <p v-if="job?.error" class="note error" role="alert">
+        {{ job.failure ? failureTitle(job.failure) + ": " : "" }}{{ job.error }}
+      </p>
       <p v-if="job?.worktree && finished" class="note">
         Работа шла в изолированной копии ({{ job.worktree.branch }}): слить её в проект можно
         командой ide.agent.job.merge по просьбе пользователя.

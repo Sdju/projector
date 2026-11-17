@@ -6,6 +6,7 @@ import {
 } from "./command-bridge.ts";
 import { createRun, readRun, removeRun, stopRun, trackRun } from "./agent-runs.ts";
 import type { AgentRunRecord } from "./agent-runs.ts";
+import { failureFromError } from "./failure.ts";
 import type { AgentBackendId, AgentEventName, AgentPermissionMode } from "./backend.ts";
 import type { AgentHistoryTurn } from "../providers/index.ts";
 import type { AgentSelection } from "./controls.ts";
@@ -74,7 +75,10 @@ async function finish(entry: Live): Promise<void> {
   job.result = clip((entry.final ?? entry.collected).trim());
   if (job.history?.at(-1)?.role === "user")
     job.history.push({ role: "assistant", content: job.result.slice(0, 20_000) });
-  if (entry.failure && !entry.stopping) job.error = entry.failure;
+  if (entry.failure && !entry.stopping) {
+    job.error = entry.failure;
+    if (entry.failureInfo) job.failure = entry.failureInfo;
+  }
   job.pending = [];
   const changed = await changedSince(job.cwd, entry.snapshot);
   job.files = [...new Set([...job.files, ...changed, ...entry.touched])].sort().slice(0, 500);
@@ -187,7 +191,11 @@ export async function drive(
       emit,
     });
   } catch (error) {
-    if (!entry.stopping) entry.failure = error instanceof Error ? error.message : "Ошибка агента";
+    if (!entry.stopping) {
+      const failure = failureFromError(error);
+      entry.failure = failure.message;
+      entry.failureInfo = failure;
+    }
   } finally {
     untrack?.();
   }

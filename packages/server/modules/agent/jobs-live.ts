@@ -1,7 +1,13 @@
 import { isJudgeVerdict } from "@ai-projector/core/modules/agent-judge/index.ts";
+import {
+  isAgentFailure,
+  sanitizeFailureText,
+  type AgentFailure,
+} from "@ai-projector/core/modules/agent-failure/index.ts";
 import type { AgentQuestion } from "./command-bridge.ts";
 import type { AgentEventName } from "./backend.ts";
-import { normalizeTouchedPaths, pathsOfCall, type GitSnapshot } from "./jobs-files.ts";
+import type { GitSnapshot } from "./jobs-files.ts";
+import { normalizeTouchedPaths, pathsOfCall } from "./jobs-files.ts";
 import {
   JOURNAL_LIMIT,
   saveJob,
@@ -29,6 +35,8 @@ export interface Live {
   waiters: Set<() => void>;
   stopping: boolean;
   failure?: string;
+  /** Safe class, code and reset time of the failure; the string above stays for old records. */
+  failureInfo?: AgentFailure;
   final?: string;
   collected: string;
   snapshot?: GitSnapshot;
@@ -205,9 +213,20 @@ export function onEvent(entry: Live, event: AgentEventName, data: unknown): void
     case "done":
       if (typeof body.text === "string" && body.text) entry.final = body.text;
       return;
-    case "error":
-      entry.failure = String(body.error ?? "Ошибка агента");
+    case "error": {
+      const text = typeof body.error === "string" ? body.error : "Ошибка агента";
+      const info = isAgentFailure(body.failure)
+        ? body.failure
+        : {
+            class: "unknown" as const,
+            message: sanitizeFailureText(text) || "Ошибка агента",
+            code: null,
+            retryable: null,
+          };
+      entry.failure = info.message;
+      entry.failureInfo = info;
       return;
+    }
     default:
       return;
   }

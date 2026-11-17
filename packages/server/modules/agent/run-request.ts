@@ -15,10 +15,19 @@ import {
   schedulePrune,
   trackRun,
 } from "./agent-runs.ts";
-import { clearRecentRunForChat, hasAnswerForm, recordRecentRun } from "./recent-runs.ts";
+import {
+  clearRecentRunForChat,
+  hasAnswerForm,
+  recordRecentRun,
+  setRecentRunResume,
+} from "./recent-runs.ts";
 import { trackEventStream } from "./event-streams.ts";
 import { requestFrom } from "./request.ts";
+import { failureFromError, makeFailure } from "./failure.ts";
+import { abortChatResume } from "./chat-resume.ts";
 import { isHostedAgent, runAgent } from "./registry.ts";
+import type { AgentFailure } from "@ai-projector/core/modules/agent-failure/index.ts";
+import { isAgentFailure } from "@ai-projector/core/modules/agent-failure/index.ts";
 import { driveRun, isRunDriven, joinRun, type RunViewer } from "./run-hub.ts";
 import { broadcastEvent, hasEventClient } from "../events/index.ts";
 import { asString, json } from "../transport/index.ts";
@@ -64,6 +73,11 @@ export async function handleAgentRun({
     void pruneRuns().catch(() => {});
     if (request.chat && !request.chat.startsWith(JOB_CHAT))
       void clearRecentRunForChat(request.chat).catch(() => {});
+  }
+  // A new message is a decision to continue now: a plan waiting for the reset is no longer needed.
+  if (!attachId && request.chat && !request.chat.startsWith(JOB_CHAT)) {
+    abortChatResume(request.chat);
+    void setRecentRunResume(request.chat, null).catch(() => {});
   }
 
   // A page with its own events stream asks for the answer there: the request returns at once and
@@ -162,12 +176,33 @@ export async function handleAgentRun({
   let collectedText = "";
   let finalText: string | undefined;
   let failure: string | undefined;
+  let failureInfo: AgentFailure | undefined;
   const emit = (event: string, data: unknown) => {
+    // The page and the saved turn get the same safe failure: a raw provider error is kept only
+    // in the run trace, never in the chat.
+    if (event === "error") {
+      const body = (data ?? {}) as {
+        error?: unknown;
+        failure?: unknown;
+        status?: unknown;
+        code?: unknown;
+      };
+      const text = typeof body.error === "string" ? body.error : "Ошибка агента";
+      const info: AgentFailure = isAgentFailure(body.failure)
+        ? body.failure
+        : makeFailure({
+            message: text,
+            status: typeof body.status === "number" ? body.status : null,
+            code: typeof body.code === "string" ? body.code : null,
+          });
+      failureInfo = info;
+      failure = info.message;
+      data = { error: info.message, failure: info };
+    }
     const body = (data ?? {}) as Record<string, unknown>;
     if (event === "session" && typeof body.id === "string") lastSession = body.id;
     else if (event === "text" && typeof body.text === "string") collectedText += body.text;
     else if (event === "done" && typeof body.text === "string" && body.text) finalText = body.text;
-    else if (event === "error" && typeof body.error === "string") failure = body.error;
     // Noted even after the page left: the run goes on, and its session is how it is found again.
     if (event === "session" && run && !run.attach)
       void rememberSession(run.id, (data as { id: string }).id).catch(() => {});
@@ -202,9 +237,9 @@ export async function handleAgentRun({
       emit,
     });
   } catch (error) {
-    const text = error instanceof Error ? error.message : "Ошибка агента";
-    failure ??= text;
-    emit("error", { error: text });
+    const info = failureFromError(error);
+    failure ??= info.message;
+    emit("error", { error: info.message, failure: info });
   }
   driver?.finish();
   untrack?.();
@@ -221,9 +256,13 @@ export async function handleAgentRun({
       topic: request.message.trim().slice(0, 120),
       status,
       ...(status === "error" && failure ? { error: failure } : {}),
+      ...(status === "error" && failureInfo ? { failure: failureInfo } : {}),
       ...(preview ? { resultPreview: preview } : {}),
       ...(status === "done" && hasAnswerForm(answerText) ? { awaitingReply: true } : {}),
       ...(session ? { session } : {}),
+      ...(request.cwd ? { cwd: request.cwd } : {}),
+      ...(request.selection ? { selection: request.selection } : {}),
+      ...(request.permissionMode ? { permissionMode: request.permissionMode } : {}),
       startedAt: stored?.startedAt ?? startedAt,
       endedAt: Date.now(),
     }).catch(() => {});

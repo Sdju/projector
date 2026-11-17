@@ -1,4 +1,5 @@
 import type { JudgeVerdict } from "@ai-projector/core/modules/agent-judge/index.ts";
+import type { AgentFailure } from "@ai-projector/core/modules/agent-failure/index.ts";
 import type { AgentBackendId } from "../model/types.ts";
 import type { AgentRoleSnapshot } from "@ai-projector/core/modules/agent-role/index.ts";
 import { deviceUrl } from "../../../common/utilities/device-url.ts";
@@ -48,6 +49,8 @@ export interface AgentJobView {
   endedAt?: number;
   sessionId?: string;
   error?: string;
+  /** The same failure as data: class, code, retry advice and the quota reset, when known. */
+  failure?: AgentFailure;
   files: string[];
   pending: AgentJobPending[];
   /** The full answer; the list carries `resultPreview` instead. */

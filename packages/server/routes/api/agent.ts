@@ -19,6 +19,7 @@ import {
   listLiveRuns,
   listRecentRuns,
   runsChanged,
+  setRecentRunResume,
   agentCatalogRevision,
   listAgentBackends,
   injectMessage,
@@ -351,6 +352,22 @@ export const routes: RouteDefinition[] = [
   route("GET", "/api/agent/runs", async ({ res }) => {
     const [runs, recent] = await Promise.all([listLiveRuns(), listRecentRuns()]);
     json(res, 200, { runs, recent });
+  }),
+  route("POST", "/api/agent/chat/resume", async ({ req, res }) => {
+    const body = await readBody(req);
+    const chat = asString(body.chat);
+    if (!chat) throw new HttpError(400, "Укажите чат");
+    if (body.auto !== true) {
+      await setRecentRunResume(chat, null);
+      json(res, 200, { resume: null });
+      return;
+    }
+    const recent = (await listRecentRuns()).find((item) => item.chat === chat);
+    const resetAt = recent?.failure?.class === "usage_limit" ? recent.failure.resetAt : undefined;
+    if (resetAt === undefined || resetAt <= Date.now())
+      throw new HttpError(400, "Нет сброса квоты, к которому можно привязать продолжение");
+    const updated = await setRecentRunResume(chat, { at: resetAt, auto: true });
+    json(res, 200, { resume: updated?.resume ?? null });
   }),
   route("POST", "/api/agent/cancel", async ({ req, res }) => {
     const body = await readBody(req);

@@ -46,6 +46,7 @@ import {
 import { useAutoCompact } from "../model/use-auto-compact.ts";
 import { bannerErrorOf } from "../model/banner-error.ts";
 import { useChatInputActions } from "../model/use-chat-input-actions.ts";
+import { useChatQuotaResume } from "../model/use-quota-resume.ts";
 import { useStartPreset } from "../model/start-preset.ts";
 import { useAnswerForm } from "../model/answer-form.ts";
 import { useAnswerDoctor } from "../model/answer-doctor.ts";
@@ -494,6 +495,13 @@ const { submit, continueTurn, suggest, newChat } = useChatInputActions({
   focus: () => composer.value?.focus(),
   closeForm: closePresetForm,
 });
+const quotaResume = useChatQuotaResume(
+  chatKey,
+  turns,
+  busy,
+  continueTurn,
+  (m) => (error.value = m),
+);
 onBeforeUnmount(() => release());
 </script>
 
@@ -622,6 +630,7 @@ onBeforeUnmount(() => release());
             :lens="turn.role === 'assistant' && turn.id === turns.at(-1)?.id ? lens : undefined"
             :doctor="answerDoctorReport(turn)"
             :doctor-live="doctorProgress.get(turn.id)"
+            :resume-scheduled="quotaResume.scheduledId.value === turn.id"
             :flags="{
               busy,
               last: firstShown + offset === turns.length - 1,
@@ -637,6 +646,7 @@ onBeforeUnmount(() => release());
             @form-submit="submitTurnForm"
             @rewind="askRewind"
             @retry="retryMessage"
+            @quota-resume="quotaResume.toggle"
             @fork="forkMessage"
             @continue="continueTurn"
             @version="showVersion"

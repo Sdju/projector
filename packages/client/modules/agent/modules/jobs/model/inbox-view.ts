@@ -1,5 +1,6 @@
 import type { HubDevice } from "@ai-projector/core/modules/hub/index.ts";
 import { answerPreview } from "@ai-projector/core/modules/agent-answer/index.ts";
+import type { AgentFailure } from "@ai-projector/core/modules/agent-failure/index.ts";
 import {
   agentLabel,
   type AgentBackendId,
@@ -53,6 +54,8 @@ export interface InboxItem {
   category: InboxCategory;
   pending: InboxPending[];
   error?: string;
+  /** Safe class, code and reset time, when the source reported them. */
+  failure?: AgentFailure;
   resultPreview?: string;
   awaitingReply?: boolean;
   createdAt: number;
@@ -138,6 +141,7 @@ export function inboxJobItem(
     category: jobCategory(job),
     pending: job.pending,
     error: job.error,
+    ...(job.failure ? { failure: job.failure } : {}),
     ...(resultPreview ? { resultPreview } : {}),
     createdAt: job.createdAt,
     startedAt: job.startedAt,
@@ -200,6 +204,7 @@ export function inboxRecentRunItem(
     category: attention ? "attention" : "finished",
     pending: [],
     error: run.error,
+    ...(run.failure ? { failure: run.failure } : {}),
     resultPreview: run.resultPreview ? answerPreview(run.resultPreview, 300) : undefined,
     awaitingReply: run.awaitingReply,
     createdAt: run.startedAt,

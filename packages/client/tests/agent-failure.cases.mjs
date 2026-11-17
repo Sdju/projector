@@ -9,6 +9,29 @@ const turn = (id, role, text = id, extra = {}) => ({ id, role, text, tools: [], 
 
 afterEach(() => vi.unstubAllGlobals());
 
+test("a structured failure is kept with the answer", () => {
+  const state = createState();
+  const assistant = turn("a1", "assistant", "");
+  state.turns = [turn("u1", "user", "почини"), assistant];
+  const failure = {
+    class: "usage_limit",
+    message: "Достигнут лимит",
+    code: "http_429",
+    retryable: true,
+    resetAt: Date.now() + 60_000,
+  };
+
+  applyAgentEvent(
+    state,
+    assistant,
+    { event: "error", data: { error: failure.message, failure } },
+    () => {},
+  );
+
+  expect(assistant.failure).toBe("Достигнут лимит");
+  expect(assistant.failureInfo).toEqual(failure);
+});
+
 test("an error is kept on the answer that failed, not only in the chat banner", () => {
   const state = createState();
   const assistant = turn("a1", "assistant", "");

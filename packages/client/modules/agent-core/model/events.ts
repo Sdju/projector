@@ -1,5 +1,6 @@
 import type { AgentTaskPatch } from "@ai-projector/core/modules/agent-task/index.ts";
 import type { JudgeVerdict } from "@ai-projector/core/modules/agent-judge/index.ts";
+import type { AgentFailure } from "@ai-projector/core/modules/agent-failure/index.ts";
 import type { Project } from "../../project/index.ts";
 import type { JudgeNote } from "./judge-note.ts";
 import type {
@@ -62,4 +63,4 @@ export type AgentEvent =
   | { event: "thought"; data: { text: string } }
   | { event: "project"; data: Project }
   | { event: "done"; data: { text: string; stopped?: "steps" | "loop" | "tokens" | "time" } }
-  | { event: "error"; data: { error: string } };
+  | { event: "error"; data: { error: string; failure?: AgentFailure } };

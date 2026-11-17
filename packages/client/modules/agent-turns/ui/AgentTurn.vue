@@ -7,6 +7,7 @@ import { chatProjectKey } from "../../chat-images/index.ts";
 import { chipIcon, chipLabel, chipTitle } from "../../agent-core/index.ts";
 import { versionsOf, type ForkMode } from "../../agent-core/index.ts";
 import { legacyParts } from "../../agent-core/index.ts";
+import { failureTitle, isAgentFailure } from "@ai-projector/core/modules/agent-failure/index.ts";
 import type { AgentLens } from "../model/lens.ts";
 import type { AgentToolChip, AgentTurn, ChatUsage, MessageChip } from "../../agent-core/index.ts";
 import type { AgentDoctorProgress, AgentDoctorReport } from "../../agent-core/index.ts";
@@ -43,6 +44,8 @@ const props = defineProps<{
   doctor?: AgentDoctorReport;
   /** What Answer Doctor is doing right now; absent until the check finds a problem. */
   doctorLive?: AgentDoctorProgress;
+  /** The chat will continue this answer when its quota resets. */
+  resumeScheduled?: boolean;
   /** Per-render state of the turn; `busy`, `last` and `copied` default to false. */
   flags?: {
     busy?: boolean;
@@ -67,6 +70,8 @@ const emit = defineEmits<{
   formSubmit: [id: string, text: string, data: unknown, summary?: string];
   rewind: [id: string];
   retry: [id: string];
+  /** Schedule (or cancel) the continuation of an answer stopped on a usage limit. */
+  quotaResume: [id: string];
   /** A new chat from this point: before a question (with it in the input) or after an answer. */
   fork: [id: string, mode: ForkMode];
   continue: [];
@@ -76,6 +81,21 @@ const emit = defineEmits<{
   /** The doctor mark was clicked: run another repair attempt for this answer. */
   doctorRetry: [id: string];
 }>();
+
+const failure = computed(() =>
+  isAgentFailure(props.turn.failureInfo) ? props.turn.failureInfo : undefined,
+);
+const failureText = computed(() => failure.value?.message ?? props.turn.failure ?? "");
+const failureTitleText = computed(() => (failure.value ? failureTitle(failure.value) : ""));
+/** Only a quota with a future reset shows a time; a passed one is retryable as usual. */
+const quotaUntil = computed(() => {
+  const resetAt = failure.value?.resetAt;
+  if (failure.value?.class !== "usage_limit" || resetAt === undefined || resetAt <= Date.now())
+    return "";
+  return new Date(resetAt).toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" });
+});
+/** A manual repeat is hidden only when the provider explicitly said it cannot work. */
+const mayRetry = computed(() => failure.value?.retryable !== false);
 
 const flags = computed(() => ({
   busy: false,
@@ -397,9 +417,29 @@ const lastWork = computed(
       />
       <div v-if="turn.failure" class="turn-failure" role="alert">
         <IconAlert aria-hidden="true" />
-        <p class="turn-failure-text">{{ turn.failure }}</p>
+        <div class="turn-failure-body">
+          <p v-if="failureTitleText" class="turn-failure-title">
+            {{ failureTitleText
+            }}<span v-if="quotaUntil">
+              · {{ resumeScheduled ? "продолжу в" : "до" }} {{ quotaUntil }}</span
+            >
+          </p>
+          <p class="turn-failure-text">{{ failureText }}</p>
+        </div>
         <UiButton
-          v-if="flags.last && !flags.busy && !flags.readonly"
+          v-if="quotaUntil"
+          size="sm"
+          :title="
+            resumeScheduled
+              ? 'Отменить автоматическое продолжение после сброса квоты'
+              : 'Продолжить разговор, когда провайдер снова разрешит запросы'
+          "
+          @click="emit('quotaResume', turn.id)"
+        >
+          {{ resumeScheduled ? "Отменить продолжение" : "Продолжить после сброса" }}
+        </UiButton>
+        <UiButton
+          v-if="flags.last && !flags.busy && !flags.readonly && mayRetry"
           size="sm"
           title="Повторить запрос с начала; изменённые файлы не откатываются"
           @click="emit('retry', turn.id)"
@@ -619,11 +659,20 @@ const lastWork = computed(
   flex-shrink: 0;
 }
 .turn-failure-text {
-  flex: 1;
-  min-width: 0;
   margin: 0;
   overflow-wrap: anywhere;
   white-space: pre-wrap;
+}
+.turn-failure-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.turn-failure-title {
+  margin: 0;
+  font-weight: 600;
 }
 .turn-failure button {
   flex-shrink: 0;

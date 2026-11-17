@@ -14,7 +14,12 @@ import { os, PARENT_SESSION_ENV } from "@ai-projector/core/modules/os/index.ts";
 import { openLauncher, startTray } from "../modules/window/index.ts";
 import type { ServerMode } from "@ai-projector/core/modules/server-mode/index.ts";
 import { attachTerminalServer, listTerminalSessions } from "../modules/terminal/index.ts";
-import { pruneRuns, recoverJobs, bindAgentEventStreams } from "../modules/agent/index.ts";
+import {
+  pruneRuns,
+  recoverJobs,
+  bindAgentEventStreams,
+  startChatResume,
+} from "../modules/agent/index.ts";
 import { registerBuiltinAgents } from "./agents.ts";
 import { registerBuiltinWidgetDefinitions } from "./widgets.ts";
 import { registerBuiltinAgentFeatures } from "./features.ts";
@@ -127,7 +132,10 @@ export function bindRuntime(
     // Jobs first: they rejoin the runs that the cleanup keeps for them.
     void recoverJobs()
       .catch((error) => console.error("Фоновые агенты:", error.message))
-      .then(() => pruneRuns())
+      .then(() => {
+        startChatResume();
+        return pruneRuns();
+      })
       .catch(() => {});
     void reconcileOnStartup().catch((error) =>
       console.error("Очистка контейнеров:", error.message),

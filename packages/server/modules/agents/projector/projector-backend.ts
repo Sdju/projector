@@ -1,4 +1,9 @@
-import { runHostedAgent, type AgentBackend, type AgentRunOptions } from "../../agent/index.ts";
+import {
+  failureFromError,
+  runHostedAgent,
+  type AgentBackend,
+  type AgentRunOptions,
+} from "../../agent/index.ts";
 import { fileURLToPath } from "node:url";
 import {
   defaultSettingsMiddleware,
@@ -325,8 +330,8 @@ async function turn(
       attempt = -1;
       continue;
     }
-    const message = failure instanceof Error ? failure.message : "Ошибка агента";
-    options.emit("error", { error: message });
+    const failureInfo = failureFromError(failure);
+    options.emit("error", { error: failureInfo.message, failure: failureInfo });
     return;
   }
 

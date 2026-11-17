@@ -34,6 +34,21 @@ afterAll(async () => {
 });
 
 describe("Projector agent chat history", () => {
+  it("keeps a failed answer with its class and reset after a reload", async () => {
+    const failure = {
+      class: "usage_limit",
+      message: "Достигнут лимит",
+      code: "http_429",
+      retryable: true,
+      resetAt: Date.now() + 60_000,
+    };
+    await writeAgentHistory("failed", [
+      turn("u", "user", "почини"),
+      { ...turn("a", "assistant", ""), failure: failure.message, failureInfo: failure },
+    ]);
+    const saved = await readAgentHistory("failed");
+    expect(saved[1]).toMatchObject({ failure: "Достигнут лимит", failureInfo: failure });
+  });
   it("puts the live chat aside, lists it, brings it back and removes it", async () => {
     expect(await archiveLiveChat("p")).toBeUndefined();
     await writeAgentHistory("p", [

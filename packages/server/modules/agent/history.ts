@@ -152,6 +152,25 @@ const turnSchema: z.ZodType<StoredTurn> = z.lazy(() =>
     worktree: z.object({ id: z.string(), branch: z.string() }).optional(),
     /** Transcript position after this answer: the next message branches off here if needed. */
     tail: z.string().optional(),
+    /** The answer failed: the text is kept so the chat offers retry after a reload. */
+    failure: z.string().optional(),
+    /** The same failure as data: class, code, retry advice and the quota reset. */
+    failureInfo: z
+      .object({
+        class: z.enum([
+          "usage_limit",
+          "provider_error",
+          "transport_error",
+          "permission_error",
+          "validation_error",
+          "unknown",
+        ]),
+        message: z.string(),
+        code: z.string().nullable(),
+        retryable: z.boolean().nullable(),
+        resetAt: z.number().optional(),
+      })
+      .optional(),
     /** The native session cannot be continued from this turn: the chat is replayed instead. */
     detached: z.boolean().optional(),
     /** What Answer Doctor did with this answer, so the mark survives a reload. */

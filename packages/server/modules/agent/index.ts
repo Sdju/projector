@@ -81,8 +81,10 @@ export {
   listRecentRuns,
   RECENT_RUN_TTL_MS,
   recordRecentRun,
+  setRecentRunResume,
   type RecentRun,
 } from "./recent-runs.ts";
+export { abortChatResume, dueResume, startChatResume, sweepChatResumes } from "./chat-resume.ts";
 export { runsChanged } from "./change-events.ts";
 export {
   completeCommandRequest,
@@ -112,6 +114,14 @@ export {
   type SecretShowResult,
 } from "./secret-show.ts";
 export { readAttachment, saveAttachment } from "./attachments.ts";
+export {
+  errorEventData,
+  failureFromAcp,
+  failureFromClaudeResult,
+  failureFromError,
+  failureRetryable,
+  makeFailure,
+} from "./failure.ts";
 export { readAgentHistory, writeAgentHistory } from "./history.ts";
 export {
   isHarnessOnly,

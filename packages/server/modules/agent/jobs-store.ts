@@ -19,6 +19,10 @@ import {
 import type { AgentBackendId, AgentPermissionMode } from "./backend.ts";
 import type { AgentSelection } from "./controls.ts";
 import { isJudgeVerdict, type JudgeVerdict } from "@ai-projector/core/modules/agent-judge/index.ts";
+import {
+  isAgentFailure,
+  type AgentFailure,
+} from "@ai-projector/core/modules/agent-failure/index.ts";
 import type { AgentRoleSnapshot } from "@ai-projector/core/modules/agent-role/index.ts";
 import type { AgentHistoryTurn } from "../providers/index.ts";
 
@@ -85,6 +89,8 @@ export interface AgentJob {
   sessionId?: string;
   result: string;
   error?: string;
+  /** The same failure as data: class, code, retry advice and the quota reset, when known. */
+  failure?: AgentFailure;
   files: string[];
   pending: JobPending[];
 }
@@ -201,6 +207,7 @@ function parseJob(id: string, value: unknown): ParsedState<AgentJob> | undefined
   ] as const)
     if (!optionalField(value, key, isText)) return;
   if (!optionalField(value, "dirty", isTextList)) return;
+  if (!optionalField(value, "failure", isAgentFailure)) return;
   for (const key of ["startedAt", "endedAt"] as const)
     if (!optionalField(value, key, isCount)) return;
   if (!optionalField(value, "worktreeCleared", isBoolean)) return;

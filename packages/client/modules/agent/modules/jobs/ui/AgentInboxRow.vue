@@ -3,6 +3,7 @@ import { computed } from "vue";
 import UiButton from "../../../../../common/ui/UiButton.vue";
 import UiStatusDot from "../../../../../common/ui/UiStatusDot.vue";
 import { formatElapsed, useElapsedClock } from "../../../../agent-core/index.ts";
+import { failureTitle } from "@ai-projector/core/modules/agent-failure/index.ts";
 import type { InboxItem } from "../model/inbox.ts";
 import AgentJobRequests from "./AgentJobRequests.vue";
 import AgentRunRequests from "./AgentRunRequests.vue";
@@ -84,7 +85,9 @@ const requestNote = computed(() => {
       </span>
       <span class="meta">{{ item.agent }} · {{ statusLabel }} · {{ when }}</span>
       <span v-if="requestNote" class="note warn">{{ requestNote }}</span>
-      <span v-if="item.error && item.status === 'error'" class="note err">{{ item.error }}</span>
+      <span v-if="item.error && item.status === 'error'" class="note err">
+        {{ item.failure ? failureTitle(item.failure) + ": " : "" }}{{ item.error }}
+      </span>
       <span
         v-else-if="item.resultPreview && (item.status === 'done' || item.awaitingReply)"
         class="preview"

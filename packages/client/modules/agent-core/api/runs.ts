@@ -1,4 +1,5 @@
 import type { JudgeVerdict } from "@ai-projector/core/modules/agent-judge/index.ts";
+import type { AgentFailure } from "@ai-projector/core/modules/agent-failure/index.ts";
 import { deviceUrl } from "../../../common/utilities/device-url.ts";
 import type { AgentBackendId, AgentQuestionRequest, AgentSecretRequest } from "../model/types.ts";
 
@@ -40,6 +41,10 @@ export interface RecentAgentRun {
   topic: string;
   status: "done" | "error" | "stopped";
   error?: string;
+  /** Safe class, code and reset time of the failure, when the run reported them. */
+  failure?: AgentFailure;
+  /** Continuation planned after the quota reset. */
+  resume?: { at: number; auto: boolean };
   resultPreview?: string;
   awaitingReply?: boolean;
   session?: string;
@@ -59,6 +64,26 @@ export async function fetchRunsFeed(
 
 export async function fetchLiveRuns(base?: string): Promise<LiveAgentRun[]> {
   return (await fetchRunsFeed(base)).runs;
+}
+
+/** Plans (or cancels) the server-side continuation of a chat after its quota reset. */
+export async function setChatResume(
+  chat: string,
+  auto: boolean,
+  base?: string,
+): Promise<{ at: number; auto: boolean } | null> {
+  const path = base ? `${base}/agent/chat/resume` : deviceUrl("/api/agent/chat/resume");
+  const response = await fetch(path, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ chat, auto }),
+  });
+  const data = (await response.json().catch(() => ({}))) as {
+    resume?: { at: number; auto: boolean } | null;
+    error?: string;
+  };
+  if (!response.ok) throw new Error(data.error || "Не удалось изменить продолжение");
+  return data.resume ?? null;
 }
 
 /** A run starts right after its message; the window keeps older turns of the same session out. */

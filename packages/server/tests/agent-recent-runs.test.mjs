@@ -34,6 +34,19 @@ registerAgentBackend({
       options.emit("error", { error: "boom" });
       return;
     }
+    if (options.message === "limited") {
+      options.emit("error", {
+        error: "usage limit reached",
+        failure: {
+          class: "usage_limit",
+          message: "Достигнут лимит",
+          code: "http_429",
+          retryable: true,
+          resetAt: Date.now() + 60_000,
+        },
+      });
+      return;
+    }
     if (options.message === "markup") {
       const text = `<Card title="Причина"><Bars unit=" КБ" :items="[{label:'828a', value:300}]" /></Card>\n\nКадр больше лимита.`;
       options.emit("done", { text });
@@ -114,6 +127,14 @@ test("completed chat runs appear in /api/agent/runs recent list with awaitingRep
   });
   await markupRes.text();
 
+  const limitedRes = await post({
+    projectId: "p1",
+    chat: "fake-chat-run:p1:c5",
+    backend: "fake-chat-run",
+    message: "limited",
+  });
+  await limitedRes.text();
+
   const feed = await (await fetch(`${base}/api/agent/runs`)).json();
   expect(feed.runs).toEqual([]);
   const byChat = new Map(feed.recent.map((item) => [item.chat, item]));
@@ -134,4 +155,28 @@ test("completed chat runs appear in /api/agent/runs recent list with awaitingRep
     status: "done",
     resultPreview: "Кадр больше лимита.",
   });
+  expect(byChat.get("fake-chat-run:p1:c5")).toMatchObject({
+    status: "error",
+    error: "Достигнут лимит",
+    failure: { class: "usage_limit", code: "http_429", retryable: true },
+  });
+  expect(byChat.get("fake-chat-run:p1:c5").failure.resetAt).toBeGreaterThan(Date.now());
+
+  const plan = await fetch(`${base}/api/agent/chat/resume`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Origin: base },
+    body: JSON.stringify({ chat: "fake-chat-run:p1:c5", auto: true }),
+  });
+  expect(await plan.json()).toMatchObject({ resume: { auto: true } });
+  const planned = await (await fetch(`${base}/api/agent/runs`)).json();
+  expect(planned.recent.find((item) => item.chat === "fake-chat-run:p1:c5")?.resume).toMatchObject({
+    auto: true,
+  });
+
+  const cancelled = await fetch(`${base}/api/agent/chat/resume`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Origin: base },
+    body: JSON.stringify({ chat: "fake-chat-run:p1:c5", auto: false }),
+  });
+  expect(await cancelled.json()).toEqual({ resume: null });
 });

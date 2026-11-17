@@ -1,16 +1,22 @@
 import { mkdir } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { dataDir } from "@ai-projector/core/modules/app-paths/index.ts";
+import {
+  isAgentFailure,
+  type AgentFailure,
+} from "@ai-projector/core/modules/agent-failure/index.ts";
 import { writeFileAtomic, withFileLock } from "../atomic-files/index.ts";
 import {
   isCount,
   isRecord,
+  isStringMap,
   isText,
   optionalField,
   readStateFile,
   type ParsedState,
 } from "./state-file.ts";
-import type { AgentBackendId } from "./backend.ts";
+import type { AgentBackendId, AgentPermissionMode } from "./backend.ts";
+import type { AgentSelection } from "./controls.ts";
 import { runsChanged } from "./change-events.ts";
 
 /** Finished chat runs are kept this long so the notification panel shows what completed. */
@@ -25,6 +31,15 @@ export interface RecentRun {
   topic: string;
   status: "done" | "error" | "stopped";
   error?: string;
+  /** The same failure as data: class, retry advice and the quota reset, when known. */
+  failure?: AgentFailure;
+  /** Continuation planned by the user: when to send and whether to do it without a page. */
+  resume?: { at: number; auto: boolean };
+  /** Where the answer ran: a resume repeats the run in the same folder. */
+  cwd?: string;
+  /** Model controls of the answer, so a resume keeps the same model and effort. */
+  selection?: AgentSelection;
+  permissionMode?: AgentPermissionMode;
   resultPreview?: string;
   /** The assistant ended with an interactive form and waits for the user's reply. */
   awaitingReply?: boolean;
@@ -68,6 +83,18 @@ function isRecentRun(value: unknown): value is RecentRun {
   if (!isCount(value.startedAt) || !isCount(value.endedAt)) return false;
   for (const key of ["error", "resultPreview", "session"])
     if (!optionalField(value, key, isText)) return false;
+  if (!optionalField(value, "failure", isAgentFailure)) return false;
+  if (!optionalField(value, "cwd", isText)) return false;
+  if (!optionalField(value, "selection", isStringMap)) return false;
+  if (!optionalField(value, "permissionMode", isText)) return false;
+  if (
+    !optionalField(
+      value,
+      "resume",
+      (item) => isRecord(item) && isCount(item.at) && typeof item.auto === "boolean",
+    )
+  )
+    return false;
   return optionalField(value, "awaitingReply", (item) => typeof item === "boolean");
 }
 
@@ -79,10 +106,21 @@ async function saveToDisk(path: string, list: RecentRun[]): Promise<void> {
 }
 
 function prune(list: RecentRun[], now = Date.now()): RecentRun[] {
-  return list
-    .filter((item) => now - item.endedAt < RECENT_RUN_TTL_MS)
-    .sort((a, b) => b.endedAt - a.endedAt)
-    .slice(0, RECENT_RUN_LIMIT);
+  return (
+    list
+      // A failed run waiting for a quota reset is kept until that reset: a weekly window is
+      // longer than the notification lifetime, and losing it loses the "continue" entry.
+      .filter(
+        (item) =>
+          (item.resume !== undefined && item.resume.at > now) ||
+          (item.failure?.class === "usage_limit" &&
+            (item.failure.resetAt ?? 0) > now &&
+            item.failure.resetAt! - now < 31 * 24 * 60 * 60 * 1000) ||
+          now - item.endedAt < RECENT_RUN_TTL_MS,
+      )
+      .sort((a, b) => b.endedAt - a.endedAt)
+      .slice(0, RECENT_RUN_LIMIT)
+  );
 }
 
 /**
@@ -159,4 +197,30 @@ export async function listRecentRuns(now = Date.now()): Promise<RecentRun[]> {
   await settleWrites(path);
   const list = await loadFromDisk(path);
   return prune(list, now);
+}
+
+/**
+ * Sets or clears the continuation planned for a chat. Returns the stored entry, or `undefined`
+ * when the chat has no finished run to continue.
+ */
+export async function setRecentRunResume(
+  chat: string,
+  resume: { at: number; auto: boolean } | null,
+): Promise<RecentRun | undefined> {
+  if (!chat) return;
+  const path = recentRunsPath();
+  let updated: RecentRun | undefined;
+  await writeRecentRuns(path, async () => {
+    const list = await loadFromDisk(path);
+    const index = list.findIndex((item) => item.chat === chat);
+    if (index < 0) return;
+    const item = { ...list[index]! };
+    if (resume) item.resume = resume;
+    else delete item.resume;
+    list[index] = item;
+    updated = item;
+    await saveToDisk(path, prune(list));
+  });
+  if (updated) runsChanged();
+  return updated;
 }

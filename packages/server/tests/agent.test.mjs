@@ -507,7 +507,10 @@ test("Claude Code messages become the shared chat events", async () => {
   });
   expect(failing.failed).toBe(true);
   expect(failing.started).toBe(false);
-  expect(failed[0]).toStrictEqual(["error", { error: "no session" }]);
+  expect(failed[0]).toStrictEqual([
+    "error",
+    { error: "no session", code: "error_during_execution" },
+  ]);
 });
 
 test("ACP session updates become the shared chat events", async () => {

@@ -110,6 +110,18 @@ export default {
             ceiling: 402,
             plan: "Вынести чтение файлов и ассетов GitLab в отдельный files.ts",
           },
+          "packages/server/modules/agent/jobs.ts": {
+            ceiling: 408,
+            plan: "Вынести запуск хода задания и его завершение в jobs-run.ts",
+          },
+          "packages/server/modules/agents/projector/projector-backend.ts": {
+            ceiling: 404,
+            plan: "Вынести цикл попыток и разбор ошибок модели в projector-attempts.ts",
+          },
+          "packages/client/modules/agent/ui/AgentChat.vue": {
+            ceiling: 504,
+            plan: "Вынести панели задач и композер в дочерние компоненты",
+          },
         },
       },
       confine: adapters,

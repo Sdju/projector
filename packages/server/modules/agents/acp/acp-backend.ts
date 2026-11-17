@@ -1,5 +1,5 @@
 import { acpProgram, type AcpProgram, registerAcpProgram } from "./acp-programs.ts";
-import { attachedImages, promptWithHistory } from "../../agent/index.ts";
+import { attachedImages, failureFromAcp, promptWithHistory } from "../../agent/index.ts";
 import { featureEnabled, featurePrompt } from "../../agent-features/index.ts";
 import { acpIdeMcpServer } from "../ide-mcp/index.ts";
 import { roleContext } from "../../agent-roles/index.ts";
@@ -205,10 +205,17 @@ async function run(options: AgentRunOptions, id: AgentBackendId): Promise<void> 
         followUp,
         options,
       });
-    } else options.emit("error", { error: stopReasonError(stopReason) });
+    } else {
+      options.emit("error", {
+        error: stopReasonError(stopReason),
+        failure: failureFromAcp(undefined, stopReason),
+      });
+    }
   } catch (error) {
-    if (!options.abort?.aborted)
-      options.emit("error", { error: error instanceof Error ? error.message : "Агент недоступен" });
+    if (!options.abort?.aborted) {
+      const failure = failureFromAcp(error);
+      options.emit("error", { error: failure.message, failure });
+    }
   } finally {
     options.abort?.removeEventListener("abort", abort);
     await connection.close({ stop: !keepProcess || !!options.abort?.aborted });

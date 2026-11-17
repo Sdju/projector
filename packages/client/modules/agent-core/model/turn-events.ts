@@ -364,6 +364,7 @@ export function applyAgentEvent(
     case "error":
       state.error = event.data.error;
       assistant.failure = event.data.error;
+      assistant.failureInfo = event.data.failure;
       assistant.run = undefined;
       return false;
     case "done":

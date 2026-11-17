@@ -1,4 +1,5 @@
 import type { AgentTask } from "@ai-projector/core/modules/agent-task/index.ts";
+import type { AgentFailure } from "@ai-projector/core/modules/agent-failure/index.ts";
 import type {
   AgentContext,
   AgentFormAnswer,
@@ -60,6 +61,8 @@ export interface AgentTurn {
   stopped?: "steps" | "loop" | "tokens" | "time";
   /** The answer failed: what the agent or its stream reported, kept so the chat can offer retry. */
   failure?: string;
+  /** The same failure as data: class, code, retry advice and the quota reset, when known. */
+  failureInfo?: AgentFailure;
   /** The IDE wrote this message, not the user: the id of the job that triggered it. */
   auto?: string;
   /** What to call that job in the note; the id stays for the agent's commands. */

@@ -27,6 +27,7 @@ export * from "./lib/turn-end.ts";
 export * from "./lib/work-items.ts";
 export * from "./model/branches.ts";
 export * from "./model/chat-actions.ts";
+export * from "./model/quota-resume.ts";
 export * from "./model/chat-contracts.ts";
 export * from "./model/chat-groups.ts";
 export * from "./model/chat-key.ts";

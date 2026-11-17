@@ -268,7 +268,16 @@ export function createClaudeEventMapper(emit: AgentEmitter) {
               : message.subtype === "error_max_turns"
                 ? "Достигнут лимит шагов Claude Code"
                 : errors.join("\n");
-          emit("error", { error: reason || "Claude Code завершился с ошибкой" });
+          // The status is the reliable signal: Claude's text often omits the code.
+          const status =
+            "api_error_status" in message && typeof message.api_error_status === "number"
+              ? message.api_error_status
+              : undefined;
+          emit("error", {
+            error: reason || "Claude Code завершился с ошибкой",
+            ...(status === undefined ? {} : { status }),
+            ...(typeof message.subtype === "string" ? { code: message.subtype } : {}),
+          });
         }
         return;
       }
