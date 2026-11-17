@@ -31,11 +31,13 @@ export function saveChat(
         }),
       });
       if (!response.ok) {
+        // A proxy in front of the server answers a rejected request with its own page, not JSON:
+        // the status is then the only thing that explains the failure (a body limit, for one).
         const detail = await response.json().then(
-          (data) => (typeof data?.error === "string" ? `: ${data.error}` : ""),
-          () => "",
+          (data) => (typeof data?.error === "string" ? data.error : `HTTP ${response.status}`),
+          () => `HTTP ${response.status}`,
         );
-        throw new Error(`Не удалось сохранить историю чата${detail}`);
+        throw new Error(`Не удалось сохранить историю чата: ${detail}`);
       }
       announceChat(key);
     });
