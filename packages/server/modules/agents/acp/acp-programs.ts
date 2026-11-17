@@ -78,6 +78,25 @@ export interface AcpProgram {
     string,
     (options: AgentRunOptions, params: Record<string, unknown>) => void
   >;
+  /** Capture ownership before sending the prompt, including fast autonomous continuations. */
+  prepareFollowUp?: (sessionId: string) => AcpFollowUp;
+}
+
+export type AcpFollowUpResult =
+  | { status: "completed" | "superseded" | "aborted" }
+  | { status: "failed" | "unavailable" | "timeout"; error: string };
+
+export interface AcpFollowUpOptions {
+  signal?: AbortSignal;
+  onStart?: () => void;
+  /** Poll child completions on every iteration, including children spawned by continuations. */
+  pending: () => number;
+}
+
+export interface AcpFollowUp {
+  /** Reject updates owned by a later human prompt before they reach the answer mapper. */
+  acceptsUpdates(sessionId: string, update: Record<string, unknown>): boolean;
+  wait(options: AcpFollowUpOptions): Promise<AcpFollowUpResult>;
 }
 
 const programs = new Map<AgentBackendId, AcpProgram>();

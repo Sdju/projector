@@ -1,4 +1,4 @@
-import { expect, test } from "vite-plus/test";
+import { expect, test, vi } from "vite-plus/test";
 import { AgentRunGone } from "../modules/agent-core/api/client.ts";
 import { streamAnswer } from "../modules/agent-core/model/run-turn.ts";
 import {
@@ -246,4 +246,47 @@ test("an attach that dies before events puts the previous answer back", async ()
   ).rejects.toBeInstanceOf(AgentRunGone);
   expect(assistant.text).toBe("Вливаю ветку");
   expect(assistant.tools).toEqual([{ id: "t1", name: "shell", status: "done", detail: "ok" }]);
+});
+
+test("a completed child before final done keeps the run available for reconnect", async () => {
+  vi.useFakeTimers();
+  try {
+    const assistant = {
+      id: "a",
+      role: "assistant",
+      text: "",
+      tools: [],
+      tasks: [],
+      parts: [],
+      run: "run-1",
+    };
+    const state = { permissions: [], questions: [], secrets: [], turns: [assistant] };
+    const onEvent = (event) => applyAgentEvent(state, assistant, event, () => {});
+    let calls = 0;
+    const result = streamAnswer(
+      assistant,
+      async (emit, _signal, attach) => {
+        calls++;
+        if (calls === 2) expect(attach).toBe("run-1");
+        emit({ event: "run", data: { id: "run-1" } });
+        emit({ event: "text", data: { text: "Первый ответ." } });
+        emit({ event: "task", data: { id: "child", status: "running", background: true } });
+        emit({ event: "task", data: { id: "child", status: "done" } });
+        emit({ event: "status", data: { phase: "thinking" } });
+        expect(assistant.run).toBe("run-1");
+        if (calls === 1) throw new Error("connection lost during continuation");
+        emit({ event: "text", data: { text: " Продолжение." } });
+        emit({ event: "done", data: { text: "Первый ответ. Продолжение.", added: [] } });
+      },
+      onEvent,
+      new AbortController().signal,
+    );
+    await vi.advanceTimersByTimeAsync(1100);
+    await result;
+    expect(calls).toBe(2);
+    expect(assistant.text).toBe("Первый ответ. Продолжение.");
+    expect(assistant.run).toBeUndefined();
+  } finally {
+    vi.useRealTimers();
+  }
 });

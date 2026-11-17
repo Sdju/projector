@@ -6,6 +6,9 @@ export {
   type AcpFormField,
   type AcpFormOption,
   type AcpProgram,
+  type AcpFollowUp,
+  type AcpFollowUpOptions,
+  type AcpFollowUpResult,
 } from "./acp-programs.ts";
 export { usageReportOf } from "./acp-usage.ts";
 export {

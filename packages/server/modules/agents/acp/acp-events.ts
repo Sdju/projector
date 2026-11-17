@@ -284,6 +284,10 @@ export function createAcpEventMapper(
     get pendingBackground() {
       return background.size;
     },
+    /** The answer held a background task that can wake the agent into another step. */
+    get hadBackground() {
+      return background.held;
+    },
     /** Whether the hosted ACP process must outlive this connection (wait and/or keep-alive). */
     get keepsProcess() {
       return background.keepsProcess;
@@ -292,6 +296,10 @@ export function createAcpEventMapper(
      * Resolves when every holding background task has ended, or when `signal` aborts. The
      * connection must stay open so later `session/update` can clear the set.
      */
+    pollBackground(): number {
+      emitTasks(dialect.poll?.() ?? []);
+      return background.size;
+    },
     waitBackground(signal?: AbortSignal): Promise<void> {
       return background.wait(signal, () => {
         const patches = dialect.poll?.() ?? [];

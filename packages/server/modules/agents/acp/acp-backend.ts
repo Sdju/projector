@@ -5,12 +5,7 @@ import { acpIdeMcpServer } from "../ide-mcp/index.ts";
 import { roleContext } from "../../agent-roles/index.ts";
 import { trustedProjectWidgets } from "../../project-widgets/index.ts";
 import { renderWidgetGuide } from "@ai-projector/core/modules/widget-catalog/index.ts";
-import type {
-  AgentBackend,
-  AgentBackendId,
-  AgentRunOptions,
-  MessagePart,
-} from "../../agent/index.ts";
+import type { AgentBackend, AgentBackendId, AgentRunOptions } from "../../agent/index.ts";
 import {
   configuredMcpServers,
   sessionMcpServers,
@@ -24,7 +19,7 @@ import { type AcpConnection, type AcpError, NO_TIMEOUT } from "./acp-client.ts";
 import { applySelection, controlsFromSession, shownModel } from "./acp-controls.ts";
 import { isCompactCommand } from "./acp-dialect.ts";
 import { contentText, createAcpEventMapper, stopReasonError } from "./acp-events.ts";
-import { markAcpKeepAlive } from "./acp-keep-alive.ts";
+import { settleAcpAnswer } from "./acp-follow-up.ts";
 import { acpAdvertisedDelete, initializeAcp, startAcp } from "./acp-process.ts";
 import {
   acpCommands,
@@ -33,41 +28,12 @@ import {
   acpLoadSession,
   acpSessions,
 } from "./acp-tools.ts";
-import { basename, resolve } from "node:path";
+import { promptBlocks } from "./acp-prompt.ts";
 import { os } from "@ai-projector/core/modules/os/index.ts";
-import { pathToFileURL } from "node:url";
 
 interface PermissionOption {
   optionId?: string;
   kind?: string;
-}
-
-/**
- * The prompt as ACP blocks: the text, which already names every file as `@path`, plus a link to
- * each file or folder so an agent can open it without guessing what the name refers to.
- */
-function promptBlocks(
-  text: string,
-  parts: MessagePart[] | undefined,
-  cwd: string | undefined,
-  images: { mime: string; data: string }[],
-) {
-  const links = (parts ?? []).flatMap((part) => {
-    if (part.type !== "file") return [];
-    const name = basename(part.path.replace(/\\/g, "/"));
-    return [
-      {
-        type: "resource_link",
-        name: part.range ? `${name}:${part.range.from}-${part.range.to}` : name,
-        uri: pathToFileURL(resolve(cwd ?? "/", part.path)).href,
-      },
-    ];
-  });
-  return [
-    { type: "text", text },
-    ...links,
-    ...images.map((image) => ({ type: "image", mimeType: image.mime, data: image.data })),
-  ];
 }
 
 /** An external agent driven through its ACP server over stdio. */
@@ -111,6 +77,8 @@ async function run(options: AgentRunOptions, id: AgentBackendId): Promise<void> 
     compactCommand,
   });
   let sessionId = "";
+  let followUp: ReturnType<NonNullable<typeof program.prepareFollowUp>> | undefined;
+  let settling = false;
   // `session/load` replays the whole conversation; those updates are history, not this answer.
   let replaying = false;
   let connection: AcpConnection | undefined;
@@ -125,10 +93,10 @@ async function run(options: AgentRunOptions, id: AgentBackendId): Promise<void> 
       onNotification(method, params) {
         if (replaying) return;
         if (method === "session/update") {
-          mapper.handleUpdate(
-            String(params.sessionId ?? ""),
-            (params.update ?? {}) as Record<string, unknown>,
-          );
+          const update = (params.update ?? {}) as Record<string, unknown>;
+          const sourceSession = String(params.sessionId ?? "");
+          if (settling && followUp && !followUp.acceptsUpdates(sourceSession, update)) return;
+          mapper.handleUpdate(sourceSession, update);
           return;
         }
         acpProgram(id).notifications?.[method]?.(options, params);
@@ -208,6 +176,7 @@ async function run(options: AgentRunOptions, id: AgentBackendId): Promise<void> 
           options.history ?? [],
           await featurePrompt(id, options.features, extraPrompt),
         );
+    followUp = program.prepareFollowUp?.(sessionId);
     const result = (await connection.request(
       "session/prompt",
       {
@@ -226,13 +195,16 @@ async function run(options: AgentRunOptions, id: AgentBackendId): Promise<void> 
     if (options.abort?.aborted) return;
     const stopReason = result?.stopReason;
     if (stopReason === "end_turn" || stopReason === "cancelled") {
-      mapper.finish();
-      options.emit("done", { text: mapper.text.trim(), added: [] });
-      if (mapper.pendingBackground)
-        options.emit("status", { phase: "background", provider: program.label, model: "" });
-      await mapper.waitBackground(options.abort);
-      keepProcess = mapper.keepsProcess;
-      if (options.run && keepProcess) await markAcpKeepAlive(options.run.id);
+      // The last child reports as OpenCode wakes the parent: keep the stream and the process.
+      settling = true;
+      // Preserve the process even if observation itself throws.
+      keepProcess = mapper.hadBackground && !!followUp;
+      keepProcess = await settleAcpAnswer({
+        answer: mapper,
+        program,
+        followUp,
+        options,
+      });
     } else options.emit("error", { error: stopReasonError(stopReason) });
   } catch (error) {
     if (!options.abort?.aborted)

@@ -579,6 +579,46 @@ test("opencode background subagent holds the connection until notify", async () 
   });
 });
 
+test("a finished background hold is remembered for the agent's own next step", () => {
+  const mapper = createAcpEventMapper(() => {}, "Hold", createBackgroundHoldDialect());
+  expect(mapper.hadBackground).toBe(false);
+  mapper.handleUpdate("s", {
+    sessionUpdate: "tool_call",
+    toolCallId: "bg",
+    title: "Agent",
+    status: "pending",
+  });
+  expect(mapper.hadBackground).toBe(true);
+  expect(mapper.pendingBackground).toBe(1);
+  mapper.finish();
+  mapper.handleUpdate("s", {
+    sessionUpdate: "tool_call_update",
+    toolCallId: "bg",
+    title: "Agent",
+    status: "completed",
+  });
+  // The hold is gone, but the agent may still answer the report: the run must not forget it.
+  expect(mapper.pendingBackground).toBe(0);
+  expect(mapper.hadBackground).toBe(true);
+});
+
+test("a soft hold keeps the process but does not ask for a follow-up step", () => {
+  const mapper = createAcpEventMapper(
+    () => {},
+    "Kimi",
+    extendPlainDialect({
+      call(update, id) {
+        return update.title === "Agent"
+          ? [{ id, status: "running", background: true, hold: false, tool: id }]
+          : [];
+      },
+    }),
+  );
+  mapper.handleUpdate("s", { sessionUpdate: "tool_call", toolCallId: "soft", title: "Agent" });
+  expect(mapper.pendingBackground).toBe(0);
+  expect(mapper.hadBackground).toBe(false);
+});
+
 test("opencode background command is a task that its call does not end", () => {
   const events = [];
   const mapper = createAcpEventMapper(

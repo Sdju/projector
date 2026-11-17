@@ -1,7 +1,7 @@
 import { acpSessions, createAcpBackend } from "../acp/index.ts";
 import type { AgentBackend } from "../../agent/index.ts";
 import { createOpencodeDialect } from "./dialect.ts";
-import { withOpenCodeBranches } from "./sessions.ts";
+import { prepareOpenCodeFollowUp, withOpenCodeBranches } from "./sessions.ts";
 import { opencodeUsageLog } from "./usage-log.ts";
 
 /**
@@ -20,6 +20,9 @@ export const opencodeProgram = {
   dialect: createOpencodeDialect,
   // ACP v2 compaction updates carry the summary; older builds fall back to `_meta` markers.
   clientCapabilities: { session: { compaction: {} } },
+  // A finished child wakes the parent session: OpenCode writes a synthetic user message and
+  // starts another step on the same connection, which the run keeps reading until it settles.
+  prepareFollowUp: prepareOpenCodeFollowUp,
 };
 
 /**

@@ -9,6 +9,8 @@ export function createBackgroundHold() {
   const pending = new Set<string>();
   /** Soft (`hold: false`) ids: keep the process, do not block connection close. */
   const soft = new Set<string>();
+  /** Whether a hard hold was ever taken: the agent may answer on its own after the last one. */
+  let held = false;
   const waiters: Array<() => void> = [];
   const wake = () => {
     if (pending.size) return;
@@ -36,12 +38,17 @@ export function createBackgroundHold() {
         } else {
           pending.add(patch.id);
           soft.delete(patch.id);
+          held = true;
         }
       }
       wake();
     },
     get size() {
       return pending.size;
+    },
+    /** A hard-held task was tracked at least once in this run. */
+    get held() {
+      return held;
     },
     /** Connection wait, process keep-alive file, or both. */
     get keepsProcess() {
