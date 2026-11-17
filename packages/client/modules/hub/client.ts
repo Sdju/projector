@@ -14,6 +14,8 @@ export async function hubRequest<T>(path: string, init?: RequestInit): Promise<T
 export interface HubPresence {
   devices: HubDevice[];
   activity: Record<string, number>;
+  local?: boolean;
+  relay?: boolean;
   enabled?: boolean;
   online?: boolean;
   url?: string;
@@ -42,6 +44,7 @@ export function normalizeHubPresence(value: unknown): HubPresence {
   return {
     devices: Array.isArray(raw.devices) ? raw.devices.filter(isDevice) : [],
     activity,
+    ...(raw.local === true ? { local: true, relay: raw.relay === true } : {}),
     ...(typeof raw.enabled === "boolean" ? { enabled: raw.enabled } : {}),
     ...(typeof raw.online === "boolean" ? { online: raw.online } : {}),
     ...(typeof raw.url === "string" ? { url: raw.url } : {}),
@@ -52,7 +55,9 @@ export function normalizeHubPresence(value: unknown): HubPresence {
 
 /** Devices of the Hub this page is served by; the device page shares its browser session. */
 export async function fetchHubPresence(): Promise<HubPresence> {
-  return normalizeHubPresence(await hubRequest("/api/hub/devices"));
+  return normalizeHubPresence(
+    await hubRequest("/api/hub/devices", { signal: AbortSignal.timeout(10_000) }),
+  );
 }
 
 export async function fetchHubDevices(): Promise<HubDevice[]> {

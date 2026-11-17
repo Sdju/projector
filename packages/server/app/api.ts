@@ -1,3 +1,4 @@
+import { handleHubRelay } from "../modules/hub/index.ts";
 import { routes as hubRoutes } from "../routes/api/hub.ts";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { HttpError } from "../modules/http/index.ts";
@@ -162,6 +163,7 @@ export async function handleApi(req: IncomingMessage, res: ServerResponse): Prom
   const context = { req, res, url, path: url.pathname, method };
   try {
     if (!localOrigin(context)) return true;
+    if (handleHubRelay(req, res, url.pathname)) return true;
     if (await dispatch(context)) return true;
     if (await handlePluginRoute(context)) return true;
     json(res, 404, { error: "Не найден" });

@@ -1,4 +1,4 @@
-import { bindHub } from "../modules/hub/index.ts";
+import { attachHubRelay, bindHub } from "../modules/hub/index.ts";
 import { findProject, loadProjects } from "../modules/projects/index.ts";
 import { bindWorkspaceEvents } from "../modules/workspace/index.ts";
 import type { RuntimeHandlers } from "./runtime-contract.ts";
@@ -96,6 +96,7 @@ export function bindRuntime(
     project: (...args: Parameters<typeof findProject>) => handlers().findProject(...args),
   };
   const transports = [
+    attachHubRelay(httpServer),
     attachTerminalServer(httpServer, {
       allowed,
       projects: (...args) => handlers().loadProjects(...args),

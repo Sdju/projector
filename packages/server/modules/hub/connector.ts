@@ -10,6 +10,7 @@ import { chunkedStream } from "./stream.ts";
 import { markHubSocket } from "../access/index.ts";
 import { broadcastEvent } from "../events/index.ts";
 import {
+  hubPresence,
   markHubDevicesOffline,
   noteHubActivity,
   resetHubPresence,
@@ -52,7 +53,7 @@ export interface HubHandlers {
 export function connectHub(
   config: HubConnection,
   handlers: HubHandlers,
-  status: (online: boolean, error?: string) => void,
+  status: (online: boolean, error?: string, relay?: boolean) => void,
 ): () => void {
   const ingress = createServer((req, res) => handlers.handle(req, res));
   const detach = handlers.attach(ingress);
@@ -124,7 +125,7 @@ export function connectHub(
         const message = JSON.parse(data.toString());
         if (message.type === "ready" && message.protocol === HUB_PROTOCOL) {
           delay = 1000;
-          status(true);
+          status(true, undefined, message.relay === true);
           // The Hub may have missed changes while the link was down: let other devices read us.
           publish();
           return;
@@ -171,8 +172,10 @@ export function connectHub(
     ws.once("close", () => {
       clearTimeout(heartbeat);
       if (host.projectorHubPublisher === publish) host.projectorHubPublisher = undefined;
-      if (disposed) resetHubPresence();
-      else markHubDevicesOffline();
+      if (!disposed) {
+        markHubDevicesOffline();
+        broadcastEvent("hub-devices", { devices: hubPresence().devices });
+      }
       status(
         false,
         disposed ? undefined : (failure ?? "Соединение с Hub потеряно, повторяем подключение"),
@@ -188,6 +191,8 @@ export function connectHub(
   open();
   return () => {
     disposed = true;
+    resetHubPresence();
+    broadcastEvent("hub-devices", { devices: [] });
     if (host.projectorHubPublisher === publisher) host.projectorHubPublisher = undefined;
     publisher = undefined;
     clearTimeout(retry);

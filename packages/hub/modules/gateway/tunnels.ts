@@ -112,7 +112,7 @@ export class Tunnels {
       ws.on("message", (data) => {
         if (Buffer.isBuffer(data)) this.activity(device, data);
       });
-      ws.send(JSON.stringify({ type: "ready", protocol: HUB_PROTOCOL }));
+      ws.send(JSON.stringify({ type: "ready", protocol: HUB_PROTOCOL, relay: true }));
       this.broadcastDevices();
     });
   }

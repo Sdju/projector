@@ -24,6 +24,9 @@ export function createHub(options: HubOptions) {
     throw new Error("Hub требует разные credentials браузера и устройств");
   const access = new HubAccess(options.origin, options.password, options.dataDir);
   const tunnels = new Tunnels(options.deviceToken);
+  const relayAllowed = (req: import("node:http").IncomingMessage) =>
+    tunnels.accepts(String(req.headers["x-projector-hub-relay"] ?? "")) &&
+    (!req.headers.origin || req.headers.origin === options.origin);
   const server = createServer((req, res) => {
     void (async () => {
       const url = new URL(req.url ?? "/", options.origin);
@@ -86,7 +89,9 @@ export function createHub(options: HubOptions) {
         else res.writeHead(405, { Allow: "GET, HEAD, POST" }).end();
         return;
       }
-      if (!access.allow(req, res)) {
+      const match = route(url.pathname);
+      const relay = !!match && relayAllowed(req);
+      if (!relay && !access.allow(req, res)) {
         if (url.pathname.startsWith("/api/"))
           res
             .writeHead(401, {
@@ -119,7 +124,6 @@ export function createHub(options: HubOptions) {
           .end(JSON.stringify({ token: options.deviceToken }));
         return;
       }
-      const match = route(url.pathname);
       if (match) {
         if (!tunnels.devices.has(match[1])) {
           res
@@ -132,7 +136,7 @@ export function createHub(options: HubOptions) {
           stream.destroy();
           return;
         }
-        if (!access.track(req, res)) {
+        if (!relay && !access.track(req, res)) {
           stream.destroy();
           return;
         }
@@ -176,7 +180,8 @@ export function createHub(options: HubOptions) {
       return;
     }
     const match = route(url.pathname);
-    if (!match || !access.allowed(req) || req.headers.origin !== options.origin) {
+    const relay = relayAllowed(req);
+    if (!match || req.headers.origin !== options.origin || (!relay && !access.allowed(req))) {
       socket.end("HTTP/1.1 403 Forbidden\r\nConnection: close\r\n\r\n");
       return;
     }
@@ -187,7 +192,7 @@ export function createHub(options: HubOptions) {
           stream.destroy();
           return;
         }
-        if (!access.track(req, socket)) {
+        if (!relay && !access.track(req, socket)) {
           stream.destroy();
           return;
         }

@@ -250,8 +250,9 @@ function restored(item: Project) {
   if (route.path === canonical) reload.value++;
   else void router.replace(canonical);
 }
+// Query-only navigation opens a workspace tab without resolving the project again.
 watch(
-  () => [projectPathFromParams(route.params.projectPath), reload.value] as const,
+  [() => projectPathFromParams(route.params.projectPath), reload],
   async ([path], _, onCleanup) => {
     let active = true;
     let dispose: (() => void) | undefined;

@@ -31,7 +31,7 @@ const { items, hub, error, loading, refresh, href, markRead, isAttention, isUnre
   useAgentInbox();
 const current = computed(() => deviceBase().split("/")[2] ?? "");
 const self = computed(() => current.value || hub.value.deviceId || "");
-const isHubPage = computed(() => !!current.value);
+const isHubPage = computed(() => !!current.value && !hub.value.local);
 const hubUrl = computed(() => hub.value.url ?? "");
 const userRefreshing = ref(false);
 const permission = ref(
@@ -45,7 +45,7 @@ const commands = useCommandScope(`hub-panel:${deviceBase() || "local"}`, () => (
 
 const devices = computed(() => sortHubDevices(hub.value.devices, self.value));
 const online = computed(() => devices.value.filter((device) => device.online).length);
-const setupNeeded = computed(() => !isHubPage.value && hub.value.enabled !== true);
+const setupNeeded = computed(() => !current.value && hub.value.enabled !== true);
 const summary = computed(() => {
   if (isHubPage.value) {
     const noun = online.value === 1 ? "устройство" : online.value < 5 ? "устройства" : "устройств";
@@ -67,7 +67,7 @@ const updated = computed(() =>
 
 const isSelf = (device: HubDevice) => device.id === self.value;
 const deviceItems = (device: HubDevice) =>
-  hubDeviceItems(items.value, device, self.value, isHubPage.value);
+  hubDeviceItems(items.value, device, self.value, !!current.value);
 const activeItems = (device: HubDevice) =>
   deviceItems(device)
     .filter((item) => item.category === "working" || isAttention(item) || isUnread(item))
@@ -111,20 +111,20 @@ function deviceFrom(value: unknown): HubDevice {
   if (!device) throw new Error("Устройство Hub не найдено");
   return device;
 }
-/** A Hub page switches the page context; a local page can only offer the Hub origin. */
-function openDevice(device: HubDevice): void {
-  if (!device.online) throw new Error("Устройство не в сети");
-  if (isHubPage.value) {
-    location.assign(`/devices/${device.id}/`);
-    return;
-  }
-  if (!hubUrl.value) throw new Error("Hub не подключён");
-  window.open(
-    new URL(`/devices/${device.id}/`, hubUrl.value).href,
-    "_blank",
-    "noopener,noreferrer",
-  );
+function deviceHref(device: HubDevice): string | undefined {
+  if (isSelf(device) || !device.online) return undefined;
+  if (hub.value.local && current.value && device.id === hub.value.deviceId) return "/";
+  const path = `/devices/${device.id}/`;
+  if (current.value || hub.value.relay) return path;
+  return hubUrl.value ? new URL(path, hubUrl.value).href : undefined;
 }
+
+function followDevice(event: MouseEvent, device: HubDevice): void {
+  if (!deviceHref(device) || modifiedClick(event)) return;
+  event.preventDefault();
+  void commands.run("ide.hub.device.open", { deviceId: device.id });
+}
+
 function openHub(): void {
   if (isHubPage.value) {
     location.assign("/");
@@ -133,25 +133,34 @@ function openHub(): void {
   if (!hubUrl.value) throw new Error("Hub не подключён");
   window.open(hubUrl.value, "_blank", "noopener,noreferrer");
 }
-function toggleNotifications(device: HubDevice): void {
-  setHubNotifyEnabled(device.id, !hubNotifyEnabled(device.id));
-}
 async function allowNotifications(): Promise<void> {
   await requestNotifications();
   permission.value = typeof Notification === "undefined" ? "unsupported" : Notification.permission;
 }
-function openItem(item: (typeof items.value)[number]): void {
-  const link = href(item);
-  if (!link) return;
-  markRead(item);
-  const same = !item.sourceId || item.sourceId === current.value;
-  if (same) {
-    const base = deviceBase();
-    return void router.push(base && link.startsWith(base) ? link.slice(base.length) || "/" : link);
-  }
-  location.assign(link);
+function modifiedClick(event: MouseEvent): boolean {
+  return event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey;
 }
 
+function followItem(event: MouseEvent, item: (typeof items.value)[number]): void {
+  if (!href(item) || modifiedClick(event)) return;
+  event.preventDefault();
+  void commands.run("ide.hub.item.open", { key: item.key });
+}
+
+commands.scope.registerCommand({
+  id: "ide.hub.item.open",
+  title: "Открыть работу Hub",
+  description: "Открывает беседу или задание из панели Hub по ключу работы.",
+  arguments: { key: "string: ключ работы" },
+  run: (value) => {
+    const item = items.value.find((entry) => entry.key === commandArgs(value).key);
+    const link = item && href(item);
+    if (!item || !link) throw new Error("Работа Hub недоступна");
+    markRead(item);
+    if (item.sourceId === current.value) return router.push(link.slice(deviceBase().length));
+    location.assign(link);
+  },
+});
 commands.scope.registerCommand({
   id: "ide.hub.devices.refresh",
   title: "Обновить устройства Hub",
@@ -162,14 +171,16 @@ commands.scope.registerCommand({
 commands.scope.registerCommand({
   id: "ide.hub.device.open",
   title: "Открыть устройство Hub",
-  description:
-    "Открывает проектное пространство другой машины. На странице Hub контекст меняется в этой вкладке, локальная страница открывает Hub отдельно.",
+  description: "Открывает список проектов выбранного устройства.",
   arguments: { deviceId: "string: id подключённого устройства" },
   enabled: () => devices.value.some((device) => device.online && !isSelf(device)),
   run: (value) => {
     const device = deviceFrom(value);
     if (isSelf(device)) throw new Error("Это устройство уже открыто");
-    openDevice(device);
+    const link = deviceHref(device);
+    if (!link) throw new Error("Устройство недоступно");
+    if (link.startsWith("/")) location.assign(link);
+    else window.open(link, "_blank", "noopener,noreferrer");
   },
 });
 commands.scope.registerCommand({
@@ -244,10 +255,10 @@ commands.scope.registerCommand({
         class="device"
         :class="{ offline: !device.online, self: isSelf(device) }"
       >
-        <button
-          type="button"
+        <component
+          :is="deviceHref(device) ? 'a' : 'div'"
           class="main"
-          :disabled="isSelf(device) || !device.online"
+          :href="deviceHref(device)"
           :title="
             isSelf(device)
               ? 'Это устройство уже открыто'
@@ -256,7 +267,7 @@ commands.scope.registerCommand({
                 : 'Устройство не в сети'
           "
           data-command="ide.hub.device.open"
-          @click="openDevice(device)"
+          @click="followDevice($event, device)"
         >
           <span class="device-icon" aria-hidden="true"><IconMonitor /></span>
           <span class="device-text">
@@ -274,8 +285,8 @@ commands.scope.registerCommand({
               </template>
             </span>
           </span>
-        </button>
-        <div v-if="isHubPage && !isSelf(device)" class="actions">
+        </component>
+        <div v-if="(current || hub.relay) && !isSelf(device)" class="actions">
           <UiButton
             shape="icon"
             size="sm"
@@ -289,7 +300,13 @@ commands.scope.registerCommand({
                 ? `Выключить уведомления с ${device.name}`
                 : `Включить уведомления с ${device.name}`
             "
-            @click="toggleNotifications(device)"
+            data-command="ide.hub.device.notify"
+            @click="
+              commands.run('ide.hub.device.notify', {
+                deviceId: device.id,
+                enabled: !hubNotifyEnabled(device.id),
+              })
+            "
           >
             <IconBell v-if="hubNotifyEnabled(device.id)" aria-hidden="true" />
             <IconBellOff v-else aria-hidden="true" />
@@ -298,21 +315,26 @@ commands.scope.registerCommand({
 
         <ul v-if="activeItems(device).length" class="work" :aria-label="`Работы ${device.name}`">
           <li v-for="item in activeItems(device)" :key="item.key">
-            <button
-              type="button"
+            <component
+              :is="href(item) ? 'a' : 'div'"
               class="work-item"
+              :href="href(item)"
+              data-command="ide.hub.item.open"
               :title="`${item.projectName} · ${item.topic}`"
-              @click="openItem(item)"
+              @click="followItem($event, item)"
             >
               <span class="work-head">
                 <UiStatusDot :size="6" :tone="itemTone(item)" />
                 <span class="work-topic">{{ item.topic }}</span>
               </span>
               <span class="work-meta">{{ item.projectName }} · {{ itemState(item) }}</span>
-            </button>
+            </component>
           </li>
         </ul>
-        <p v-else-if="!isSelf(device) && device.online && !isHubPage" class="remote-hint">
+        <p
+          v-else-if="!isSelf(device) && device.online && !current && !hub.relay"
+          class="remote-hint"
+        >
           Работы и переход в проект — в Hub.
         </p>
       </article>
@@ -418,7 +440,7 @@ commands.scope.registerCommand({
   color: var(--text-2);
   font: inherit;
   text-align: left;
-  cursor: pointer;
+  text-decoration: none;
 }
 .main {
   flex-direction: row;
@@ -426,12 +448,9 @@ commands.scope.registerCommand({
   gap: var(--sp-2);
   padding: var(--sp-2) var(--sp-3);
 }
-.main:hover:not(:disabled),
-.work-item:hover {
+a.main:hover,
+a.work-item:hover {
   background: var(--hover);
-}
-.main:disabled {
-  cursor: default;
 }
 .device-icon {
   display: grid;

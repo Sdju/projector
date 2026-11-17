@@ -2,13 +2,22 @@ import { afterEach, describe, expect, test, vi } from "vite-plus/test";
 import { mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { createServer } from "node:http";
 import { once } from "node:events";
 import { WebSocketServer, WebSocket } from "ws";
 import { hubReturnPath } from "../../core/modules/hub/index.ts";
 import { HubAccess } from "../modules/access/index.ts";
 import { createHub } from "../modules/gateway/index.ts";
 import { connectHub } from "../../server/modules/hub/connector.ts";
-import { hubPresence, publishHubActivity } from "../../server/modules/hub/index.ts";
+import {
+  attachHubRelay,
+  bindHub,
+  configureHub,
+  handleHubRelay,
+  hubPresence,
+  hubStatus,
+  publishHubActivity,
+} from "../../server/modules/hub/index.ts";
 import { resetHubPresence } from "../../server/modules/hub/presence.ts";
 import { attachSse } from "../../server/modules/events/index.ts";
 import { accessAllowed, isLocalRequest } from "../../server/modules/access/index.ts";
@@ -241,6 +250,60 @@ describe("Hub reverse connection", () => {
     ws.close();
     await once(ws, "close");
   });
+  test("relays HTTP, events and terminal sockets from the local Projector origin", async () => {
+    const { origin } = await setup();
+    configureHub({ url: origin, deviceId: "laptop", token: "device-secret" });
+    const stop = bindHub({ handle: (_req, res) => res.end(), attach: () => () => {} });
+    cleanups.push(() => {
+      stop();
+      configureHub(null);
+    });
+    await until(() => hubStatus().relay);
+    const local = createServer((req, res) => {
+      if (!handleHubRelay(req, res, new URL(req.url, "http://localhost").pathname))
+        res.writeHead(404).end();
+    });
+    const detach = attachHubRelay(local);
+    cleanups.push(() => {
+      detach();
+      local.closeAllConnections();
+      local.close();
+    });
+    await new Promise((resolve) => local.listen(0, "127.0.0.1", resolve));
+    const localOrigin = `http://127.0.0.1:${local.address().port}`;
+    const api = `${localOrigin}/api/devices/desk`;
+    const projects = await fetch(`${api}/projects?path=a%2Fb`, {
+      headers: { Cookie: "local-session=private", Authorization: "Bearer local-password" },
+    });
+    expect(await projects.json()).toMatchObject({
+      path: "/api/projects?path=a%2Fb",
+      local: false,
+      cookie: null,
+    });
+    expect(
+      (await fetch(`${api}/projects`, { headers: { Origin: "https://other.example" } })).status,
+    ).toBe(403);
+    expect((await fetch(`${api}/upload`, { method: "POST", body: "hello" })).status).toBe(403);
+    const upload = await fetch(`${api}/upload`, {
+      method: "POST",
+      headers: { Origin: localOrigin },
+      body: "hello",
+    });
+    expect(await upload.text()).toBe("5");
+    const events = await fetch(`${api}/events`);
+    expect(await events.text()).toContain("data: second");
+    const ws = new WebSocket(`${api.replace("http", "ws")}/terminal/socket`, {
+      headers: { Origin: localOrigin },
+    });
+    cleanups.push(() => ws.terminate());
+    await once(ws, "open");
+    const message = once(ws, "message");
+    ws.send("terminal");
+    expect((await message)[0].toString()).toBe("terminal");
+    ws.close();
+    await once(ws, "close");
+  });
+
   test("rejects wrong connector credentials and reports disconnect", async () => {
     const { origin, cookie, stop } = await setup();
     const ws = new WebSocket(

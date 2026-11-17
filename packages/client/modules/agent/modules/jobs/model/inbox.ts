@@ -6,8 +6,6 @@ import {
   fetchRunsFeed,
   notifyInbox,
   type AgentJobView,
-  type LiveAgentRun,
-  type RecentAgentRun,
 } from "../../../../agent-core/index.ts";
 import { fetchHubPresence, hubNoticeAllowed, type HubPresence } from "../../../../hub/index.ts";
 import {
@@ -50,7 +48,10 @@ const PROJECT_TTL_MS = 30_000;
 const SOURCES_TTL_MS = 30_000;
 
 async function json<T>(base: string | undefined, path: string): Promise<T> {
-  const response = await fetch(deviceApiUrl(base, path), { cache: "no-store" });
+  const response = await fetch(deviceApiUrl(base, path), {
+    cache: "no-store",
+    signal: AbortSignal.timeout(10_000),
+  });
   const data = (await response.json().catch(() => ({}))) as T & { error?: string };
   if (!response.ok) throw new Error(data.error || `Запрос не удался (${response.status})`);
   return data;
@@ -87,12 +88,10 @@ const inboxRelevant = (job: AgentJobView) =>
 
 async function loadSource(source: InboxSource, fresh: boolean): Promise<InboxItem[]> {
   const base = source.base || undefined;
+  const signal = AbortSignal.timeout(10_000);
   const [jobs, runsFeed, projects] = await Promise.all([
-    fetchJobs(undefined, base),
-    fetchRunsFeed(base).catch(() => ({
-      runs: [] as LiveAgentRun[],
-      recent: [] as RecentAgentRun[],
-    })),
+    fetchJobs(undefined, base, signal),
+    fetchRunsFeed(base, signal),
     projectsOf(source, fresh),
   ]);
   return [
@@ -111,28 +110,26 @@ function localItems(source: InboxSource, projects: readonly InboxProject[]): Inb
 
 const hub = ref<HubPresence>({ devices: [], activity: {} });
 
-/**
- * Reads the device list without failing the work centre. A local page is not served by the Hub,
- * so it keeps the local source; its device list still answers which machines are reachable.
- */
-async function readHubPresence(): Promise<HubPresence | undefined> {
-  try {
-    const presence = await fetchHubPresence();
-    hub.value = presence;
-    return presence;
-  } catch {
-    // Without a Hub a local Projector has only its own work.
-    return undefined;
-  }
+function sourcesFor(presence: HubPresence): InboxSource[] {
+  const current = currentDeviceId();
+  if (current) return inboxSourcesFromDevices(presence.devices, current);
+  const local = { id: "", name: "Это устройство", base: "", current: true };
+  const remote = presence.relay
+    ? inboxSourcesFromDevices(
+        presence.devices.filter((device) => device.id !== presence.deviceId),
+        "",
+      )
+    : [];
+  return [local, ...remote];
 }
 
 export async function fetchInboxSources(): Promise<InboxSource[]> {
-  const current = currentDeviceId();
-  const presence = await readHubPresence();
-  if (!current) return [{ id: "", name: "Это устройство", base: "", current: true }];
-  return presence
-    ? inboxSourcesFromDevices(presence.devices, current)
-    : [{ id: current, name: "Это устройство", base: "", current: true }];
+  try {
+    hub.value = await fetchHubPresence();
+  } catch {
+    // A failed snapshot is transient; leave the last known sources available for retries.
+  }
+  return sourcesFor(hub.value);
 }
 
 const items = ref<InboxItem[]>([]);
@@ -151,7 +148,15 @@ let rerunAll = false;
 let sourcesAt = 0;
 let subscribers = 0;
 let disposed = false;
-const refreshingSources = new Set<string>();
+const pendingSources = new Set<string>();
+const failedSources = new Map<string, string>();
+
+function drainSources(): void {
+  if (disposed || refreshing || loading.value || !pendingSources.size) return;
+  const ids = new Set(pendingSources);
+  pendingSources.clear();
+  void refresh(false, false, ids);
+}
 
 async function sourcesOf(fresh: boolean): Promise<InboxSource[]> {
   if (!fresh && sourcesAt && Date.now() - sourcesAt < SOURCES_TTL_MS) return sources.value;
@@ -180,36 +185,43 @@ function publishItems(list: readonly InboxSource[]): void {
   for (const notice of notices) notifyInbox(notice.key, notice.title, notice.body, notice.href);
 }
 
-async function refresh(fresh = false, localOnly = false): Promise<void> {
+async function refresh(fresh = false, localOnly = false, ids?: ReadonlySet<string>): Promise<void> {
   if (refreshing) {
-    if (localOnly) rerun = true;
+    if (fresh) rerunAll = true;
+    else if (localOnly) rerun = true;
     return refreshing;
   }
   refreshing = (async () => {
     try {
       const list = await sourcesOf(fresh);
       if (disposed) return;
+      const selected = list.filter((source) =>
+        source.current ? !ids : !localOnly && (!ids || ids.has(source.id)),
+      );
       const results = await Promise.allSettled(
-        list.map((source) => {
+        selected.map((source) => {
           // This page's own server pushes changes: its list comes from the shared feed.
           if (source.current)
             return projectsOf(source, fresh).then((projects) => localItems(source, projects));
-          // A change pushed by this server must not read every Hub device again.
-          if (localOnly) return Promise.resolve(cache.get(source.id) ?? []);
           return loadSource(source, fresh);
         }),
       );
       if (disposed) return;
-      const failed: string[] = [];
       results.forEach((result, index) => {
-        const source = list[index]!;
-        if (result.status === "fulfilled") cache.set(source.id, result.value);
-        else failed.push(source.name);
+        const source = selected[index]!;
+        if (!sources.value.some((current) => current.id === source.id)) return;
+        if (result.status === "fulfilled") {
+          cache.set(source.id, result.value);
+          failedSources.delete(source.id);
+        } else {
+          failedSources.set(source.id, source.name);
+        }
       });
+      const failed = sources.value.flatMap(({ id }) => failedSources.get(id) ?? []);
       error.value = failed.length
         ? `Нет ответа: ${failed.join(", ")}. Показано последнее известное состояние.`
         : "";
-      publishItems(list);
+      publishItems(sources.value);
     } catch (cause) {
       if (!disposed)
         error.value = cause instanceof Error ? cause.message : "Не удалось прочитать работы";
@@ -218,32 +230,14 @@ async function refresh(fresh = false, localOnly = false): Promise<void> {
       refreshing = undefined;
       if (!disposed && rerunAll) {
         rerunAll = false;
-        void refresh(false);
+        void refresh(true);
       } else if (!disposed && rerun) {
         rerun = false;
         void refresh(false, true);
-      }
+      } else drainSources();
     }
   })();
   return refreshing;
-}
-
-/** A Hub event names one device: read only that source, not every other device. */
-async function refreshSource(id: string): Promise<void> {
-  if (disposed || loading.value) return;
-  const source = sources.value.find((item) => item.id === id && !item.current);
-  if (!source || refreshingSources.has(id)) return;
-  refreshingSources.add(id);
-  try {
-    const items = await loadSource(source, false);
-    if (disposed) return;
-    cache.set(id, items);
-    publishItems(sources.value);
-  } catch {
-    // The timer keeps the last known state; the device may be restarting.
-  } finally {
-    refreshingSources.delete(id);
-  }
 }
 
 /** The Hub pushes its device list; pages behind it update sources without polling. */
@@ -261,19 +255,18 @@ function applyHubDevices(event: Event): void {
     );
   });
   hub.value = { ...hub.value, devices: list };
-  const current = currentDeviceId();
-  // A local Projector sees the Hub devices but still reads only its own work.
-  if (!current) return;
-  sources.value = inboxSourcesFromDevices(list, current);
+  sources.value = sourcesFor(hub.value);
   sourcesAt = Date.now();
-  for (const id of Array.from(cache.keys()))
-    if (!sources.value.some((source) => source.id === id)) cache.delete(id);
-  if (refreshing || loading.value) {
-    rerunAll = true;
-    return;
+  for (const id of Array.from(cache.keys())) {
+    if (sources.value.some((source) => source.id === id)) continue;
+    cache.delete(id);
+    failedSources.delete(id);
   }
   publishItems(sources.value);
-  void refresh(false);
+  // Re-read presence too: a device event can follow a connector reconnect or Hub switch.
+  if (!currentDeviceId() || hub.value.local) void refresh(true);
+  else if (refreshing || loading.value) rerunAll = true;
+  else void refresh();
 }
 
 function start() {
@@ -297,7 +290,8 @@ function start() {
       ...hub.value,
       activity: { ...hub.value.activity, [deviceId]: at },
     };
-    void refreshSource(deviceId);
+    pendingSources.add(deviceId);
+    drainSources();
   };
   if (typeof window !== "undefined") {
     window.addEventListener("projector:hub-devices", onHubDevices);
@@ -317,7 +311,8 @@ function start() {
     sourcesAt = 0;
     rerun = false;
     rerunAll = false;
-    refreshingSources.clear();
+    pendingSources.clear();
+    failedSources.clear();
   };
 }
 

@@ -88,9 +88,15 @@ const post = (url: string, body: unknown = {}, failure?: string) =>
 export const deviceApiUrl = (base: string | undefined, path: string) =>
   base ? `${base}${path.slice(4)}` : deviceUrl(path);
 
-export async function fetchJobs(projectId?: string, base?: string): Promise<AgentJobView[]> {
+export async function fetchJobs(
+  projectId?: string,
+  base?: string,
+  signal?: AbortSignal,
+): Promise<AgentJobView[]> {
   const query = projectId ? `?projectId=${encodeURIComponent(projectId)}` : "";
-  return (await call<{ jobs: AgentJobView[] }>(deviceApiUrl(base, `/api/agent/jobs${query}`))).jobs;
+  return (
+    await call<{ jobs: AgentJobView[] }>(deviceApiUrl(base, `/api/agent/jobs${query}`), { signal })
+  ).jobs;
 }
 
 /** One job with its journal; with `wait` the server holds the answer until `rev` changes. */

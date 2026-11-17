@@ -54,9 +54,10 @@ export interface RecentAgentRun {
 
 export async function fetchRunsFeed(
   base?: string,
+  signal?: AbortSignal,
 ): Promise<{ runs: LiveAgentRun[]; recent: RecentAgentRun[] }> {
   const path = base ? `${base}/agent/runs` : deviceUrl("/api/agent/runs");
-  const response = await fetch(path, { cache: "no-store" });
+  const response = await fetch(path, { cache: "no-store", signal });
   if (!response.ok) throw new Error("Не удалось получить работающие процессы агентов");
   const data = (await response.json()) as { runs?: LiveAgentRun[]; recent?: RecentAgentRun[] };
   return { runs: data.runs ?? [], recent: data.recent ?? [] };

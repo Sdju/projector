@@ -18,9 +18,18 @@ export const routes: RouteDefinition[] = [
       // Read-only: a same-origin GET carries no Origin, so only a foreign one is rejected.
       if (!accessAllowed(req, false))
         throw new HttpError(403, "Доступно только со страницы Projector");
-      const { enabled, online, url, deviceId, error } = hubStatus();
+      const { enabled, online, url, deviceId, error, relay } = hubStatus();
       res.setHeader("Cache-Control", "no-store");
-      json(res, 200, { enabled, online, url, deviceId, error, ...hubPresence() });
+      json(res, 200, {
+        enabled,
+        online,
+        url,
+        deviceId,
+        error,
+        local: true,
+        relay: isLocalRequest(req) && relay,
+        ...hubPresence(),
+      });
     },
   },
   {

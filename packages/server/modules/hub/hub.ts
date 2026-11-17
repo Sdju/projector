@@ -1,3 +1,4 @@
+import { setMaxListeners } from "node:events";
 import { chmodSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { dataDir } from "@ai-projector/core/modules/app-paths/index.ts";
@@ -10,6 +11,8 @@ interface State {
   config?: HubConnection;
   connections?: HubConnection[];
   online: boolean;
+  relay?: boolean;
+  relayLifetime?: AbortController;
   error?: string;
   apply?: (config?: HubConnection) => void;
 }
@@ -22,11 +25,18 @@ export function hubStatus() {
   return {
     enabled: !!state.config,
     online: state.online,
+    relay: !!hubRelayConnection(),
     url: state.config?.url,
     deviceId: state.config?.deviceId,
     error: state.error,
     connections: state.connections!.map(({ url, deviceId }) => ({ url, deviceId })),
   };
+}
+
+export function hubRelayConnection(): { config: HubConnection; signal: AbortSignal } | undefined {
+  if (!state.relay || !state.config || !state.relayLifetime) return undefined;
+  const signal = state.relayLifetime.signal;
+  if (!signal.aborted) return { config: state.config, signal };
 }
 
 const LOGIN_CODE = /^[a-f0-9]{64}$/;
@@ -157,16 +167,22 @@ export function configureHub(value: unknown): void {
 export function bindHub(handlers: HubHandlers): () => void {
   let stop: (() => void) | undefined;
   let epoch = 0;
+  let lifetime: AbortController | undefined;
   const apply = (config?: HubConnection) => {
     const current = ++epoch;
     stop?.();
     stop = undefined;
     state.online = false;
+    state.relay = false;
+    lifetime?.abort();
+    state.relayLifetime = lifetime = config ? new AbortController() : undefined;
+    if (lifetime) setMaxListeners(0, lifetime.signal);
     state.error = undefined;
     if (config)
-      stop = connectHub(config, handlers, (online, error) => {
+      stop = connectHub(config, handlers, (online, error, relay) => {
         if (epoch === current) {
           state.online = online;
+          if (relay !== undefined) state.relay = relay;
           state.error = error;
         }
       });
@@ -195,6 +211,7 @@ export function bindHub(handlers: HubHandlers): () => void {
   }
   apply(state.config);
   return () => {
+    lifetime?.abort();
     stop?.();
     if (state.apply === apply) state.apply = undefined;
   };
