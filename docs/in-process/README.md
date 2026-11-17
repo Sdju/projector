@@ -33,3 +33,5 @@
 - [opencode-background-subagents.md](opencode-background-subagents.md) — фоновый `subagent` OpenCode не виден как живая задача, поэтому Lens не читает его рассуждения.
 - [opencode-followup-handoff.md](opencode-followup-handoff.md) — передача по обрыву хода после отчёта фонового сабагента: evidence из баз, гонка на снятии последнего удержания, фикс и открытые риски.
 - [qwencloud-media-integration.md](qwencloud-media-integration.md) — медиа-API и баланс QwenCloud: проверенные эндпоинты, адаптеры, временный ключ и открытые решения по интеграции.
+- [t3code.md](t3code.md) — разбор `pingdotgg/t3code`: какие фичи и механики забрать, что не брать, оценки и открытые вопросы.
+- [agent-errors.md](agent-errors.md) — реализация обработки ошибок агентов: контракт, классификация, квота и продолжение.
