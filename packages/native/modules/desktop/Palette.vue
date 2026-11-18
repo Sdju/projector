@@ -37,6 +37,7 @@ import {
   type LaunchAction,
   type LaunchItem,
 } from "@ai-projector/core/modules/launcher/index.ts";
+import ProjectIcon from "./ProjectIcon.vue";
 
 const props = defineProps<{ baseUrl: string; applicationIcon: (id: string) => object | null }>();
 GLib.setPrgname("projector-launcher");
@@ -60,6 +61,7 @@ const focus = computed(() => state.value.focus);
 const detailActions = computed(() => state.value.detail?.actions ?? []);
 const failure = computed(() => state.value.detail?.failure);
 const detailIndex = ref(0);
+const iconRevision = ref(0);
 const scope = computed(() => parseLaunchQuery(state.value.query).scope);
 const scopeTitle = computed(() => (scope.value === "all" ? "" : launchScopeTitles[scope.value]));
 const infoText = computed(() => {
@@ -154,6 +156,7 @@ function rowHint(item: LaunchItem) {
 async function show() {
   clearTimeout(blurTimer);
   suppressBlurUntil = Date.now() + 2000;
+  iconRevision.value++;
   model.live(true);
   model.setQuery("");
   await nextTick();
@@ -437,6 +440,11 @@ defineExpose({ show, hide, toggle, invokeSelected, openPage, quitProjector, rest
               >
               <VBox :spacing="12">
                 <VImage v-if="appIcon(item)" :gicon="appIcon(item)" :pixel-size="32" />
+                <ProjectIcon
+                  v-else-if="item.kind === 'project' && item.icon"
+                  :key="iconRevision"
+                  :url="props.baseUrl + item.icon"
+                />
                 <VImage
                   v-else
                   :icon-name="

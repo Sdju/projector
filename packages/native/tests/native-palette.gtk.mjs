@@ -14,14 +14,23 @@ function descendants(node) {
   return [node, ...node.children.flatMap(descendants)];
 }
 
-await test("Projector palette uses the published renderer for native entry, search rows and cleanup", async () => {
+await test("Projector palette renders native search rows, project icons and folder fallback", async () => {
   const windows = Gtk.Window.getToplevels();
   const before = windows.getNItems();
   const fetch = globalThis.fetch;
   const queries = [];
+  const requestedIcons = [];
   globalThis.fetch = async (input) => {
     const url = new URL(input);
     assert.equal(url.origin, "http://palette.test");
+    if (url.pathname.endsWith("/icon")) {
+      requestedIcons.push(url.pathname);
+      if (url.pathname === "/api/projects/broken/icon") return new Response("Invalid image");
+      return new Response(
+        '<svg xmlns="http://www.w3.org/2000/svg" width="120" height="60"><rect width="120" height="60" fill="red"/></svg>',
+        { headers: { "Content-Type": "image/svg+xml" } },
+      );
+    }
     assert.equal(url.pathname, "/api/launcher/search");
     queries.push(url.searchParams.get("q"));
     return Response.json({
@@ -33,6 +42,16 @@ await test("Projector palette uses the published renderer for native entry, sear
           description: "",
           keywords: "",
           actions: [],
+          icon: "/api/projects/test/icon",
+        },
+        {
+          id: "project:broken",
+          kind: "project",
+          name: "Project with a broken icon",
+          description: "",
+          keywords: "",
+          actions: [],
+          icon: "/api/projects/broken/icon",
         },
       ],
     });
@@ -49,8 +68,11 @@ await test("Projector palette uses the published renderer for native entry, sear
     assert.equal(window.getTitle(), "Projector — поиск");
     assert.equal(windows.getNItems(), before + 1);
     entry.setText("external vio");
+    const context = GLib.MainContext.default();
+    const findPicture = () => descendants(app.root).find((node) => node.type === "picture")?.widget;
     const deadline = Date.now() + 3000;
-    while (!list.getRowAtIndex(0) && Date.now() < deadline) {
+    while (!findPicture() && Date.now() < deadline) {
+      for (let step = 0; step < 64 && context.iteration(false); step++);
       await new Promise((resolve) => setTimeout(resolve, 20));
       await nextTick();
     }
@@ -58,6 +80,16 @@ await test("Projector palette uses the published renderer for native entry, sear
     assert.ok(list.getRowAtIndex(0), "search results become real GTK rows");
     const labels = descendants(app.root).filter((node) => node.type === "label" && node.widget);
     assert.ok(labels.some((node) => node.widget.getLabel() === "External vio project"));
+    assert.deepEqual(requestedIcons.sort(), [
+      "/api/projects/broken/icon",
+      "/api/projects/test/icon",
+    ]);
+    const texture = findPicture()?.getPaintable();
+    assert.ok(texture, "the project SVG becomes a GTK texture");
+    assert.equal(texture.getIntrinsicWidth(), 32);
+    assert.equal(texture.getIntrinsicHeight(), 16);
+    const fallback = descendants(app.root).find((node) => node.type === "image")?.widget;
+    assert.equal(fallback?.getIconName(), "folder");
     assert.equal(controller.hide(), true);
     assert.equal(window.getVisible(), false);
     assert.deepEqual(errors, []);
