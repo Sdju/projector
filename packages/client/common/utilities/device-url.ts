@@ -23,3 +23,13 @@ export function deviceUrl(value: string | URL): string {
   }
   return raw;
 }
+
+/** A deep link the current router can open without changing the page's device. */
+export function deviceRoute(href: string): string | undefined {
+  if (!href.startsWith("/") || href.startsWith("//") || href.includes("\\")) return undefined;
+  const base = deviceBase();
+  if (deviceBase(href.split(/[?#]/, 1)[0]) !== base) return undefined;
+  if (!base) return href;
+  const route = href.slice(base.length);
+  return route.startsWith("/") ? route : `/${route}`;
+}

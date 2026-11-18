@@ -55,7 +55,7 @@ function noticeHref(notice: TrustNotice): string {
     const section = notice.section ? `?settings=${encodeURIComponent(notice.section)}` : "";
     return `${deviceBase()}${projectRoute(notice.projectPath)}${section}`;
   }
-  return `${deviceBase()}${notice.href ?? ""}`;
+  return `${deviceBase()}${notice.href ?? "/settings?section=plugins"}`;
 }
 
 /** A file can change outside the watched project tree; the slow poll catches that case. */
@@ -92,6 +92,7 @@ async function load(): Promise<void> {
   try {
     const response = await fetch(deviceApiUrl(undefined, "/api/trust-notices"), {
       cache: "no-store",
+      signal: AbortSignal.timeout(10_000),
     });
     if (!response.ok) return;
     const data = (await response.json()) as { notices?: TrustNotice[] };

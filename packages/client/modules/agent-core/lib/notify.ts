@@ -8,6 +8,12 @@ function hidden(): boolean {
   return typeof document !== "undefined" && document.visibilityState === "hidden";
 }
 
+let navigateInbox = (href: string): void => location.assign(href);
+
+export function setInboxNotificationNavigator(navigate: (href: string) => void): void {
+  navigateInbox = navigate;
+}
+
 function show(title: string, body: string, tag: string, href?: string) {
   if (typeof Notification === "undefined" || Notification.permission !== "granted" || !hidden())
     return;
@@ -16,7 +22,8 @@ function show(title: string, body: string, tag: string, href?: string) {
     if (href)
       notification.onclick = () => {
         window.focus();
-        location.assign(href);
+        notification.close();
+        navigateInbox(href);
       };
   } catch {
     // Some browsers only allow notifications from a service worker.

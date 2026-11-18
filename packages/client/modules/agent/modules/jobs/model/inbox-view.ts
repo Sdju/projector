@@ -97,14 +97,15 @@ export function inboxSourcesFromDevices(
   current: string,
 ): InboxSource[] {
   const online = devices.filter((device) => device.online);
-  if (!online.length)
-    return current ? [{ id: current, name: "Это устройство", base: "", current: true }] : [];
-  return online.map((device) => ({
+  const sources = online.map((device) => ({
     id: device.id,
     name: device.name,
     base: `/api/devices/${device.id}`,
     current: device.id === current,
   }));
+  if (current && !sources.some((source) => source.current))
+    sources.unshift({ id: current, name: "Это устройство", base: "", current: true });
+  return sources;
 }
 
 export function jobCategory(job: AgentJobView): InboxCategory {

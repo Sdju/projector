@@ -101,6 +101,7 @@ test("a local page reads remote work through its own origin when the Hub support
   vi.stubGlobal("document", document);
   vi.stubGlobal("location", new URL("http://localhost:4177/settings"));
   const urls = [];
+  let localJobs = [];
   vi.stubGlobal(
     "fetch",
     vi.fn(async (url) => {
@@ -122,7 +123,7 @@ test("a local page reads remote work through its own origin when the Hub support
           return { projects: [{ id: "p1", name: "Work", path: "/w" }] };
         if (path.includes("/devices/laptop/agent/jobs")) return { jobs: [job()] };
         if (path.includes("/agent/runs")) return { runs: [], recent: [] };
-        return { jobs: [] };
+        return { jobs: localJobs };
       })();
       return { ok: true, json: async () => body };
     }),
@@ -131,7 +132,9 @@ test("a local page reads remote work through its own origin when the Hub support
   const scope = effectScope();
   const inbox = scope.run(() => useAgentInbox());
   await vi.waitFor(() => expect(inbox.loading.value).toBe(false));
+  localJobs = [job({ id: "bbbbbbbbbbbb", status: "running", pending: [] })];
   await inbox.refresh();
+  expect(inbox.items.value.find((item) => item.sourceId === "")?.id).toBe("bbbbbbbbbbbb");
   expect(inbox.sources.value.map((source) => source.id)).toEqual(["", "laptop"]);
   expect(inbox.hub.value).toMatchObject({
     url: "https://hub.example",

@@ -12,11 +12,12 @@ import IconSquare from "~icons/lucide/square";
 
 const props = defineProps<{
   item: InboxItem;
+  href?: string;
   busy?: boolean;
   unread?: boolean;
   acknowledgeable?: boolean;
 }>();
-const emit = defineEmits<{ open: []; stop: []; answered: []; read: [] }>();
+const emit = defineEmits<{ open: [MouseEvent]; stop: []; answered: []; read: [] }>();
 const now = useElapsedClock();
 
 const labels: Record<InboxItem["status"], string> = {
@@ -70,12 +71,13 @@ const requestNote = computed(() => {
 
 <template>
   <article class="item" :class="{ read: tone === 'faint' }">
-    <button
-      type="button"
+    <component
+      :is="href ? 'a' : 'div'"
       class="main"
-      :disabled="busy || !item.projectPath"
+      :href="href"
+      data-command="ide.inbox.work.open"
       :title="item.projectPath ? undefined : 'Проект не найден в каталоге этого устройства'"
-      @click="emit('open')"
+      @click="emit('open', $event)"
     >
       <span class="head">
         <UiStatusDot :tone="tone" />
@@ -98,7 +100,7 @@ const requestNote = computed(() => {
       <span v-if="item.pending.length" class="note warn">
         {{ item.pending.length }} {{ item.pending.length === 1 ? "запрос" : "запроса" }}
       </span>
-    </button>
+    </component>
     <div v-if="canStop || acknowledgeable" class="actions">
       <UiButton
         v-if="canStop"
@@ -163,9 +165,7 @@ const requestNote = computed(() => {
   padding: var(--sp-2) var(--sp-3);
   color: var(--text-2);
   text-align: left;
-}
-.main:disabled {
-  cursor: default;
+  text-decoration: none;
 }
 .head {
   display: flex;

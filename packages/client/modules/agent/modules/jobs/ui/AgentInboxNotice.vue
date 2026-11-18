@@ -6,8 +6,13 @@ import UiStatusDot from "../../../../../common/ui/UiStatusDot.vue";
 import IconCheck from "~icons/lucide/check";
 import IconShieldCheck from "~icons/lucide/shield-check";
 
-const props = defineProps<{ notice: TrustNotice; unread?: boolean; busy?: boolean }>();
-const emit = defineEmits<{ open: []; read: []; trust: [] }>();
+const props = defineProps<{
+  notice: TrustNotice;
+  href: string;
+  unread?: boolean;
+  busy?: boolean;
+}>();
+const emit = defineEmits<{ open: [MouseEvent]; read: []; trust: [] }>();
 
 const KIND_LABELS: Record<TrustNotice["kind"], string> = {
   plugin: "плагин",
@@ -34,14 +39,20 @@ const when = computed(() =>
 
 <template>
   <article class="item" :class="{ read: !unread }">
-    <button type="button" class="main" :title="action" @click="emit('open')">
+    <a
+      :href="href"
+      class="main"
+      :title="action"
+      data-command="ide.inbox.notice.open"
+      @click="emit('open', $event)"
+    >
       <span class="head">
         <UiStatusDot tone="warning" />
         <span class="topic">{{ notice.title }}</span>
       </span>
       <span class="meta">{{ notice.name }} · {{ kind }} · {{ when }}</span>
       <span class="preview">{{ notice.body }}</span>
-    </button>
+    </a>
     <div class="actions">
       <UiButton
         shape="icon"
@@ -88,6 +99,7 @@ const when = computed(() =>
   padding: var(--sp-2) var(--sp-3);
   color: var(--text-2);
   text-align: left;
+  text-decoration: none;
 }
 .head {
   display: flex;

@@ -5,6 +5,8 @@ import { registerBuiltinWidgets } from "./widgets.ts";
 import { registerBuiltinClientAgents } from "./agents.ts";
 import { refreshClientAgents } from "../modules/agents-integration/catalog/index.ts";
 import { disposePluginRuntime, initPluginRuntime } from "../modules/plugin-runtime/index.ts";
+import { deviceRoute } from "../common/utilities/device-url.ts";
+import { setInboxNotificationNavigator } from "../modules/agent-core/index.ts";
 import { authedFetch } from "../common/utilities/lan-auth.ts";
 import { initAppearance } from "../modules/appearance/index.ts";
 import { initPwa } from "../modules/pwa/index.ts";
@@ -13,6 +15,11 @@ import "./styles.css";
 
 window.fetch = authedFetch as typeof fetch;
 initAppearance();
+setInboxNotificationNavigator((href) => {
+  const route = deviceRoute(href);
+  if (route) void router.push(route);
+  else location.assign(href);
+});
 const disposeViewport = initAppViewport();
 registerBuiltinWidgets();
 registerBuiltinClientAgents();

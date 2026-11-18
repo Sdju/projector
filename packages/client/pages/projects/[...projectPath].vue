@@ -200,6 +200,7 @@ gitlabCommands.scope.registerCommand({
 let initProjectId = "";
 /** A notification opens the project together with the job, chat or settings section it points at. */
 function openInboxTarget() {
+  if (!workspace.value || !project.value || route.path !== projectRoute(project.value.path)) return;
   const job = typeof route.query.job === "string" ? route.query.job : "";
   const chat = typeof route.query.chat === "string" ? route.query.chat : "";
   const section = typeof route.query.settings === "string" ? route.query.settings : "";
@@ -230,7 +231,7 @@ function suggestInit(instance: unknown) {
 }
 // The inbox may link to settings of the project that is already open; the page is not remounted then.
 watch(
-  () => [route.query.job, route.query.chat, route.query.settings] as const,
+  [() => route.path, () => route.query.job, () => route.query.chat, () => route.query.settings],
   () => {
     if (workspace.value) openInboxTarget();
   },
@@ -299,7 +300,7 @@ watch(
         missing.value = gone;
         void bindProjectAppearance(item.id).catch(() => undefined);
         const canonical = projectRoute(item.path);
-        if (route.path !== canonical) await router.replace(canonical);
+        if (route.path !== canonical) await router.replace({ path: canonical, query: route.query });
       }
     } catch (err) {
       if (active)

@@ -52,7 +52,11 @@ async function read(): Promise<void> {
   }
   refreshing = (async () => {
     try {
-      const [jobList, runFeed] = await Promise.allSettled([fetchJobs(), fetchRunsFeed()]);
+      const signal = AbortSignal.timeout(10_000);
+      const [jobList, runFeed] = await Promise.allSettled([
+        fetchJobs(undefined, undefined, signal),
+        fetchRunsFeed(undefined, signal),
+      ]);
       if (!subscribers) return;
       const failure =
         jobList.status === "rejected"
@@ -165,7 +169,11 @@ export function useJobsFeed() {
     error: feedError,
     loading: feedLoading,
     updatedAt: feedUpdatedAt,
-    refresh: () => read(),
+    async refresh() {
+      // A read already in flight may have started before the action being refreshed.
+      if (refreshing) await refreshing;
+      await read();
+    },
     onUpdate: onJobsFeedUpdate,
   };
 }

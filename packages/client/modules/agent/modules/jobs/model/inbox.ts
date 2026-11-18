@@ -1,5 +1,4 @@
 import { computed, getCurrentScope, onScopeDispose, ref } from "vue";
-import type { HubDevice } from "@ai-projector/core/modules/hub/index.ts";
 import {
   deviceApiUrl,
   fetchJobs,
@@ -7,7 +6,12 @@ import {
   notifyInbox,
   type AgentJobView,
 } from "../../../../agent-core/index.ts";
-import { fetchHubPresence, hubNoticeAllowed, type HubPresence } from "../../../../hub/index.ts";
+import {
+  fetchHubPresence,
+  hubNoticeAllowed,
+  normalizeHubPresence,
+  type HubPresence,
+} from "../../../../hub/index.ts";
 import {
   FINISHED_TTL_MS,
   inboxGroups,
@@ -28,7 +32,14 @@ import {
   markInboxItemRead,
   markOldFinishedAsRead,
 } from "./inbox-read.ts";
-import { feedJobs, feedRecentRuns, feedRuns, onJobsFeedUpdate, useJobsFeed } from "./jobs-feed.ts";
+import {
+  feedError,
+  feedJobs,
+  feedRecentRuns,
+  feedRuns,
+  onJobsFeedUpdate,
+  useJobsFeed,
+} from "./jobs-feed.ts";
 import { trustNoticeUnread, useTrustNotices } from "./trust-notices.ts";
 
 export * from "./inbox-view.ts";
@@ -39,10 +50,7 @@ export {
   markInboxItemRead,
 } from "./inbox-read.ts";
 
-/**
- * The server pushes job and run changes over the page event stream. This timer only keeps the
- * Hub devices and project names fresh and repairs a stream that dropped a change.
- */
+// Fallback for missed Hub events and project renames.
 const POLL_MS = 30_000;
 const PROJECT_TTL_MS = 30_000;
 const SOURCES_TTL_MS = 30_000;
@@ -187,8 +195,12 @@ function publishItems(list: readonly InboxSource[]): void {
 
 async function refresh(fresh = false, localOnly = false, ids?: ReadonlySet<string>): Promise<void> {
   if (refreshing) {
-    if (fresh) rerunAll = true;
-    else if (localOnly) rerun = true;
+    if (fresh) {
+      rerunAll = true;
+      // The finally block starts the requested refresh before this promise settles.
+      return refreshing.then(() => refreshing);
+    }
+    if (localOnly) rerun = true;
     return refreshing;
   }
   refreshing = (async () => {
@@ -240,21 +252,10 @@ async function refresh(fresh = false, localOnly = false, ids?: ReadonlySet<strin
   return refreshing;
 }
 
-/** The Hub pushes its device list; pages behind it update sources without polling. */
 function applyHubDevices(event: Event): void {
   const devices = (event as CustomEvent<{ devices?: unknown }>).detail?.devices;
   if (!Array.isArray(devices)) return;
-  const list = devices.filter((item): item is HubDevice => {
-    if (!item || typeof item !== "object") return false;
-    const value = item as Record<string, unknown>;
-    return (
-      typeof value.id === "string" &&
-      typeof value.name === "string" &&
-      typeof value.protocol === "number" &&
-      typeof value.online === "boolean"
-    );
-  });
-  hub.value = { ...hub.value, devices: list };
+  hub.value = { ...hub.value, devices: normalizeHubPresence({ devices }).devices };
   sources.value = sourcesFor(hub.value);
   sourcesAt = Date.now();
   for (const id of Array.from(cache.keys())) {
@@ -273,12 +274,11 @@ function start() {
   disposed = false;
   void refresh();
   timer = setInterval(() => void refresh(true), POLL_MS);
-  // The server pushes job and run changes; only a dropped event waits for the timer.
   stopFeed = onJobsFeedUpdate(() => void refresh(false, true));
-  // A page that became visible catches up at once; a hidden one keeps the slow poll for notices.
   const onVisible = () => {
     if (document.visibilityState === "visible") void refresh(true);
   };
+  const onReconnect = () => void refresh(true);
   const onHubDevices = (event: Event) => applyHubDevices(event);
   const onHubActivity = (event: Event) => {
     const detail = (event as CustomEvent<{ deviceId?: unknown; at?: unknown }>).detail;
@@ -294,6 +294,7 @@ function start() {
     drainSources();
   };
   if (typeof window !== "undefined") {
+    window.addEventListener("projector:events-open", onReconnect);
     window.addEventListener("projector:hub-devices", onHubDevices);
     window.addEventListener("projector:hub-activity", onHubActivity);
   }
@@ -301,6 +302,7 @@ function start() {
   return () => {
     document.removeEventListener("visibilitychange", onVisible);
     if (typeof window !== "undefined") {
+      window.removeEventListener("projector:events-open", onReconnect);
       window.removeEventListener("projector:hub-devices", onHubDevices);
       window.removeEventListener("projector:hub-activity", onHubActivity);
     }
@@ -336,7 +338,7 @@ let stopPolling: (() => void) | undefined;
 
 /** The one inbox of the page: the panel and the header bell share its polling and state. */
 export function useAgentInbox() {
-  useJobsFeed();
+  const jobsFeed = useJobsFeed();
   const trust = useTrustNotices();
   if (!subscribers) stopPolling = start();
   subscribers++;
@@ -363,7 +365,7 @@ export function useAgentInbox() {
     sources,
     hub,
     loading,
-    error,
+    error: computed(() => [feedError.value, error.value].filter(Boolean).join(" ")),
     updatedAt,
     attention,
     unread,
@@ -381,7 +383,10 @@ export function useAgentInbox() {
     isAttention: isItemAttention,
     markRead: markInboxItemRead,
     markAllRead: markAllInboxRead,
-    refresh: () => refresh(true),
+    async refresh() {
+      await Promise.all([jobsFeed.refresh(), trust.refresh()]);
+      await refresh(true);
+    },
     href: (item: InboxItem) => inboxHref(item, sources.value),
   };
 }

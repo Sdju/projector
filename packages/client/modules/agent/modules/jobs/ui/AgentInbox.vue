@@ -9,16 +9,9 @@ import UiMessage from "../../../../../common/ui/UiMessage.vue";
 import UiSectionRefresh, { sectionRefreshKey } from "../../../../../common/ui/UiSectionRefresh.vue";
 import { useCommandScope, commandArgs } from "../../../../../common/utilities/commands.ts";
 import { notify, reportError } from "../../../../../common/utilities/notice.ts";
-import {
-  cancelAgentRun,
-  requestChatTab,
-  requestJobTab,
-  requestNotifications,
-  stopJob,
-} from "../../../../agent-core/index.ts";
-import { deviceBase } from "../../../../../common/utilities/device-url.ts";
-import { projectRoute } from "../../../../project/index.ts";
-import { currentDeviceId, useAgentInbox, type InboxGroup, type InboxItem } from "../model/inbox.ts";
+import { cancelAgentRun, requestNotifications, stopJob } from "../../../../agent-core/index.ts";
+import { deviceRoute } from "../../../../../common/utilities/device-url.ts";
+import { useAgentInbox, type InboxGroup, type InboxItem } from "../model/inbox.ts";
 import AgentInboxNotice from "./AgentInboxNotice.vue";
 import AgentInboxRow from "./AgentInboxRow.vue";
 import IconCheckCheck from "~icons/lucide/check-check";
@@ -44,6 +37,7 @@ const {
   finished,
   notices,
   noticeUnread,
+  noticeHref,
   isNoticeRead,
   markNoticeRead,
   markAllNoticesRead,
@@ -63,7 +57,6 @@ const pending = computed(() => loading.value || userRefreshing.value);
 const permission = ref(
   typeof Notification === "undefined" ? "unsupported" : Notification.permission,
 );
-const current = currentDeviceId();
 const hubDevices = computed(() => sources.value.filter((source) => !source.current).length);
 const updated = computed(() =>
   updatedAt.value
@@ -75,10 +68,12 @@ const updated = computed(() =>
     : "",
 );
 
+const waiting = computed(() => Math.max(0, attention.value - noticeUnread.value));
+
 /** Non-empty counters of the header; zero values would only add noise. */
 const summary = computed(() =>
   [
-    { key: "attention", text: `${attention.value} ждут вас`, count: attention.value, alert: true },
+    { key: "attention", text: `${waiting.value} ждут вас`, count: waiting.value, alert: true },
     { key: "working", text: `${working.value} работают`, count: working.value },
     {
       key: "trust",
@@ -127,11 +122,26 @@ function findNotice(value: unknown) {
   if (!notice) throw new Error("Уведомление не найдено");
   return notice;
 }
-/** Page-relative route; vue-router adds the current Hub device prefix itself. */
-function noticeRoute(notice: (typeof notices.value)[number]): string {
-  if (!notice.projectPath) return notice.href ?? "/settings?section=plugins";
-  const section = notice.section ? `?settings=${encodeURIComponent(notice.section)}` : "";
-  return `${projectRoute(notice.projectPath)}${section}`;
+function followLink(event: MouseEvent, command: string, key: string): void {
+  if (
+    event.defaultPrevented ||
+    event.button !== 0 ||
+    event.ctrlKey ||
+    event.metaKey ||
+    event.shiftKey ||
+    event.altKey ||
+    !(event.currentTarget instanceof HTMLAnchorElement)
+  )
+    return;
+  event.preventDefault();
+  void commands.run(command, { key });
+}
+
+function navigate(link: string): void {
+  const route = deviceRoute(link);
+  emit("navigate");
+  if (route) void router.push(route);
+  else location.assign(link);
 }
 commands.scope.registerCommand({
   id: "ide.inbox.refresh",
@@ -171,7 +181,7 @@ commands.scope.registerCommand({
   run: (value) => {
     const notice = findNotice(value);
     markNoticeRead(notice.id);
-    void router.push(noticeRoute(notice));
+    navigate(noticeHref(notice));
   },
 });
 commands.scope.registerCommand({
@@ -235,23 +245,11 @@ function confirmTrust(notice: (typeof notices.value)[number]): void {
   if (window.confirm(question)) commands.run("ide.inbox.notice.trust", { key: notice.id });
 }
 
-function sameDevice(item: InboxItem): boolean {
-  return !item.sourceId || item.sourceId === current;
-}
 function open(item: InboxItem): void {
-  if (!item.projectPath) return;
+  const link = href(item);
+  if (!link) return;
   markRead(item);
-  if (!sameDevice(item)) {
-    const link = href(item);
-    if (link) location.assign(link);
-    return;
-  }
-  if (item.kind === "job") requestJobTab(item.projectId, item.id);
-  else if (item.chat) requestChatTab(item.projectId, item.chat);
-  // The tab is requested for the workspace; a project that is not open yet mounts and opens it.
-  const link = `${deviceBase()}${projectRoute(item.projectPath)}`;
-  emit("navigate");
-  void router.push(link);
+  navigate(link);
 }
 
 async function stop(item: InboxItem): Promise<void> {
@@ -369,9 +367,10 @@ const groupBadge = (group: InboxGroup) =>
         v-for="notice in notices"
         :key="notice.id"
         :notice="notice"
+        :href="noticeHref(notice)"
         :unread="!isNoticeRead(notice)"
         :busy="busyNotice === notice.id"
-        @open="commands.run('ide.inbox.notice.open', { key: notice.id })"
+        @open="followLink($event, 'ide.inbox.notice.open', notice.id)"
         @trust="confirmTrust(notice)"
         @read="commands.run('ide.inbox.notice.read', { key: notice.id })"
       />
@@ -389,10 +388,11 @@ const groupBadge = (group: InboxGroup) =>
         v-for="item in shown(group)"
         :key="item.key"
         :item="item"
+        :href="href(item)"
         :busy="busy === item.key"
         :unread="isUnread(item)"
         :acknowledgeable="canAcknowledge(item)"
-        @open="commands.run('ide.inbox.work.open', { key: item.key })"
+        @open="followLink($event, 'ide.inbox.work.open', item.key)"
         @stop="commands.run('ide.inbox.work.stop', { key: item.key })"
         @read="commands.run('ide.inbox.work.read', { key: item.key })"
         @answered="refresh"
@@ -407,8 +407,9 @@ const groupBadge = (group: InboxGroup) =>
           v-for="item in completed(group)"
           :key="item.key"
           :item="item"
+          :href="href(item)"
           :busy="busy === item.key"
-          @open="commands.run('ide.inbox.work.open', { key: item.key })"
+          @open="followLink($event, 'ide.inbox.work.open', item.key)"
           @stop="commands.run('ide.inbox.work.stop', { key: item.key })"
           @answered="refresh"
         />
