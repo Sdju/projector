@@ -1,0 +1,35 @@
+<!doctype html>
+<link rel="icon" href="data:," />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<div id="fixture"></div>
+<script type="module">
+  import "/packages/client/app/styles.css";
+  import { createApp, h, ref } from "vue";
+  import AgentComposer from "/packages/client/modules/agent/modules/composer/ui/AgentComposer.vue";
+  import { registerBuiltinWidgets } from "/packages/client/app/widgets.ts";
+  registerBuiltinWidgets();
+
+  const form =
+    '<IntelligentForm summary="Fold"><Field type="text" name="note" label="Заметка" initial="ok" /></IntelligentForm>';
+  const draft = ref("");
+  const parts = ref([]);
+  window.fixture = { ready: true, submitted: [] };
+  const app = createApp({
+    setup: () => () =>
+      h("div", { style: "padding: 24px; max-width: 600px" }, [
+        h(AgentComposer, {
+          modelValue: draft.value,
+          parts: parts.value,
+          busy: false,
+          error: "",
+          copied: false,
+          form,
+          "onUpdate:modelValue": (value) => (draft.value = value ?? ""),
+          "onUpdate:parts": (value) => (parts.value = value ?? []),
+          onSubmit: () => window.fixture.submitted.push({ text: draft.value }),
+          onFormSubmit: (text, data) => window.fixture.submitted.push({ text, data }),
+        }),
+      ]),
+  });
+  app.mount("#fixture");
+</script>

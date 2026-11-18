@@ -12,6 +12,7 @@ import IconSquare from "~icons/lucide/square";
 import IconAlert from "~icons/lucide/circle-alert";
 import IconType from "~icons/lucide/type";
 import IconListChecks from "~icons/lucide/list-checks";
+import IconChevronDown from "~icons/lucide/chevron-down";
 import IconX from "~icons/lucide/x";
 
 const draft = defineModel<string>({ required: true });
@@ -161,14 +162,28 @@ defineExpose({
         Бросьте файлы или папки — добавим в сообщение
       </div>
       <div v-if="activeForm" class="composer-form">
-        <AgentFormPanel
-          ref="formPanel"
-          composer
-          :source="activeForm"
-          :project-id="projectId"
-          @submit="submitForm"
-          @submittable="formSubmittable = $event"
-        />
+        <div class="composer-form-head">
+          <UiButton
+            class="form-fold"
+            shape="icon"
+            size="sm"
+            title="Свернуть форму"
+            aria-label="Свернуть форму"
+            @click="dismissForm"
+          >
+            <IconChevronDown aria-hidden="true" />
+          </UiButton>
+        </div>
+        <div class="composer-form-body">
+          <AgentFormPanel
+            ref="formPanel"
+            composer
+            :source="activeForm"
+            :project-id="projectId"
+            @submit="submitForm"
+            @submittable="formSubmittable = $event"
+          />
+        </div>
       </div>
       <AgentInput
         v-show="!formOpen"
@@ -287,22 +302,31 @@ defineExpose({
   padding: 2px var(--sp-2) var(--sp-1);
 }
 .composer-form {
+  min-width: 0;
+  border-bottom: 1px solid var(--line);
+}
+/* The fold above the scrolling fields collapses the block into the text field. */
+.composer-form-head {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: 2px;
+}
+.composer-form-body {
   display: grid;
   gap: var(--sp-1);
   min-width: 0;
   max-height: min(46vh, 460px);
   overflow: auto;
-  padding: var(--sp-3) 0 var(--sp-2);
-  border-bottom: 1px solid var(--line);
+  padding: 0 0 var(--sp-2);
   scrollbar-width: thin;
 }
-.composer-form :deep(.widget > .ui-card) {
+.composer-form-body :deep(.widget > .ui-card) {
   padding: 0;
   border: 0;
   border-radius: 0;
   background: transparent;
 }
-.composer-form :deep(.widget) {
+.composer-form-body :deep(.widget) {
   margin: 0;
 }
 /* Form mode has a wider composer padding, so the footer only compensates its left inset.
@@ -310,10 +334,12 @@ defineExpose({
 .composer.form-mode .composer-footer {
   padding: 0 0 0 var(--sp-2);
 }
-.form-toggle {
+.form-toggle,
+.form-fold {
   color: var(--muted);
 }
-.form-toggle:hover:not(:disabled) {
+.form-toggle:hover:not(:disabled),
+.form-fold:hover:not(:disabled) {
   color: var(--text);
 }
 .composer-footer {
