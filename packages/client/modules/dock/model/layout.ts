@@ -11,6 +11,7 @@ export type {
 export {
   createDockLayout,
   dockGroups,
+  ensurePanelGroup,
   findDockGroup,
   groupOfPanel,
   dockPanels,

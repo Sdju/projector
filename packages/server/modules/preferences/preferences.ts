@@ -21,6 +21,8 @@ interface Preferences {
   agentDefaults: Record<string, Record<string, string>>;
   /** Agent backends the user switched off: their runs are refused and the UI hides them. */
   disabledAgents: string[];
+  /** The dock may collapse its right panel into a rail; projects can override it locally. */
+  rightPanel: boolean;
 }
 
 export type AgentSessionMode = "tui" | "gui";
@@ -57,6 +59,7 @@ export async function preferences(): Promise<Preferences> {
       agentModes: agentModes(data.agentModes),
       agentDefaults: agentDefaults(data.agentDefaults),
       disabledAgents: disabledAgents(data.disabledAgents),
+      rightPanel: data.rightPanel === true,
     };
   } catch {
     return {
@@ -68,6 +71,7 @@ export async function preferences(): Promise<Preferences> {
       agentModes: {},
       agentDefaults: {},
       disabledAgents: [],
+      rightPanel: false,
     };
   }
 }
@@ -110,6 +114,12 @@ export function saveInterface(mode: InterfaceMode, shortcut?: string): Promise<v
   return updatePreferences((value) => {
     value.mode = mode;
     if (shortcut !== undefined) value.shortcut = shortcut;
+  });
+}
+/** Global right-panel preference of the workbench; project sessions override it locally. */
+export function saveRightPanel(enabled: boolean): Promise<void> {
+  return updatePreferences((value) => {
+    value.rightPanel = enabled;
   });
 }
 /** Adds or removes a favorite and returns the new state. */

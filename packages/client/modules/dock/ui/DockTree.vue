@@ -2,12 +2,7 @@
 import UiResizeHandle from "../../../common/ui/UiResizeHandle.vue";
 import { computed, inject, ref } from "vue";
 import { usePointerDrag } from "../../../common/utilities/pointer-drag.ts";
-import {
-  isNodeVisible,
-  setSplitSizes,
-  type DockNode as DockNodeData,
-  type DockSplit,
-} from "../model/layout.ts";
+import { setSplitSizes, type DockNode as DockNodeData, type DockSplit } from "../model/layout.ts";
 import { dockKey } from "./context.ts";
 import DockGroupView from "./DockGroupView.vue";
 
@@ -17,7 +12,12 @@ const dock = inject(dockKey)!;
 const zen = computed(() => dock.zen?.() ?? false);
 const element = ref<HTMLElement>();
 const split = computed(() => (props.node.type === "split" ? props.node : undefined));
-const visibleChildren = computed(() => split.value?.children.filter(isNodeVisible) ?? []);
+/** The panel group is teleported to the right rail, so the dock gives its space to the others. */
+const asideNode = (node: DockNodeData) =>
+  node.type === "group" && !!node.panel && (dock.aside?.() ?? false);
+const isVisible = (node: DockNodeData): boolean =>
+  node.type === "group" ? !node.hidden && !asideNode(node) : node.children.some(isVisible);
+const visibleChildren = computed(() => split.value?.children.filter(isVisible) ?? []);
 const row = computed(() => split.value?.direction === "row");
 const minimum = computed(() => (row.value ? 140 : 100));
 const sizeOf = (node: DockNodeData) =>
@@ -75,8 +75,13 @@ function sashKey(event: KeyboardEvent, index: number) {
 </script>
 
 <template>
-  <DockGroupView v-if="node.type === 'group'" :group="node" />
-  <div v-else ref="element" class="dock-split" :class="[split!.direction, { zen }]">
+  <DockGroupView v-if="node.type === 'group' && !asideNode(node)" :group="node" />
+  <div
+    v-else-if="node.type === 'split'"
+    ref="element"
+    class="dock-split"
+    :class="[split!.direction, { zen }]"
+  >
     <template v-for="(child, index) in visibleChildren" :key="child.id">
       <UiResizeHandle
         v-if="index"

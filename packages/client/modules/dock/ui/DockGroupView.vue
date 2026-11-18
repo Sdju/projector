@@ -19,7 +19,7 @@ import {
 } from "../model/layout.ts";
 import { dockKey } from "./context.ts";
 
-const props = defineProps<{ group: DockGroup }>();
+const props = defineProps<{ group: DockGroup; embedded?: boolean }>();
 const dock = inject(dockKey)!;
 const body = ref<HTMLElement>();
 const header = ref<HTMLElement>();
@@ -33,7 +33,7 @@ const compactHeader = computed(
 );
 const zone = ref<DockZone | "">("");
 const focused = computed(() => dock.layout().focused === props.group.id);
-const maximized = computed(() => dock.layout().maximized === props.group.id);
+const maximized = computed(() => !props.embedded && dock.layout().maximized === props.group.id);
 const zen = computed(() => dock.zen?.() ?? false);
 const zenActive = computed(() => zen.value && focused.value);
 const tabs = computed(() => props.group.panels.map((id) => dock.describe(id)));
@@ -137,7 +137,7 @@ const focus = () => {
     as="section"
     sizing="flex"
     class="dock-group"
-    :class="{ focused, maximized, zen: zenActive }"
+    :class="{ focused, maximized, zen: zenActive, embedded }"
     :inert="zen && !focused"
     :data-group="group.id"
     @pointerdown.capture="focus"
@@ -179,6 +179,7 @@ const focus = () => {
           :args="{ group, activeId: group.active }"
         />
         <UiButton
+          v-if="!embedded"
           shape="icon"
           size="sm"
           :active="maximized"
@@ -228,6 +229,12 @@ const focus = () => {
   border: 1px solid var(--line);
   border-radius: var(--r-lg);
   background: var(--bg);
+}
+/* The right-rail panel already has a frame: the teleported terminal group sits inside it. */
+.dock-group.embedded {
+  border-width: 0;
+  border-radius: 0;
+  background: none;
 }
 .dock-group.focused {
   border-color: var(--line-strong);

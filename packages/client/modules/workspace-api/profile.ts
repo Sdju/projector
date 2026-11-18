@@ -115,6 +115,8 @@ export interface WorkspaceProfile {
   sidebar?: readonly SidebarType[];
   /** Service sections in the bottom group of the left rail (Hub, trash, owner tools). */
   utility?: readonly SidebarType[];
+  /** Sections of the optional right rail (terminals and owner tools). */
+  aside?: readonly SidebarType[];
   /** `full` — editor and terminals; `editor` — a single editor group. */
   layout: "full" | "editor";
 }

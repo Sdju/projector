@@ -118,6 +118,17 @@ if (process.argv.includes("--prepare")) {
       const initialSettings = await (await request("/api/launcher/settings")).json();
       expect(initialSettings.mode).toBe("native");
       expect(initialSettings.shortcut).toBe("Ctrl+Alt+Space");
+      expect(initialSettings.rightPanel).toBe(false);
+      expect((await request("/api/launcher/settings", "PUT", { rightPanel: "yes" })).status).toBe(
+        400,
+      );
+      expect((await request("/api/launcher/settings", "PUT", { rightPanel: true })).status).toBe(
+        200,
+      );
+      expect((await (await request("/api/launcher/settings")).json()).rightPanel).toBe(true);
+      expect((await request("/api/launcher/settings", "PUT", { rightPanel: false })).status).toBe(
+        200,
+      );
       expect((await request("/api/launcher/settings", "PUT", { mode: "bogus" })).status).toBe(400);
       expect(
         (await request("/api/launcher/settings", "PUT", { mode: "native", shortcut: "invalid" }))

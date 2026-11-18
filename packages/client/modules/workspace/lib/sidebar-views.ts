@@ -67,6 +67,13 @@ export const sidebarSections = (profile: WorkspaceProfile, capabilities: Workspa
     profile.utility?.map((type) => ({ ...type, utility: true })),
   );
 
+/** Sections of the optional right rail (`profile.aside`: terminals, owner tools). */
+export const asideSections = (profile: WorkspaceProfile, capabilities: WorkspaceCapabilities) =>
+  createSidebarRegistry(
+    (capability) => capabilities[capability as keyof WorkspaceCapabilities],
+    profile.aside,
+  );
+
 /** What a section may ask of the workspace that shows it. */
 export interface SidebarHost {
   readonly projectId: string;

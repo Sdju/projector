@@ -41,8 +41,11 @@ export const workspaceSessionSchema = z.object({
   /** Открытая мобильная поверхность; на десктопе не используется. */
   mobileSurface: z.enum(["editor", "files", "terminal"]).optional(),
   treeWidth: z.number().finite().positive().optional(),
+  asideWidth: z.number().finite().positive().optional(),
   agentWidth: z.number().finite().positive().optional(),
   sidebarHidden: z.boolean().optional(),
+  /** Переопределение глобальной настройки правой панели для этого проекта. */
+  rightPanel: z.boolean().optional(),
   /** Последняя запущенная сессия: основная часть split-кнопки шапки повторяет её. */
   launcher: z.string().optional(),
   /** Раскладка блоков; читается через `parseDockLayout`, который сам отбрасывает повреждённые данные. */

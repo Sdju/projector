@@ -3,6 +3,7 @@ export { interfaceMode } from "./launcher.ts";
 export { launchItem } from "./launcher.ts";
 export { preferences } from "./launcher.ts";
 export { saveInterface } from "./launcher.ts";
+export { saveRightPanel } from "./launcher.ts";
 export { searchLauncher } from "./launcher.ts";
 export { shortcuts } from "./launcher.ts";
 export { checkShortcut } from "./launcher.ts";

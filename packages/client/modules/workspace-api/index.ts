@@ -73,6 +73,7 @@ export {
 } from "./pipeline-stages.ts";
 export {
   createSidebarRegistry,
+  workspaceAside,
   workspaceUtility,
   type SidebarRegistry,
   type SidebarType,

@@ -24,6 +24,7 @@ import {
   useAppearanceFontSettings,
 } from "../appearance/index.ts";
 import { useSectionAction } from "../../common/utilities/use-section-action.ts";
+import { rightPanelPreference, saveRightPanelPreference } from "../workspace/index.ts";
 const shortcutId = useId();
 const appearanceId = useId();
 const chatSizeId = useId();
@@ -94,7 +95,30 @@ async function loadLauncher() {
     mode.value = saved.value = data.mode;
     shortcut.value = savedShortcut.value = data.shortcut;
     hotkey.value = data.hotkey;
+    rightPanelPreference.value = data.rightPanel === true;
   }, "Не удалось загрузить настройки");
+}
+const rightPanelBusy = ref(false);
+const rightPanelStatus = ref("");
+const rightPanelError = ref("");
+async function setRightPanel(enabled: boolean) {
+  if (rightPanelBusy.value) return;
+  const previous = rightPanelPreference.value;
+  rightPanelPreference.value = enabled;
+  rightPanelBusy.value = true;
+  rightPanelError.value = "";
+  rightPanelStatus.value = "";
+  try {
+    rightPanelPreference.value = await saveRightPanelPreference(enabled);
+    rightPanelStatus.value = enabled
+      ? "Правая панель включена для всех проектов"
+      : "Правая панель выключена";
+  } catch (error) {
+    rightPanelPreference.value = previous;
+    rightPanelError.value = error instanceof Error ? error.message : "Не удалось сохранить";
+  } finally {
+    rightPanelBusy.value = false;
+  }
 }
 async function loadAppearance() {
   await loadAppearanceSection(async () => {
@@ -220,6 +244,27 @@ async function open() {
     <UiMessage v-if="error || status" role="status" :tone="error ? 'danger' : undefined">{{
       error || status
     }}</UiMessage>
+    <UiHeading as="h2" size="sm" :space-before="4">Правая панель</UiHeading>
+    <UiInline align="center" wrap>
+      <UiControl
+        type="checkbox"
+        :model-value="rightPanelPreference"
+        :disabled="!ready || rightPanelBusy"
+        @update:model-value="setRightPanel(!!$event)"
+      />
+      <span>Правая панель с терминалами</span>
+    </UiInline>
+    <UiHint class="hint">
+      Включает правую полосу разделов: в ней раздел «Терминалы», а группа терминалов переезжает туда
+      из дока. Ширина панели меняется перетаскиванием границы. Настройка общая для машины, а проект
+      переопределяет её командой <code>ide.workbench.rightPanel.toggle</code>.
+    </UiHint>
+    <UiMessage
+      v-if="rightPanelError || rightPanelStatus"
+      role="status"
+      :tone="rightPanelError ? 'danger' : undefined"
+      >{{ rightPanelError || rightPanelStatus }}</UiMessage
+    >
     <UiHeading as="h2" size="sm" :space-before="4">Оформление</UiHeading>
     <UiLabel :for="appearanceId" :space-after="2">Цветовая схема</UiLabel>
     <UiControl

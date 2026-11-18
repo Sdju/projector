@@ -39,6 +39,12 @@ export const workspaceUtility: readonly SidebarType[] = [
   { id: "trash", title: "Корзина", requires: "write", utility: true },
 ];
 
+/**
+ * Standard sections of the optional right rail: the terminal group. Other profiles may add
+ * their own sections through `profile.aside`; the rail is hidden until the setting is on.
+ */
+export const workspaceAside: readonly SidebarType[] = [{ id: "terminals", title: "Терминалы" }];
+
 /** Later groups win by id; sections whose capability is off are left out. */
 export function createSidebarRegistry(
   available: (capability: string) => boolean,

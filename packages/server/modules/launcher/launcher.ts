@@ -46,7 +46,7 @@ function runDesktop(args: string[], options: { timeout?: number; maxBuffer?: num
   });
 }
 import { preferences, toggleFavorite, updatePreferences } from "../preferences/index.ts";
-export { preferences, interfaceMode, saveInterface } from "../preferences/index.ts";
+export { preferences, interfaceMode, saveInterface, saveRightPanel } from "../preferences/index.ts";
 export async function shortcutStatus(): Promise<{
   supported: boolean;
   active: boolean;

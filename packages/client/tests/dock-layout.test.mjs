@@ -5,6 +5,7 @@ import {
   createDockLayout,
   dockGroups,
   dockPanels,
+  ensurePanelGroup,
   findDockGroup,
   groupOfPanel,
   movePanel,
@@ -46,6 +47,35 @@ test("default layout has editor and terminal groups", () => {
   const layout = createDockLayout();
   assertValid(layout);
   expect(dockGroups(layout).map((group) => group.role)).toStrictEqual(["editor", "terminal"]);
+  expect(
+    dockGroups(layout)
+      .filter((group) => group.panel)
+      .map((group) => group.id),
+  ).toEqual(["g2"]);
+});
+
+test("the panel marker survives a session round trip", () => {
+  const layout = addPanel(createDockLayout(), "terminal:1", { groupId: "g2" });
+  const restored = parseDockLayout(serializeDockLayout(layout));
+  expect(findDockGroup(restored, "g2").panel).toBe(true);
+  expect(findDockGroup(restored, "g2").panels).toStrictEqual(["terminal:1"]);
+  assertValid(restored);
+});
+
+test("a legacy layout without a panel gets one at the right edge", () => {
+  const layout = createDockLayout();
+  delete findDockGroup(layout, "g2").panel;
+  const marked = ensurePanelGroup(layout);
+  expect(findDockGroup(marked, "g2").panel).toBe(true);
+  expect(ensurePanelGroup(marked)).toBe(marked);
+});
+
+test("a legacy stacked layout finds the terminal group below the editor", () => {
+  const layout = createDockLayout();
+  layout.root.direction = "column";
+  delete findDockGroup(layout, "g2").panel;
+  const marked = ensurePanelGroup(layout);
+  expect(findDockGroup(marked, "g2").panel).toBe(true);
 });
 
 test("panels are added to a group, activated and reuse the same reference when unchanged", () => {

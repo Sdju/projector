@@ -2,9 +2,9 @@ import { appUrl } from "@ai-projector/core/modules/app-paths/index.ts";
 
 import { startTray } from "../../../modules/window/index.ts";
 import {
-  interfaceMode,
   preferences,
   saveInterface,
+  saveRightPanel,
   shortcuts,
   checkShortcut,
   shortcutStatus,
@@ -63,6 +63,7 @@ export const routes: RouteDefinition[] = [
       json(res, 200, {
         mode: prefs.mode,
         shortcut: prefs.shortcut,
+        rightPanel: prefs.rightPanel,
         hotkey: await shortcutStatus(),
       });
     },
@@ -72,18 +73,34 @@ export const routes: RouteDefinition[] = [
     path: "/api/launcher/settings",
     handler: async ({ req, res }) => {
       const body = await readBody(req);
-      if (!["native", "window", "browser"].includes(asString(body.mode)))
-        throw new Error("Неизвестный режим интерфейса");
-      const mode = interfaceMode(body.mode);
+      const mode = body.mode === undefined ? undefined : validInterfaceMode(body.mode);
       const shortcut = body.shortcut === undefined ? undefined : asString(body.shortcut);
       if (shortcut !== undefined && !shortcuts.includes(shortcut))
         throw new Error("Неизвестное сочетание клавиш");
+      if (body.rightPanel !== undefined && typeof body.rightPanel !== "boolean")
+        throw new Error("rightPanel должен быть boolean");
+      if (mode === undefined && shortcut === undefined && body.rightPanel === undefined)
+        throw new Error("Нечего сохранять");
       if (shortcut !== undefined) await checkShortcut(shortcut);
-      await saveInterface(mode, shortcut);
+      if (mode !== undefined) await saveInterface(mode, shortcut);
+      else if (shortcut !== undefined) await saveInterface((await preferences()).mode, shortcut);
+      if (typeof body.rightPanel === "boolean") await saveRightPanel(body.rightPanel);
       // Update an existing resident process without showing its palette.
       if (shortcut !== undefined) await startTray(appUrl()).catch(() => undefined);
       const prefs = await preferences();
-      json(res, 200, { mode, shortcut: prefs.shortcut, hotkey: await shortcutStatus() });
+      json(res, 200, {
+        mode: prefs.mode,
+        shortcut: prefs.shortcut,
+        rightPanel: prefs.rightPanel,
+        hotkey: await shortcutStatus(),
+      });
     },
   },
 ];
+
+function validInterfaceMode(value: unknown): "native" | "window" | "browser" {
+  const mode = asString(value);
+  if (!["native", "window", "browser"].includes(mode))
+    throw new Error("Неизвестный режим интерфейса");
+  return mode as "native" | "window" | "browser";
+}

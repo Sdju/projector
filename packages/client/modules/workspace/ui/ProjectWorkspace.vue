@@ -40,6 +40,7 @@ import { createPanelHosts } from "../panel-hosts.ts";
 import { TerminalCloseDialog } from "../../terminal/index.ts";
 import { useDocker } from "../../docker/index.ts";
 import { sidebarSections, type SidebarViews } from "../lib/sidebar-views.ts";
+import { useWorkspaceAsidePanel } from "../lib/workspace-aside.ts";
 import { provideLastSession } from "../lib/session-launchers.ts";
 import { registerTreeCommands } from "../lib/tree-commands.ts";
 import { provideTabHost, useWorkspaceTabTypes, type TabViews } from "../lib/tab-views.ts";
@@ -48,6 +49,7 @@ import {
   usePluginWorkspaceViews,
 } from "../lib/plugin-workspace.ts";
 import { useWorkspaceRefresh } from "../lib/workspace-refresh.ts";
+import { useRightPanelPreference } from "../lib/right-panel.ts";
 import { useMobileSurfaces, registerMobileCommands } from "../lib/mobile-surfaces.ts";
 import { useSurfaceSwipe } from "../lib/surface-swipe.ts";
 import { registerProjectWidgetCommands } from "../../project-widgets/index.ts";
@@ -58,8 +60,8 @@ const props = defineProps<{
   beforeCloseProjectSettings?: () => boolean;
   saveProjectSettings?: () => void | Promise<void>;
   tabViews?: TabViews; // views of the kinds the embedding page owns
-  /** Views of the sidebar sections the embedding page owns. */
   sidebarViews?: SidebarViews;
+  asideViews?: SidebarViews;
 }>();
 const profile = workspaceProfile(props.projectId);
 const capabilities = profileCapabilities(profile);
@@ -74,8 +76,10 @@ const workspaceElement = ref<HTMLElement>();
 const sidebarHidden = ref(false);
 const { mobile, mobileSurface, mobileSidebarOpen, sidebarInvisible, showSidebar } =
   useMobileSurfaces(sidebarHidden);
-const { treeWidth, sizes, resizeTree, resizeTreeKey } = useSidebarResize(workspaceElement);
-const sidebar = ref<InstanceType<typeof WorkspaceSidebar>>();
+const { treeWidth, asideWidth, sizes, resizeTree, resizeTreeKey, resizeAside, resizeAsideKey } =
+  useSidebarResize(workspaceElement);
+const sidebar = ref<InstanceType<typeof WorkspaceSidebar>>(),
+  asidePanel = ref<InstanceType<typeof WorkspaceSidebar>>();
 const editorCommands = useCommandScope(`editor:${props.projectId}`, () => ({
   surface: "editor",
   projectId: props.projectId,
@@ -129,10 +133,10 @@ const branches = useGitBranches(() => props.projectId);
 const loadGit = () => (capabilities.git ? overview.load() : Promise.resolve());
 /** An answer of the agent may leave edits and commits: the Git panel reads them again. */
 const releaseAgentTurnEnd = onAgentTurnEnd(props.projectId, () => void loadGit());
-const section = ref("files");
-const extraSections = ref<SidebarType[]>([]);
+const section = ref("files"),
+  extraSections = ref<SidebarType[]>([]);
+const { override: rightPanelOverride, enabled: rightPanelEnabled } = useRightPanelPreference();
 const { pluginSidebarSections, mergedSidebarViews } = usePluginWorkspaceViews(props.sidebarViews);
-/** The program the header launcher repeats; it travels with the session. */
 const lastSession = ref("shell");
 provideLastSession(lastSession);
 const sections = computed(() =>
@@ -232,7 +236,6 @@ const isDirty = (file: OpenFile) =>
     ? !!tabTypes.behaviorOf(file.virtual)?.dirty?.()
     : file.draft !== undefined && file.draft !== file.content;
 const tabs = ref<OpenFile[]>([]);
-/** Куда поместить следующую открытую вкладку: заполняется при перетаскивании файла на блок. */
 const pending: { target?: DockTarget } = {};
 const workbench = useWorkbenchLayout({
   projectId: () => props.projectId,
@@ -259,6 +262,25 @@ const {
   currentPreset,
   presetsAvailable,
 } = workbench;
+const {
+  hidden: asideHidden,
+  middle: asideBottom,
+  shown: asideShown,
+  asideTarget,
+  section: asideSection,
+  registry: asideRegistry,
+  views: asideViews,
+} = useWorkspaceAsidePanel({
+  profile,
+  capabilities,
+  mobile,
+  enabled: () => rightPanelEnabled.value,
+  override: rightPanelOverride,
+  layout,
+  register: registerEditor,
+  views: props.asideViews,
+  refresh: () => asidePanel.value?.refreshSection(),
+});
 const files = useOpenFiles({
   projectId: () => props.projectId,
   tabs,
@@ -331,7 +353,6 @@ registerPluginWorkspaceCommands({
   section,
   showSidebar,
 });
-// The workspace is the default surface: its commands work even before the first focus.
 editorCommands.scope.activate();
 const docker = useDocker(props.projectId, {
   enabled: capabilities.docker,
@@ -422,7 +443,9 @@ useWorkspaceSession({
   extraSections,
   restoreSections,
   treeWidth,
+  asideWidth,
   sidebarHidden,
+  rightPanel: rightPanelOverride,
   launcher: lastSession,
   mobile,
   mobileSurface,
@@ -484,6 +507,9 @@ onBeforeUnmount(() => {
     class="workspace"
     :class="{
       'sidebar-hidden': sidebarInvisible,
+      'has-aside': asideShown,
+      'aside-hidden': asideHidden,
+      'aside-bottom': asideShown && asideBottom,
       zen: zenMode,
     }"
     :data-surface="mobile ? mobileSurface : undefined"
@@ -561,6 +587,41 @@ onBeforeUnmount(() => {
       data-command="ide.workbench.sidebar.toggle"
       @click="editorCommands.run('ide.workbench.sidebar.toggle')"
     />
+    <WorkspaceSidebar
+      v-if="asideShown"
+      ref="asidePanel"
+      class="aside"
+      :inert="zenMode"
+      v-model:section="asideSection"
+      side="right"
+      :project-id="projectId"
+      :capabilities="capabilities"
+      :sections="asideRegistry"
+      :views="asideViews"
+      :hidden="asideHidden"
+      :rail="!asideBottom"
+      :active="active"
+      :revision="revision"
+      :overview="overview"
+      :history="history"
+      :branches="branches"
+      :files="files"
+      :git-sync="gitSync"
+      :execute-command="(id, args) => editorCommands.scope.executeCommand(id, args)"
+      toggle-command="ide.workbench.aside.toggle"
+      refresh-command="ide.workbench.aside.refresh"
+      close-command="ide.workbench.aside.section.close"
+      @command="
+        (id, args) =>
+          (id.startsWith('ide.docker.') ? docker.commands : editorCommands).run(id, args)
+      "
+      @open-commit-tree="openCommitTree"
+      @open-search="openSearch"
+      @refresh="refresh"
+      @changed="treeChanged"
+      @deleted="entryDeleted"
+      @moved="entryMoved"
+    />
     <section
       class="dock-pane"
       :inert="mobile && mobileSidebarOpen && !zenMode"
@@ -575,6 +636,8 @@ onBeforeUnmount(() => {
         :mobile="mobile"
         :mobile-surface="mobileSurface"
         :zen="zenMode"
+        :aside="asideShown && !zenMode"
+        :aside-target="asideTarget"
         :files="files"
         :tab-actions="tabActions"
         :panel-hosts="panelHosts"
@@ -585,6 +648,16 @@ onBeforeUnmount(() => {
         @command="(id, args) => editorCommands.run(id, args)"
       />
     </section>
+    <UiResizeHandle
+      v-if="asideShown && !asideHidden && !asideBottom"
+      appearance="gap"
+      orientation="vertical"
+      class="resize-handle aside-resize"
+      aria-label="Ширина правой панели"
+      tabindex="0"
+      @pointerdown="resizeAside"
+      @keydown="resizeAsideKey"
+    />
     <MobileSurfaces
       v-if="mobile"
       v-show="!zenMode"
@@ -618,6 +691,7 @@ onBeforeUnmount(() => {
 <style scoped>
 .workspace {
   --rail-w: 40px;
+  --aside-width: clamp(240px, 21vw, 320px);
   display: grid;
   grid-template-columns: var(--tree-width, clamp(240px, 21vw, 320px)) var(--island-gap) minmax(
       0,
@@ -633,8 +707,37 @@ onBeforeUnmount(() => {
   grid-template-columns: calc(var(--rail-w) - var(--island-gap)) var(--island-gap) minmax(0, 1fr);
   column-gap: 0;
 }
+/* Правая полоса разделов: её колонка остаётся, даже когда панель свёрнута. */
+.workspace.has-aside {
+  grid-template-columns:
+    var(--tree-width, clamp(240px, 21vw, 320px)) var(--island-gap) minmax(0, 1fr)
+    var(--island-gap) var(--aside-width);
+}
+.workspace.sidebar-hidden.has-aside {
+  grid-template-columns:
+    calc(var(--rail-w) - var(--island-gap)) var(--island-gap) minmax(0, 1fr) var(--island-gap)
+    var(--aside-width);
+}
+.workspace.has-aside.aside-hidden {
+  grid-template-columns:
+    var(--tree-width, clamp(240px, 21vw, 320px)) var(--island-gap) minmax(0, 1fr)
+    var(--island-gap) calc(var(--rail-w) - var(--island-gap));
+}
+.workspace.sidebar-hidden.has-aside.aside-hidden {
+  grid-template-columns:
+    calc(var(--rail-w) - var(--island-gap)) var(--island-gap) minmax(0, 1fr) var(--island-gap)
+    calc(var(--rail-w) - var(--island-gap));
+}
+.workspace > .aside {
+  grid-column: 5;
+  grid-row: 3;
+}
 .tree-resize {
   grid-column: 2;
+  grid-row: 3;
+}
+.aside-resize {
+  grid-column: 4;
   grid-row: 3;
 }
 .dock-pane {
@@ -660,10 +763,46 @@ onBeforeUnmount(() => {
     overflow: auto;
   }
   .workspace {
+    --aside-width: clamp(200px, 24vw, 260px);
     grid-template-columns: 260px var(--island-gap) minmax(0, 1fr);
   }
   .workspace.sidebar-hidden {
     grid-template-columns: calc(var(--rail-w) - var(--island-gap)) var(--island-gap) minmax(0, 1fr);
+  }
+  .workspace.has-aside {
+    grid-template-columns: 260px var(--island-gap) minmax(0, 1fr) var(--island-gap) var(
+        --aside-width
+      );
+  }
+  .workspace.has-aside.aside-bottom {
+    grid-template-columns: 260px var(--island-gap) minmax(0, 1fr);
+    grid-template-rows: auto auto minmax(0, 1fr) minmax(180px, 34vh) auto;
+  }
+  .workspace.has-aside.aside-bottom > .aside {
+    grid-column: 3;
+    grid-row: 4;
+  }
+  .workspace.has-aside.aside-bottom > .sidebar:not(.aside),
+  .workspace.has-aside.aside-bottom > .tree-resize {
+    grid-row: 3 / 5;
+  }
+  .workspace.has-aside.aside-bottom > .workspace-status {
+    grid-row: 5;
+  }
+  .workspace.sidebar-hidden.has-aside {
+    grid-template-columns:
+      calc(var(--rail-w) - var(--island-gap)) var(--island-gap) minmax(0, 1fr) var(--island-gap)
+      var(--aside-width);
+  }
+  .workspace.has-aside.aside-hidden {
+    grid-template-columns:
+      260px var(--island-gap) minmax(0, 1fr) var(--island-gap)
+      calc(var(--rail-w) - var(--island-gap));
+  }
+  .workspace.sidebar-hidden.has-aside.aside-hidden {
+    grid-template-columns:
+      calc(var(--rail-w) - var(--island-gap)) var(--island-gap) minmax(0, 1fr) var(--island-gap)
+      calc(var(--rail-w) - var(--island-gap));
   }
 }
 @media (max-width: 700px), (max-width: 1050px) and (max-height: 500px) and (pointer: coarse) {
@@ -679,6 +818,9 @@ onBeforeUnmount(() => {
     border-radius: 0;
   }
   .tree-resize {
+    display: none;
+  }
+  .aside-resize {
     display: none;
   }
   .dock-pane {
@@ -714,13 +856,19 @@ onBeforeUnmount(() => {
   margin-top: var(--island-gap);
 }
 .workspace.zen,
-.workspace.zen.sidebar-hidden {
+.workspace.zen.sidebar-hidden,
+.workspace.zen.has-aside,
+.workspace.zen.sidebar-hidden.has-aside,
+.workspace.zen.has-aside.aside-hidden,
+.workspace.zen.sidebar-hidden.has-aside.aside-hidden {
   position: relative;
   grid-template-columns: minmax(0, 1fr);
   grid-template-rows: minmax(0, 1fr);
   column-gap: 0;
 }
 .workspace.zen > .sidebar,
+.workspace.zen > .aside,
+.workspace.zen > .aside-resize,
 .workspace.zen > .tree-resize,
 .workspace.zen > .sidebar-backdrop,
 .workspace.zen > .workspace-status,

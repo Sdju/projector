@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { computed, provide, useSlots, type Slots } from "vue";
+import { computed, provide, useSlots, watch, type Slots } from "vue";
 import { useEventListener } from "@vueuse/core";
 import { tabDrag } from "../../../common/utilities/tab-drag.ts";
 import type { ContextMenuItem } from "../../../common/ui/context-menu.ts";
-import { isNodeVisible, type DockLayout, type DockTarget } from "../model/layout.ts";
+import { dockGroups, toggleMaximized, type DockLayout, type DockTarget } from "../model/layout.ts";
 import { dockKey, type DockTabInfo } from "./context.ts";
 import DockTree from "./DockTree.vue";
+import DockGroupView from "./DockGroupView.vue";
 import MobileDock from "./MobileDock.vue";
 
 /**
@@ -17,6 +18,10 @@ const props = defineProps<{
   mobile?: boolean;
   mobileSurface?: "editor" | "files" | "terminal";
   zen?: boolean;
+  /** The right rail is on: the panel group (terminals) renders inside it, not in the dock. */
+  aside?: boolean;
+  /** Element of the rail section; the teleport mounts only when it exists. */
+  asideTarget?: HTMLElement;
   terminalPanel?: (id: string) => boolean;
   describe: (id: string) => DockTabInfo;
   projectId: string;
@@ -38,6 +43,7 @@ const slots: Slots = useSlots();
 provide(dockKey, {
   layout: () => props.layout,
   zen: () => !!props.zen,
+  aside: () => !!props.aside,
   slots,
   get projectId() {
     return props.projectId;
@@ -56,7 +62,24 @@ provide(dockKey, {
   pin: (id) => emit("pin", id),
   drop: (event, target) => emit("drop", event, target),
 });
-const visible = computed(() => isNodeVisible(props.layout.root));
+const visible = computed(() =>
+  dockGroups(props.layout).some((group) => !group.hidden && !(props.aside && group.panel)),
+);
+/** The panel group (terminals) lives in the right rail while the setting is on. */
+const asideGroup = computed(() =>
+  props.aside ? dockGroups(props.layout).find((group) => group.panel && !group.hidden) : undefined,
+);
+/** Maximized means "fill the dock": for a teleported group that would only fill its own panel. */
+watch(
+  () => [props.aside, props.layout.maximized] as const,
+  () => {
+    const id = props.layout.maximized;
+    if (!props.aside || !id) return;
+    if (dockGroups(props.layout).some((group) => group.id === id && group.panel))
+      emit("update:layout", toggleMaximized(props.layout, id));
+  },
+  { immediate: true },
+);
 // A drop elsewhere on the page, or a cancelled drag, must not leave group drop zones armed.
 useEventListener(window, "dragend", () => (tabDrag.value = undefined));
 useEventListener(window, "drop", () => (tabDrag.value = undefined));
@@ -71,6 +94,15 @@ useEventListener(window, "drop", () => (tabDrag.value = undefined));
     />
     <DockTree v-else-if="visible" :node="layout.root" />
     <p v-else class="dock-none">Все блоки скрыты. Включите нужный блок на панели выше.</p>
+    <div
+      v-if="asideGroup && asideTarget"
+      :key="`${asideGroup.id}:${asideGroup.panels.join(',')}:${asideGroup.active}`"
+      class="dock-aside-slot"
+    >
+      <Teleport :to="asideTarget">
+        <DockGroupView :group="asideGroup" embedded />
+      </Teleport>
+    </div>
   </div>
 </template>
 
@@ -81,6 +113,10 @@ useEventListener(window, "drop", () => (tabDrag.value = undefined));
   min-width: 0;
   min-height: 0;
   height: 100%;
+}
+/* The teleported group lives in the right rail; the slot itself takes no space. */
+.dock-aside-slot {
+  display: contents;
 }
 .dock-none {
   margin: auto;

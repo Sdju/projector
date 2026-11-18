@@ -26,11 +26,25 @@ export function createDockLayout(): DockLayout {
       type: "split",
       id: "s1",
       direction: "row",
-      children: [emptyGroup("g1", "editor"), emptyGroup("g2", "terminal")],
+      children: [emptyGroup("g1", "editor"), { ...emptyGroup("g2", "terminal"), panel: true }],
       sizes: [0.65, 0.35],
     },
     focused: "g1",
   };
+}
+
+/** Панель — группа, которая сворачивается в полосу; у старой раскладки её ещё нет. */
+export function ensurePanelGroup(layout: DockLayout): DockLayout {
+  if (dockGroups(layout).some((group) => group.panel)) return layout;
+  // The terminal group may sit anywhere: a stacked preset has a column root, and splits nest.
+  const groups = dockGroups(layout).filter((group) => !group.hidden);
+  const panel = groups.findLast((group) => group.role === "terminal") ?? groups.at(-1);
+  if (!panel) return layout;
+  const next = copy(layout);
+  const target = findDockGroup(next, panel.id);
+  if (!target) return layout;
+  target.panel = true;
+  return commit(layout, next);
 }
 
 export function dockGroups(layout: DockLayout): DockGroup[] {

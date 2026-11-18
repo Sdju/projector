@@ -49,6 +49,8 @@ const props = defineProps<{
   scopeId?: string;
   /** The section is reloading: the mobile refresh button shows a spinner. */
   refreshing?: boolean;
+  /** Command of the refresh button in the compact (non-rail) bar. */
+  refreshCommand?: string;
 }>();
 const emit = defineEmits<{
   "update:section": [section: string];
@@ -277,9 +279,9 @@ function choose(item: SidebarItem) {
         size="sm"
         title="Обновить раздел"
         :aria-label="refreshing ? 'Обновление раздела' : 'Обновить раздел'"
-        data-command="ide.workbench.sidebar.refresh"
+        :data-command="refreshCommand ?? 'ide.workbench.sidebar.refresh'"
         :busy="refreshing"
-        @click="emit('command', 'ide.workbench.sidebar.refresh')"
+        @click="emit('command', refreshCommand ?? 'ide.workbench.sidebar.refresh')"
       >
         <IconRefresh aria-hidden="true" />
       </UiButton>

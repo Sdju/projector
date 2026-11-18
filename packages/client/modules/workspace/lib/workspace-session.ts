@@ -1,5 +1,10 @@
 import { nextTick, onBeforeUnmount, watch, type Ref } from "vue";
-import { parseDockLayout, serializeDockLayout, type DockLayout } from "../../dock/index.ts";
+import {
+  parseDockLayout,
+  serializeDockLayout,
+  ensurePanelGroup,
+  type DockLayout,
+} from "../../dock/index.ts";
 import type { SidebarRegistry, SidebarType, TabParams } from "../../workspace-api/index.ts";
 import {
   fileScopeKey,
@@ -30,7 +35,10 @@ export interface WorkspaceSessionContext {
   /** Rebuilds temporary sections from a session before the saved section is selected. */
   restoreSections?: (sections: SidebarType[]) => void;
   treeWidth: Ref<number | undefined>;
+  asideWidth?: Ref<number | undefined>;
   sidebarHidden: Ref<boolean>;
+  /** Local override of the global right-panel preference (`undefined` — follow the setting). */
+  rightPanel?: Ref<boolean | undefined>;
   /** Последняя запущенная сессия (программа или встроенный агент). */
   launcher?: Ref<string>;
   mobile: Ref<boolean>;
@@ -100,7 +108,9 @@ export function useWorkspaceSession(ctx: WorkspaceSessionContext) {
         section: ctx.section.value,
         mobileSurface: ctx.mobileSurface.value,
         treeWidth: ctx.treeWidth.value,
+        asideWidth: ctx.asideWidth?.value,
         sidebarHidden: ctx.sidebarHidden.value,
+        rightPanel: ctx.rightPanel?.value,
         launcher: ctx.launcher?.value,
         layout: serializeDockLayout(ctx.layout.value),
       };
@@ -168,13 +178,15 @@ export function useWorkspaceSession(ctx: WorkspaceSessionContext) {
       ctx.restoringSession.value = true;
       ctx.resetFiles();
       ctx.resetGit();
-      ctx.layout.value = parseDockLayout(saved?.layout) ?? ctx.initialLayout();
+      ctx.layout.value = ensurePanelGroup(parseDockLayout(saved?.layout) ?? ctx.initialLayout());
       ctx.restoreSections?.(saved?.sections ?? []);
       const exists = (id: string) =>
         ctx.sectionExists ? ctx.sectionExists(id) : ctx.sections.has(id);
       ctx.section.value = exists(saved?.section ?? "") ? saved!.section : "files";
       ctx.treeWidth.value = saved?.treeWidth;
+      if (ctx.asideWidth) ctx.asideWidth.value = saved?.asideWidth;
       ctx.sidebarHidden.value = !!saved?.sidebarHidden;
+      if (ctx.rightPanel) ctx.rightPanel.value = saved?.rightPanel;
       if (ctx.launcher) ctx.launcher.value = saved?.launcher || "shell";
       ctx.reloadGit();
       void restoreSession(saved, generation);

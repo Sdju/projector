@@ -5,7 +5,7 @@ import { clientAgents } from "../agents-integration/catalog/index.ts";
 import type { FileWrite, GitWrite, WorkspaceProfile } from "./profile.ts";
 import { defineTab, inboxTab, singletonTab } from "./tabs.ts";
 import { localWorkspaceWatch } from "./local-watch.ts";
-import { workspaceUtility } from "./sidebar.ts";
+import { workspaceAside, workspaceUtility } from "./sidebar.ts";
 
 const base = (projectId: string) =>
   deviceUrl(`/api/projects/${encodeURIComponent(projectId)}/workspace`);
@@ -59,6 +59,7 @@ export function createLocalWorkspaceProfile(projectId: string): WorkspaceProfile
     layout: "full",
     sidebar: [{ id: "docker", title: "Docker", command: "ide.docker.sidebar.open" }],
     utility: workspaceUtility,
+    aside: workspaceAside,
     tabs: [
       inboxTab,
       // The Projector agent: the tab without a chat id is the project's original conversation.

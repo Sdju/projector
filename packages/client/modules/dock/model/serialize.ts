@@ -44,6 +44,7 @@ function parseNode(
           : (list[0] ?? ""),
       ...(typeof value.role === "string" && value.role.length <= 20 ? { role: value.role } : {}),
       ...(value.hidden === true ? { hidden: true } : {}),
+      ...(value.panel === true ? { panel: true } : {}),
       ...(value.keepEmpty === true ? { keepEmpty: true } : {}),
     };
   }

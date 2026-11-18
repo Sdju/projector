@@ -5,6 +5,7 @@ export {
   addPanel,
   createDockLayout,
   dockGroups,
+  ensurePanelGroup,
   findDockGroup,
   groupOfPanel,
   movePanel,

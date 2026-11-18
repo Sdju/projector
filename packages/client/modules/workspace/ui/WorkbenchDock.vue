@@ -5,7 +5,7 @@ import { computed } from "vue";
 import UiButton from "../../../common/ui/UiButton.vue";
 import UiEmpty from "../../../common/ui/UiEmpty.vue";
 import IconFinishFlag from "../../../common/ui/IconFinishFlag.vue";
-import { DockView } from "../../dock/index.ts";
+import { DockView, dockGroups } from "../../dock/index.ts";
 import type { ContextMenuItem } from "../../../common/ui/context-menu.ts";
 import { TerminalView } from "../../terminal/index.ts";
 import { ActivityIsland, AgentInboxBell } from "../../agent/index.ts";
@@ -28,6 +28,10 @@ const props = defineProps<{
   mobile?: boolean;
   mobileSurface?: "editor" | "files" | "terminal";
   zen?: boolean;
+  /** The right rail is on: terminals render there instead of the dock. */
+  aside?: boolean;
+  /** Element of the rail's terminal section; the teleport waits for it. */
+  asideTarget?: HTMLElement;
   workbench: ReturnType<typeof useWorkbenchLayout>;
   files: ReturnType<typeof useOpenFiles>;
   tabActions: (id: string) => ContextMenuItem[];
@@ -46,14 +50,23 @@ const viewOf = (tab: OpenFile) => (tab.virtual ? workspaceTabs.views[tab.virtual
 const kept = computed(() => props.tabs.filter((tab) => viewOf(tab)?.keepAlive));
 const isKept = (id: string) => kept.value.some((tab) => tab.key === id);
 const hostOf = (key: string) => props.panelHosts.hosts[key] ?? null;
+/** The rail group is painted from another tree; a membership change rebuilds the dock so the
+ * teleported group takes the current tab list instead of keeping a stale one. */
+const asideKey = computed(() => {
+  const group = dockGroups(props.workbench.layout.value).find((item) => item.panel);
+  return group ? `${group.id}:${group.panels.join(",")}` : "none";
+});
 </script>
 
 <template>
   <DockView
+    :key="asideKey"
     v-model:layout="workbench.layout.value"
     :mobile="mobile"
     :mobile-surface="mobileSurface"
     :zen="zen"
+    :aside="aside"
+    :aside-target="asideTarget"
     :terminal-panel="(id) => terminalPanels.has(id) || id.startsWith('terminal:')"
     :describe="workbench.describePanel"
     :project-id="projectId"

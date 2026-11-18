@@ -17,6 +17,8 @@ export interface DockTabInfo {
 export interface DockContext {
   layout: () => DockLayout;
   zen?: () => boolean;
+  /** The right rail is on: its panel group renders in the rail, outside the dock tree. */
+  aside?: () => boolean;
   slots: Slots;
   projectId: string;
   commandNamespace: string;
