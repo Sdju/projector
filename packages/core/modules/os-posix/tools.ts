@@ -1,5 +1,6 @@
 import { chmodSync } from "node:fs";
 import { execFile, execFileSync, spawn } from "node:child_process";
+import { resolve } from "node:path";
 import { promisify } from "node:util";
 import type { SpawnProcessSpec } from "./contract.ts";
 
@@ -13,16 +14,24 @@ export function spawnProcess(spec: SpawnProcessSpec) {
     shell: spec.shell === true,
   });
 }
-export function commandExists(bin: string, env?: Record<string, string | undefined>): boolean {
+export function commandPath(
+  bin: string,
+  env?: Record<string, string | undefined>,
+): string | undefined {
   try {
-    execFileSync("which", [bin], {
-      stdio: "ignore",
+    const path = execFileSync("which", [bin], {
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
       env: (env ?? process.env) as NodeJS.ProcessEnv,
-    });
-    return true;
+    }).trimEnd();
+    return path ? resolve(path) : undefined;
   } catch {
-    return false;
+    return undefined;
   }
+}
+
+export function commandExists(bin: string, env?: Record<string, string | undefined>): boolean {
+  return commandPath(bin, env) !== undefined;
 }
 /** Argument-vector Docker transport; never invoke a shell or inherit a host override. */
 export function runDocker(

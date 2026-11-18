@@ -36,6 +36,24 @@ export function commandExists(bin: string, env?: Record<string, string | undefin
   }
 }
 
+export function commandPath(
+  bin: string,
+  env?: Record<string, string | undefined>,
+): string | undefined {
+  try {
+    return (
+      execFileSync("where.exe", [`$PATH:${bin}`], {
+        encoding: "utf8",
+        stdio: ["ignore", "pipe", "ignore"],
+        windowsHide: true,
+        env: (env ?? process.env) as NodeJS.ProcessEnv,
+      }).split(/\r?\n/u)[0] || undefined
+    );
+  } catch {
+    return undefined;
+  }
+}
+
 function dockerEnv() {
   const env = { ...process.env };
   for (const key of Object.keys(env))

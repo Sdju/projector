@@ -21,6 +21,7 @@ export {
   runDockerSync,
   runNodeScript,
   commandExists,
+  commandPath,
   ptyCommand,
   spawnProcess,
   isExecutableFile,

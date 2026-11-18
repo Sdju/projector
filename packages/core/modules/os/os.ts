@@ -125,6 +125,8 @@ export function createOs(platform: NodeJS.Platform = process.platform) {
     tools: {
       commandExists: (bin: string, env?: Record<string, string | undefined>) =>
         backend("commandExists").commandExists(bin, env),
+      commandPath: (bin: string, env?: Record<string, string | undefined>) =>
+        backend("commandPath").commandPath(bin, env),
       agentEnv: (base: Record<string, string | undefined>) => backend("agentEnv").agentEnv(base),
       spawnAgentProcess: (spec: AgentProcessSpec) =>
         backend("spawnAgentProcess").spawnAgentProcess(spec),

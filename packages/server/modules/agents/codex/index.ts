@@ -14,6 +14,7 @@ export const codexProgram = {
   command: "npx",
   args: ["-y", "@agentclientprotocol/codex-acp@2.1.1"],
   binary: "codex-acp",
+  executableEnv: { name: "CODEX_PATH", command: "codex" },
   dialect: createCodexDialect,
   forms: codexForms,
 };

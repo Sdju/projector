@@ -32,6 +32,12 @@ export interface AcpInitResult {
 async function resolveLaunch(program: AcpProgram, cwd: string) {
   // Resolve programs the way a terminal session does, not through the server's own PATH.
   const env = await os.tools.agentEnv(agentEnv());
+  const executable = program.executableEnv;
+  if (executable && !env[executable.name]) {
+    // Resolve before npx prepends bundled executables to PATH.
+    const path = os.tools.commandPath(executable.command, env);
+    if (path) env[executable.name] = path;
+  }
   if (program.binary && os.tools.commandExists(program.binary, env))
     return { command: program.binary, args: program.binaryArgs ?? [], cwd, env };
   if (program.command === "npx")

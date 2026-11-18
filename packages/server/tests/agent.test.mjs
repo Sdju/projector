@@ -861,10 +861,12 @@ test("agent processes resolve programs through the interactive shell PATH", asyn
   try {
     const base = { PATH: "/usr/bin:/bin" };
     expect(os.tools.commandExists("fake-agent", base)).toBe(false);
+    expect(os.tools.commandPath("fake-agent", base)).toBeUndefined();
     const env = await os.tools.agentEnv(base);
     expect(env.PATH.split(":")).toContain(dir);
     expect(env.PATH.startsWith("/usr/bin:/bin")).toBe(true);
     expect(os.tools.commandExists("fake-agent", env)).toBe(true);
+    expect(os.tools.commandPath("fake-agent", env)).toBe(join(dir, "fake-agent"));
   } finally {
     if (previous === undefined) delete process.env.SHELL;
     else process.env.SHELL = previous;

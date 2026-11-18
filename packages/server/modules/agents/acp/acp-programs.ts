@@ -48,6 +48,8 @@ export interface AcpProgram {
   binary?: string;
   /** Arguments of `binary`; empty when the binary takes none (default). */
   binaryArgs?: string[];
+  /** Gives the adapter the path to an installed executable when the env override is unset. */
+  executableEnv?: { name: string; command: string };
   /**
    * Overrides of the terminal that opens the agent: the program id defaults to `id`, the
    * executable to `id` and the tab title to `label`.
