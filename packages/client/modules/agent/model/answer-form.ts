@@ -2,8 +2,11 @@ import { computed, nextTick, shallowRef, watch, type Ref } from "vue";
 import {
   answerFormSource,
   doctorFormSource,
-  formProblem,
+  doctorVerdict,
+  formatProblems,
+  formProblems,
   heuristicFormRepair,
+  type AnswerProblem,
 } from "../../widget-runtime/index.ts";
 import { repairForm } from "../../agent-core/index.ts";
 import type {
@@ -12,6 +15,7 @@ import type {
   AgentTurn,
   MessagePart,
 } from "../../agent-core/index.ts";
+import { textFingerprint } from "./fingerprint.ts";
 
 const FORM_DOCTOR_ATTEMPTS = 3;
 
@@ -61,6 +65,8 @@ export function useAnswerForm(options: {
   edit: (id: string) => void;
   /** The project whose trusted widgets may own the answer form. */
   projectId?: string;
+  /** Saves a doctor verdict with the chat, so a reload does not ask the same question again. */
+  persist?: () => void;
 }) {
   const rawForm = computed(() => {
     if (options.busy.value) return undefined;
@@ -94,46 +100,88 @@ export function useAnswerForm(options: {
     repairing.value = false;
     repairError.value = "";
     if (!source) return;
+    const turn = options.turns.value.at(-1);
+    const saved = turn?.role === "assistant" ? turn.formRepair : undefined;
+    // The doctor already said the check is wrong: show the same form, do not ask again.
+    if (saved?.status === "accepted" && saved.source === textFingerprint(source)) {
+      pendingForm.value = heuristicFormRepair(source);
+      return;
+    }
     let candidate = heuristicFormRepair(source);
-    let problem = await formProblem(candidate, options.projectId);
+    let problems: AnswerProblem[] = await formProblems(candidate, options.projectId);
     if (run !== generation) return;
-    if (!problem) {
+    if (!problems.length) {
       pendingForm.value = candidate;
       return;
     }
     repairing.value = true;
     const next = new AbortController();
     controller = next;
+    const originalError = formatProblems(problems);
+    let diagnosis = originalError;
+    let previous: string | undefined;
     for (let attempt = 0; attempt < FORM_DOCTOR_ATTEMPTS && !next.signal.aborted; attempt++) {
       try {
-        const answer = await repairForm({
+        const reply = await repairForm({
           form: candidate,
-          error: problem,
+          error: diagnosis,
+          original: source,
+          originalError,
+          previous,
+          attempt: attempt + 1,
+          limit: FORM_DOCTOR_ATTEMPTS,
           history: formHistory(options.turns.value),
           selection: options.selection?.value,
           signal: next.signal,
         });
         if (run !== generation || next.signal.aborted) return;
-        const extracted = doctorFormSource(answer, options.projectId);
+        previous = reply;
+        const verdict = doctorVerdict(reply);
+        if (verdict) {
+          if (!problems.every((problem) => problem.soft)) {
+            // A compiler error is a fact: the check keeps the form out of the composer.
+            repairing.value = false;
+            repairError.value = `${diagnosis} · вердикт доктора отклонён: ${verdict.reason}`;
+            return;
+          }
+          pendingForm.value = candidate;
+          repairing.value = false;
+          if (turn?.role === "assistant") {
+            turn.formRepair = {
+              status: "accepted",
+              attempts: attempt + 1,
+              problem: originalError,
+              reason: verdict.reason,
+              source: textFingerprint(source),
+              at: Date.now(),
+            };
+            options.persist?.();
+          }
+          return;
+        }
+        const extracted = doctorFormSource(reply, options.projectId);
         if (!extracted) {
-          problem = "Form Doctor вернул не форму";
+          diagnosis = "Form Doctor вернул не форму";
           continue;
         }
         candidate = heuristicFormRepair(extracted);
-        problem = await formProblem(candidate, options.projectId);
+        const nextProblems = await formProblems(candidate, options.projectId);
         if (run !== generation || next.signal.aborted) return;
-        if (!problem) {
+        if (!nextProblems.length) {
           pendingForm.value = candidate;
+          repairing.value = false;
           return;
         }
+        problems = nextProblems;
+        diagnosis = formatProblems(nextProblems);
       } catch (error) {
         if (run !== generation || next.signal.aborted) return;
-        problem = error instanceof Error ? error.message : String(error);
+        diagnosis = error instanceof Error ? error.message : String(error);
       }
     }
     if (run === generation) {
       repairing.value = false;
-      repairError.value = problem ?? "Не удалось восстановить форму";
+      repairError.value = diagnosis || "Не удалось восстановить форму";
     }
   }
 

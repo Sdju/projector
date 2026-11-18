@@ -29,6 +29,11 @@ export const routes: RouteDefinition[] = [
       const repaired = await repairForm({
         form,
         error,
+        original: asString(body.original) || undefined,
+        originalError: asString(body.originalError) || undefined,
+        previous: asString(body.previous) || undefined,
+        attempt: typeof body.attempt === "number" ? body.attempt : undefined,
+        limit: typeof body.limit === "number" ? body.limit : undefined,
         history: asString(body.history),
         selection,
         signal: abort.signal,

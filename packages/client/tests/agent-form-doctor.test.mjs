@@ -21,6 +21,7 @@ const ask = (text) => ({
   selection: ref({}),
   send: async () => {},
   edit: () => {},
+  persist: vi.fn(),
 });
 
 async function waitFor(check, ms = 3000) {
@@ -67,6 +68,56 @@ test("Form Doctor retries the doctor until the answer compiles", async () => {
   const form = scope.run(() => useAnswerForm(options));
   await waitFor(() => Boolean(form.pendingForm.value));
   expect(repairForm).toHaveBeenCalledTimes(3);
+  expect(repairForm.mock.calls[1][0]).toMatchObject({
+    attempt: 2,
+    limit: 3,
+    original: "<IntelligentForm><Unknown /></IntelligentForm>",
+    previous: "<IntelligentForm><Unknown /></IntelligentForm>",
+  });
   expect(form.pendingForm.value).toBe('<IntelligentForm><Input name="next" /></IntelligentForm>');
+  scope.stop();
+});
+
+test("Form Doctor accepts a verdict and does not check the same form again", async () => {
+  repairForm.mockReset();
+  repairForm.mockResolvedValueOnce(
+    "PROJECTOR-DOCTOR: VALID\nПричина: Unknown — это проектный виджет, он просто ещё не загружен.",
+  );
+  const source = '<IntelligentForm><Unknown name="next" /></IntelligentForm>';
+  const options = ask(source);
+  const scope = effectScope();
+  const form = scope.run(() => useAnswerForm(options));
+  await waitFor(() => Boolean(form.pendingForm.value));
+  expect(repairForm).toHaveBeenCalledTimes(1);
+  expect(form.pendingForm.value).toBe(source);
+  expect(options.persist).toHaveBeenCalledTimes(1);
+  expect(options.turns.value[0].formRepair).toMatchObject({
+    status: "accepted",
+    attempts: 1,
+    reason: expect.stringContaining("проектный виджет"),
+  });
+  scope.stop();
+
+  // The verdict is saved with the answer: a reload shows the form without another request.
+  const reloaded = ask(source);
+  reloaded.turns.value[0] = options.turns.value[0];
+  const reloadedScope = effectScope();
+  const reloadedForm = reloadedScope.run(() => useAnswerForm(reloaded));
+  await waitFor(() => Boolean(reloadedForm.pendingForm.value));
+  expect(repairForm).toHaveBeenCalledTimes(1);
+  expect(reloaded.persist).not.toHaveBeenCalled();
+  reloadedScope.stop();
+});
+
+test("Form Doctor rejects a verdict on a compiler error", async () => {
+  repairForm.mockReset();
+  repairForm.mockResolvedValue("PROJECTOR-DOCTOR: VALID\nПричина: форма корректна.");
+  const options = ask("<IntelligentForm><p>{{ 1 + }}</p></IntelligentForm>");
+  const scope = effectScope();
+  const form = scope.run(() => useAnswerForm(options));
+  await waitFor(() => Boolean(form.repairError.value));
+  expect(repairForm).toHaveBeenCalledTimes(1);
+  expect(form.pendingForm.value).toBeUndefined();
+  expect(form.repairError.value).toContain("вердикт доктора отклонён");
   scope.stop();
 });

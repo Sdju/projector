@@ -5,6 +5,16 @@ interface DoctorInput {
   history?: string;
   selection?: AgentSelection;
   signal?: AbortSignal;
+  /** 1-based attempt of the same repair round, so the doctor continues instead of restarting. */
+  attempt?: number;
+  /** How many attempts the round allows. */
+  limit?: number;
+  /** The text before the first repair: the round starts from it. */
+  original?: string;
+  /** The diagnosis that opened the round. */
+  originalError?: string;
+  /** The doctor's previous reply, raw: the round keeps its own transcript. */
+  previous?: string;
 }
 
 /** Asks the Projector Form Doctor to rewrite a form the compiler rejected. */

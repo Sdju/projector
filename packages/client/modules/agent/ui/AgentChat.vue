@@ -352,9 +352,7 @@ const zenMode = useChatZenFocus({
 // The project folder: edited files and dropped paths are shown relative to it.
 const projectRoot = ref("");
 void workspaceRequest(props.projectId, "root")
-  .then((data) => {
-    projectRoot.value = data.root;
-  })
+  .then((data) => (projectRoot.value = data.root))
   .catch(() => {});
 // MCP servers shown in the parameters island; read when it opens, as that starts a probe process.
 const { mcp, load: loadMcpServers } = useMcpServers(() => props.backend, props.projectId);
@@ -377,6 +375,7 @@ const { pendingForm, answerFormFor, submitComposerForm, submitTurnForm } = useAn
   send,
   edit,
   projectId: props.projectId,
+  persist,
 });
 /** The form the composer shows: a starter preset wins over the last answer's form. */
 const {
@@ -489,9 +488,7 @@ const { submit, continueTurn, suggest, newChat } = useChatInputActions({
   side,
   clear,
   toBottom,
-  resetAway: () => {
-    away.value = false;
-  },
+  resetAway: () => (away.value = false),
   focus: () => composer.value?.focus(),
   closeForm: closePresetForm,
 });

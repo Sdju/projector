@@ -12,17 +12,34 @@ import type {
 
 /** What Answer Doctor found and did with a finished answer; saved with the turn. */
 export interface AgentDoctorReport {
-  status: "fixed" | "failed";
+  status: "fixed" | "accepted" | "failed";
   /** How many repair attempts the doctor used. */
   attempts: number;
-  /** The first problem the client check found. */
+  /** The problems the client check found before the first attempt. */
   problem: string;
   /** The diagnosis after the last attempt, when the doctor gave up. */
   remaining?: string;
+  /** Why the doctor overruled the check (`status: "accepted"`). */
+  reason?: string;
   /** Milliseconds spent from the first diagnosis to the last attempt. */
   took: number;
   /** FNV-1a hash of the repaired text: an edited or repeated answer hides the old report. */
   answer: number;
+  /** When the doctor finished (ms since the epoch). */
+  at: number;
+}
+
+/** A form the doctor accepted as it is: the check no longer runs on this answer. */
+export interface AgentFormRepair {
+  status: "accepted";
+  /** How many calls it took to get the verdict. */
+  attempts: number;
+  /** The problems the client check found. */
+  problem: string;
+  /** Why the doctor overruled the check. */
+  reason: string;
+  /** FNV-1a hash of the form source: an edited or repeated answer hides the old verdict. */
+  source: number;
   /** When the doctor finished (ms since the epoch). */
   at: number;
 }
@@ -83,6 +100,8 @@ export interface AgentTurn {
   detached?: boolean;
   /** What Answer Doctor did with this answer, kept so the mark stays after a reload. */
   doctor?: AgentDoctorReport;
+  /** The form check's saved verdict: an accepted form is not checked again after a reload. */
+  formRepair?: AgentFormRepair;
   /**
    * On a user turn: the other versions of the conversation from this message on, which exist
    * after the message was edited or its answer repeated. Each version starts with a user turn.

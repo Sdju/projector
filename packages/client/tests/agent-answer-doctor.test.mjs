@@ -192,8 +192,65 @@ test("Answer Doctor validates each attempt and accepts a fenced answer", async (
   await waitFor(() => options.turns.value[0].text === "<Card><h3>Готово</h3></Card>");
   expect(repairAnswer).toHaveBeenCalledTimes(2);
   expect(repairAnswer.mock.calls[1][0].answer).toContain("Всё ещё");
+  // The second request continues the same round: it names the attempt, keeps the original
+  // text and shows the doctor its own previous reply.
+  expect(repairAnswer.mock.calls[1][0]).toMatchObject({
+    attempt: 2,
+    limit: 3,
+    original: "<Card>### Сломано</Card>",
+    originalError: expect.stringContaining("Markdown"),
+    previous: "<Card>### Всё ещё Markdown</Card>",
+  });
   expect(options.persist).toHaveBeenCalledTimes(1);
   expect(doctor.reportFor(options.turns.value[0])).toMatchObject({ attempts: 2 });
   expect(doctorAnswerSource("  \n```text\nГотово\n```\n")).toBe("Готово");
+  scope.stop();
+});
+
+test("Answer Doctor accepts a verdict instead of rebuilding a valid answer", async () => {
+  repairAnswer.mockReset();
+  repairAnswer.mockResolvedValueOnce(
+    "PROJECTOR-DOCTOR: VALID\nПричина: 7**3**2 — математическая запись, а не Markdown.",
+  );
+  const text = "<Card><p>7**3**2 = 42</p></Card>";
+  const options = ask(text);
+  const scope = effectScope();
+  const doctor = scope.run(() => useAnswerDoctor(options));
+  await waitFor(() => options.turns.value[0].doctor?.status === "accepted");
+  expect(repairAnswer).toHaveBeenCalledTimes(1);
+  expect(options.turns.value[0].text).toBe(text);
+  expect(options.persist).toHaveBeenCalledTimes(1);
+  expect(doctor.reportFor(options.turns.value[0])).toMatchObject({
+    status: "accepted",
+    attempts: 1,
+    reason: expect.stringContaining("7**3**2"),
+  });
+  expect(doctor.progress.has("assistant")).toBe(false);
+  scope.stop();
+
+  // The saved verdict belongs to this text: a reload does not ask the doctor again.
+  const reloaded = ask(text);
+  reloaded.turns.value[0] = options.turns.value[0];
+  const reloadedScope = effectScope();
+  const reloadedDoctor = reloadedScope.run(() => useAnswerDoctor(reloaded));
+  await new Promise((resolve) => setTimeout(resolve, 50));
+  expect(repairAnswer).toHaveBeenCalledTimes(1);
+  expect(reloaded.persist).not.toHaveBeenCalled();
+  expect(reloadedDoctor.reportFor(reloaded.turns.value[0])?.status).toBe("accepted");
+  reloadedScope.stop();
+});
+
+test("Answer Doctor rejects a verdict on a structural error", async () => {
+  repairAnswer.mockReset();
+  repairAnswer.mockResolvedValue("PROJECTOR-DOCTOR: VALID\nПричина: всё хорошо.");
+  const options = ask("<Card><p>ok</p></Card>\n<Card>");
+  const scope = effectScope();
+  const doctor = scope.run(() => useAnswerDoctor(options));
+  await waitFor(() => doctor.progress.get("assistant")?.status === "failed");
+  // A broken widget is a fact: one rejected verdict ends the round instead of three rebuilds.
+  expect(repairAnswer).toHaveBeenCalledTimes(1);
+  expect(options.turns.value[0].text).toBe("<Card><p>ok</p></Card>\n<Card>");
+  expect(options.turns.value[0].doctor).toMatchObject({ status: "failed", attempts: 1 });
+  expect(options.turns.value[0].doctor?.remaining).toContain("Вердикт доктора отклонён");
   scope.stop();
 });

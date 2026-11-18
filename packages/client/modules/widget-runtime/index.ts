@@ -25,9 +25,16 @@ export { useMessageScope, messageScopeKey, widgetProjectKey, type MessageScope }
 export { autoClose, parseWidgetSource } from "./autoclose.ts";
 export {
   answerProblem,
+  answerProblems,
   dedupeAttributes,
   doctorAnswerSource,
   doctorFormSource,
+  doctorVerdict,
+  formatProblems,
   formProblem,
+  formProblems,
   heuristicFormRepair,
+  type AnswerProblem,
+  type DoctorVerdict,
+  type ProblemKind,
 } from "./repair.ts";

@@ -1,5 +1,11 @@
 import { onScopeDispose, reactive, watch, type Ref } from "vue";
-import { answerProblem, doctorAnswerSource } from "../../widget-runtime/index.ts";
+import {
+  answerProblems,
+  doctorAnswerSource,
+  doctorVerdict,
+  formatProblems,
+  type AnswerProblem,
+} from "../../widget-runtime/index.ts";
 import { repairAnswer } from "../../agent-core/index.ts";
 import type {
   AgentDoctorProgress,
@@ -8,18 +14,12 @@ import type {
   AgentSelection,
   AgentTurn,
 } from "../../agent-core/index.ts";
+import { textFingerprint } from "./fingerprint.ts";
+
+/** The saved marks and their tests keep the old name. */
+export { textFingerprint as answerFingerprint };
 
 const ANSWER_DOCTOR_ATTEMPTS = 3;
-
-/** FNV-1a over the text: a cheap check that a saved report belongs to this answer. */
-export function answerFingerprint(text: string): number {
-  let hash = 0x811c9dc5;
-  for (let at = 0; at < text.length; at++) {
-    hash ^= text.charCodeAt(at);
-    hash = Math.imul(hash, 0x01000193);
-  }
-  return hash >>> 0;
-}
 
 function answerHistory(turns: AgentTurn[]): string {
   return turns
@@ -61,18 +61,51 @@ export function useAnswerDoctor(options: {
   /** The saved outcome, but only while the shown text is the one the doctor fixed. */
   function reportFor(turn: AgentTurn): AgentDoctorReport | undefined {
     const report = turn.doctor;
-    return report && report.answer === answerFingerprint(turn.text) ? report : undefined;
+    return report && report.answer === textFingerprint(turn.text) ? report : undefined;
+  }
+
+  function remember(turn: AgentTurn, report: AgentDoctorReport): void {
+    turn.doctor = report;
+    progress.delete(turn.id);
+    controllers.delete(turn.id);
+    options.persist();
+  }
+
+  /** The doctor says the check is wrong: keep the answer, save the reason, stop the round. */
+  function accept(
+    turn: AgentTurn,
+    candidate: string,
+    attempts: number,
+    problem: string,
+    reason: string,
+    startedAt: number,
+  ): void {
+    const current = options.turns.value.find((item) => item.id === turn.id);
+    if (current?.text !== turn.text) return;
+    if (candidate !== turn.text) replaceAnswer(current, candidate);
+    remember(current, {
+      status: "accepted",
+      attempts,
+      problem,
+      reason,
+      took: Date.now() - startedAt,
+      answer: textFingerprint(candidate),
+      at: Date.now(),
+    });
   }
 
   async function prepare(turn: AgentTurn): Promise<void> {
     if (turn.role !== "assistant" || attempted.get(turn.id) === turn.text) return;
+    // A saved fix or verdict is final for this text; only a failure invites another run.
+    const saved = reportFor(turn);
+    if (saved && saved.status !== "failed") return;
     attempted.set(turn.id, turn.text);
     controllers.get(turn.id)?.abort();
     controllers.delete(turn.id);
     progress.delete(turn.id);
-    const problem = await answerProblem(turn.text, options.projectId);
+    const problems: AnswerProblem[] = await answerProblems(turn.text, options.projectId);
     if (attempted.get(turn.id) !== turn.text) return;
-    if (!problem) {
+    if (!problems.length) {
       // The checker changed or the answer was already fixed: an old failure mark would be a lie.
       if (turn.doctor?.status === "failed") {
         delete turn.doctor;
@@ -81,7 +114,11 @@ export function useAnswerDoctor(options: {
       return;
     }
     let candidate = turn.text;
-    let diagnosis = problem;
+    const original = turn.text;
+    let current = problems;
+    let diagnosis = formatProblems(problems);
+    const originalError = diagnosis;
+    let previous: string | undefined;
     const startedAt = Date.now();
     const controller = new AbortController();
     controllers.set(turn.id, controller);
@@ -96,68 +133,99 @@ export function useAnswerDoctor(options: {
         status: "repairing",
         attempts: attempt + 1,
         limit: ANSWER_DOCTOR_ATTEMPTS,
-        problem,
-        ...(diagnosis === problem ? {} : { remaining: diagnosis }),
+        problem: originalError,
+        ...(diagnosis === originalError ? {} : { remaining: diagnosis }),
       });
       try {
-        const answer = await repairAnswer({
+        const reply = await repairAnswer({
           answer: candidate,
           error: diagnosis,
+          original,
+          originalError,
+          previous,
+          attempt: attempt + 1,
+          limit: ANSWER_DOCTOR_ATTEMPTS,
           history: answerHistory(options.turns.value),
           selection: options.selection?.value,
           signal: controller.signal,
         });
         if (!alive()) return;
-        const extracted = doctorAnswerSource(answer);
+        previous = reply;
+        const verdict = doctorVerdict(reply);
+        if (verdict) {
+          if (!current.every((problem) => problem.soft)) {
+            // The compiler and broken markup are facts; a verdict cannot waive them.
+            const currentTurn = options.turns.value.find((item) => item.id === turn.id);
+            if (currentTurn?.text === turn.text) {
+              remember(currentTurn, {
+                status: "failed",
+                attempts: attempt + 1,
+                problem: originalError,
+                remaining: `${diagnosis}\nВердикт доктора отклонён: ${verdict.reason}`,
+                took: Date.now() - startedAt,
+                answer: textFingerprint(currentTurn.text),
+                at: Date.now(),
+              });
+            }
+            progress.set(turn.id, {
+              status: "failed",
+              attempts: attempt + 1,
+              limit: ANSWER_DOCTOR_ATTEMPTS,
+              problem: originalError,
+              remaining: `${diagnosis}\nВердикт доктора отклонён: ${verdict.reason}`,
+            });
+            return;
+          }
+          accept(turn, candidate, attempt + 1, originalError, verdict.reason, startedAt);
+          return;
+        }
+        const extracted = doctorAnswerSource(reply);
         if (!extracted) {
           diagnosis = "Answer Doctor вернул пустой ответ";
           continue;
         }
         candidate = extracted;
-        const nextProblem = await answerProblem(candidate, options.projectId);
+        const next = await answerProblems(candidate, options.projectId);
         if (!alive()) return;
-        if (!nextProblem) {
-          const current = options.turns.value.find((item) => item.id === turn.id);
-          if (current?.text !== turn.text) return;
-          replaceAnswer(current, candidate);
-          current.doctor = {
+        if (!next.length) {
+          const currentTurn = options.turns.value.find((item) => item.id === turn.id);
+          if (currentTurn?.text !== turn.text) return;
+          replaceAnswer(currentTurn, candidate);
+          remember(currentTurn, {
             status: "fixed",
             attempts: attempt + 1,
-            problem,
+            problem: originalError,
             took: Date.now() - startedAt,
-            answer: answerFingerprint(candidate),
+            answer: textFingerprint(candidate),
             at: Date.now(),
-          };
-          progress.delete(turn.id);
-          controllers.delete(turn.id);
-          options.persist();
+          });
           return;
         }
-        diagnosis = nextProblem;
+        current = next;
+        diagnosis = formatProblems(next);
       } catch (error) {
         if (!alive()) return;
         diagnosis = error instanceof Error ? error.message : String(error);
       }
     }
     if (!alive()) return;
-    const current = options.turns.value.find((item) => item.id === turn.id);
-    if (current?.text === turn.text) {
-      current.doctor = {
+    const currentTurn = options.turns.value.find((item) => item.id === turn.id);
+    if (currentTurn?.text === turn.text) {
+      remember(currentTurn, {
         status: "failed",
         attempts: ANSWER_DOCTOR_ATTEMPTS,
-        problem,
+        problem: originalError,
         remaining: diagnosis,
         took: Date.now() - startedAt,
-        answer: answerFingerprint(current.text),
+        answer: textFingerprint(currentTurn.text),
         at: Date.now(),
-      };
-      options.persist();
+      });
     }
     progress.set(turn.id, {
       status: "failed",
       attempts: ANSWER_DOCTOR_ATTEMPTS,
       limit: ANSWER_DOCTOR_ATTEMPTS,
-      problem,
+      problem: originalError,
       remaining: diagnosis,
     });
     controllers.delete(turn.id);

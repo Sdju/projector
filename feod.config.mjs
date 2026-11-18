@@ -119,7 +119,7 @@ export default {
             plan: "Вынести цикл попыток и разбор ошибок модели в projector-attempts.ts",
           },
           "packages/client/modules/agent/ui/AgentChat.vue": {
-            ceiling: 504,
+            ceiling: 501,
             plan: "Вынести панели задач и композер в дочерние компоненты",
           },
         },

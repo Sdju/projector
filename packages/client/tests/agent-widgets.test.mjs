@@ -222,6 +222,23 @@ test("Form Doctor heuristics fix duplicate attributes and validate the result", 
   const answer = `<IntelligentForm><Input name="next" /></IntelligentForm>`;
   expect(doctorFormSource(`Вот исправление:\n\n\`\`\`vue\n${answer}\n\`\`\``)).toBe(answer);
   expect(doctorFormSource("<IntelligentForm>не закрыта")).toBeUndefined();
+
+  const { doctorVerdict, answerProblems, formatProblems } =
+    await import("../modules/widget-runtime/repair.ts");
+  expect(doctorVerdict("PROJECTOR-DOCTOR: VALID\nПричина: 7**3**2 — математика")).toMatchObject({
+    reason: expect.stringContaining("7**3**2"),
+  });
+  expect(doctorVerdict("```text\nPROJECTOR-DOCTOR: OK\nуже корректно\n```")).toMatchObject({
+    reason: "уже корректно",
+  });
+  expect(doctorVerdict("**PROJECTOR-DOCTOR: VALID**\nПричина: уже хорошо")).toMatchObject({
+    reason: "уже хорошо",
+  });
+  expect(doctorVerdict("<Card><h3>Готово</h3></Card>")).toBeUndefined();
+  const problems = await answerProblems("<Card><p>7**3**2</p></Card>\n<Card>");
+  expect(problems[0]).toMatchObject({ kind: "markdown", soft: true });
+  expect(problems.some((problem) => problem.kind === "unclosed" && !problem.soft)).toBe(true);
+  expect(formatProblems(problems)).toContain("Markdown");
 });
 
 test("the reserved project-widget names match the built-in catalogue", async () => {

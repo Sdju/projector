@@ -31,13 +31,16 @@ const shown = computed(() => Boolean(props.live ?? props.report));
 const failed = computed(
   () => props.live?.status === "failed" || (!props.live && props.report?.status === "failed"),
 );
+const accepted = computed(() => !props.live && props.report?.status === "accepted");
 const tone = computed(() => {
   if (props.live) return failed.value ? "failed" : "repairing";
-  return failed.value ? "failed" : "fixed";
+  if (failed.value) return "failed";
+  return accepted.value ? "accepted" : "fixed";
 });
 const attempts = computed(() => props.live?.attempts ?? props.report?.attempts ?? 0);
 const canRetry = computed(() => failed.value && props.live?.status !== "repairing");
 const problem = computed(() => props.live?.problem ?? props.report?.problem ?? "");
+const reason = computed(() => (accepted.value ? (props.report?.reason ?? "") : ""));
 const remaining = computed(() => {
   const value = props.live?.remaining ?? props.report?.remaining;
   return value && value !== problem.value ? value : "";
@@ -46,6 +49,7 @@ const summary = computed(() => {
   if (props.live?.status === "repairing")
     return "Проверяю разметку и переписываю то, что сломалось.";
   if (failed.value) return "Исправить разметку не удалось: показан исходный ответ.";
+  if (accepted.value) return "Проверка ошиблась: доктор подтвердил, что разметка корректна.";
   return "Разметку исправил; ответ сохранён уже исправленным.";
 });
 const label = computed(() => {
@@ -53,6 +57,7 @@ const label = computed(() => {
     return `Доктор ответов исправляет разметку: попытка ${props.live.attempts} из ${props.live.limit}`;
   if (failed.value)
     return "Доктор ответов не справился с разметкой ответа. Нажмите, чтобы повторить попытку";
+  if (accepted.value) return "Доктор ответов: проверка ошиблась, разметка корректна";
   return `Ответ исправлен доктором: ${attempts.value} ${attemptsWord(attempts.value)}`;
 });
 </script>
@@ -78,6 +83,7 @@ const label = computed(() => {
       <span class="doctor-title"><strong>Доктор ответов</strong></span>
       <span class="doctor-line">{{ summary }}</span>
       <span class="doctor-line doctor-detail">Нашёл: {{ problem }}</span>
+      <span v-if="reason" class="doctor-line doctor-detail">Причина: {{ reason }}</span>
       <span v-if="remaining" class="doctor-line doctor-detail"
         >Последняя проверка: {{ remaining }}</span
       >
@@ -128,6 +134,9 @@ button.doctor-mark:hover,
 }
 .doctor-mark.fixed .doctor-icon {
   color: var(--run);
+}
+.doctor-mark.accepted .doctor-icon {
+  color: var(--info);
 }
 .doctor-mark.failed {
   color: var(--err);

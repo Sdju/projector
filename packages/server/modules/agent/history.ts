@@ -176,12 +176,24 @@ const turnSchema: z.ZodType<StoredTurn> = z.lazy(() =>
     /** What Answer Doctor did with this answer, so the mark survives a reload. */
     doctor: z
       .object({
-        status: z.enum(["fixed", "failed"]),
+        status: z.enum(["fixed", "accepted", "failed"]),
         attempts: z.number().int().min(1),
         problem: z.string(),
         remaining: z.string().optional(),
+        reason: z.string().optional(),
         took: z.number().min(0),
         answer: z.number().int(),
+        at: z.number(),
+      })
+      .optional(),
+    /** The form check's saved verdict: an accepted form is not checked again. */
+    formRepair: z
+      .object({
+        status: z.literal("accepted"),
+        attempts: z.number().int().min(1),
+        problem: z.string(),
+        reason: z.string(),
+        source: z.number().int(),
         at: z.number(),
       })
       .optional(),

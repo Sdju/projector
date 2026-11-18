@@ -70,19 +70,49 @@ function templateText(template: string): string[] {
   return nodes;
 }
 
+export type ProblemKind = "compiler" | "markdown" | "component" | "unclosed" | "empty" | "script";
+
+/** One visible problem the automatic check found; the doctor gets the whole list. */
+export interface AnswerProblem {
+  kind: ProblemKind;
+  /** A heuristic the doctor may overrule with a `PROJECTOR-DOCTOR: VALID` reply. */
+  soft: boolean;
+  /** The widget whose markup failed, when the problem belongs to one. */
+  widget?: string;
+  /** The sentence sent to the doctor: a widget name is part of it. */
+  message: string;
+}
+
+interface WidgetProblem {
+  kind: ProblemKind;
+  message: string;
+}
+
+/** The compiler is a fact; Markdown and an unknown name are guesses that may be stale. */
+const SOFT: ReadonlySet<ProblemKind> = new Set<ProblemKind>(["markdown", "component"]);
+
+function answerProblemOf(problem: WidgetProblem, widget?: string): AnswerProblem {
+  return {
+    kind: problem.kind,
+    soft: SOFT.has(problem.kind),
+    ...(widget ? { widget } : {}),
+    message: widget ? `${widget}: ${problem.message}` : problem.message,
+  };
+}
+
 /** Nothing here executes the widget: valid template and script syntax is enough to show it. */
 async function widgetProblem(
   source: string,
   empty: string,
   projectId?: string,
-): Promise<string | undefined> {
+): Promise<WidgetProblem | undefined> {
   await loadCompiler();
   const parsed = parseWidgetSource(source);
-  if (parsed.scriptOpen) return "Незакрытый <script>";
-  if (!parsed.template.trim()) return empty;
+  if (parsed.scriptOpen) return { kind: "script", message: "Незакрытый <script>" };
+  if (!parsed.template.trim()) return { kind: "empty", message: empty };
   const names = [...new Set(templateTags(parsed.template))];
   const unknown = names.find((name) => /^[A-Z]/.test(name) && !isWidgetName(name, projectId));
-  if (unknown) return `Неизвестный компонент ${unknown}`;
+  if (unknown) return { kind: "component", message: `Неизвестный компонент ${unknown}` };
   try {
     if (parsed.script) compileScript(parsed.script);
     compileTemplate(parsed.template);
@@ -96,42 +126,55 @@ async function widgetProblem(
     }
     return undefined;
   } catch (error) {
-    return error instanceof Error ? error.message : String(error);
+    return {
+      kind: "compiler",
+      message: error instanceof Error ? error.message : String(error),
+    };
   }
 }
 
-export function formProblem(source: string, projectId?: string): Promise<string | undefined> {
-  return widgetProblem(source, "Пустая форма", projectId);
+/** Every form problem; a form is checked for markup only, not for Markdown text. */
+export async function formProblems(source: string, projectId?: string): Promise<AnswerProblem[]> {
+  const problem = await widgetProblem(source, "Пустая форма", projectId);
+  return problem ? [answerProblemOf(problem)] : [];
+}
+
+export async function formProblem(source: string, projectId?: string): Promise<string | undefined> {
+  return (await formProblems(source, projectId))[0]?.message;
 }
 
 const MARKDOWN_TEXT =
   /(^|\n)\s{0,3}(#{1,6}\s+\S|[-*+]\s+\S|\d+\.\s+\S)|\*\*[^*\n]+\*\*|`[^`\n]+`|(^|\n)\s*\|?\s*:?-{3,}/;
 
 /** Markdown in a Vue slot is rendered literally instead of becoming formatted content. */
-function widgetMarkdownProblem(source: string): string | undefined {
+function widgetMarkdownProblem(source: string): WidgetProblem | undefined {
   const { template } = parseWidgetSource(source);
   // Each text node is checked on its own: tags are not line breaks, and code renders literally.
   const markdown = templateText(template).some((text) => MARKDOWN_TEXT.test(text));
   return markdown
-    ? "Внутри виджета остался Markdown: он показывается как сломанный исходный текст"
+    ? {
+        kind: "markdown",
+        message: "Внутри виджета остался Markdown: он показывается как сломанный исходный текст",
+      }
     : undefined;
 }
 
-/** A finished answer is repaired only for visible structural problems, never just to rewrite it. */
-export async function answerProblem(
-  source: string,
-  projectId?: string,
-): Promise<string | undefined> {
+/**
+ * Every visible problem of a finished answer, not only the first one: the doctor sees the whole
+ * list, and `soft` tells it which findings the heuristic may have invented.
+ */
+export async function answerProblems(source: string, projectId?: string): Promise<AnswerProblem[]> {
   const parts = splitMessage(source, {
     known: (name) => isWidgetName(name, projectId),
     streaming: false,
   });
+  const found: AnswerProblem[] = [];
   for (const part of parts) {
     if (part.type === "widget") {
       const problem =
         (await widgetProblem(part.source, `Пустой виджет ${part.name}`, projectId)) ??
         widgetMarkdownProblem(part.source);
-      if (problem) return `${part.name}: ${problem}`;
+      if (problem) found.push(answerProblemOf(problem, part.name));
       continue;
     }
     if (part.type !== "markdown") continue;
@@ -144,11 +187,68 @@ export async function answerProblem(
         continue;
       }
       const name = !fence && /^ {0,3}<([A-Z][A-Za-z0-9]*)(?=[\s/>]|$)/.exec(line)?.[1];
-      if (name && isWidgetName(name, projectId))
-        return `Незакрытый или неверно оформленный виджет ${name}`;
+      if (name && isWidgetName(name, projectId)) {
+        found.push({
+          kind: "unclosed",
+          soft: false,
+          widget: name,
+          message: `Незакрытый или неверно оформленный виджет ${name}`,
+        });
+        break;
+      }
     }
   }
-  return undefined;
+  return found
+    .filter(
+      (problem, index) => found.findIndex((other) => other.message === problem.message) === index,
+    )
+    .slice(0, 8);
+}
+
+/** The first problem as one sentence; kept for callers that only need a yes/no check. */
+export async function answerProblem(
+  source: string,
+  projectId?: string,
+): Promise<string | undefined> {
+  return (await answerProblems(source, projectId))[0]?.message;
+}
+
+/** One diagnosis string for the doctor; capped like the request field on the server. */
+export function formatProblems(problems: readonly AnswerProblem[]): string {
+  return problems
+    .map((problem) => problem.message)
+    .join("\n")
+    .slice(0, 2_000);
+}
+
+const DOCTOR_VALID = /^\s*PROJECTOR-DOCTOR\s*[:—–-]\s*(?:VALID|OK)\b[\s:—–*-]*(.*)$/i;
+
+/** A model often wraps a repair in one fenced block; the verdict may be wrapped that way too. */
+function unwrapFence(text: string): string {
+  const trimmed = text.trim();
+  const match = /^```[^\n]*\n?([\s\S]*?)\n?```$/m.exec(trimmed);
+  return (match?.[1] ?? trimmed).trim();
+}
+
+export interface DoctorVerdict {
+  /** Why the doctor believes the automatic check is wrong; shown in the doctor mark. */
+  reason: string;
+}
+
+/** The doctor's "the check is wrong" reply; absent when it returns a repair instead. */
+export function doctorVerdict(text: string): DoctorVerdict | undefined {
+  const lines = unwrapFence(text).split(/\r?\n/);
+  // Models sometimes bold the marker or make it a heading; the verdict still counts.
+  const head = (lines[0] ?? "").replace(/^[\s>*_#]+/, "");
+  const match = DOCTOR_VALID.exec(head);
+  if (!match) return undefined;
+  const reason = [match[1] ?? "", ...lines.slice(1)]
+    .join(" ")
+    .replace(/^\s*(?:причина|reason)\s*:\s*/i, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 500);
+  return { reason: reason || "Разметка корректна: проверка ошиблась." };
 }
 
 /** Accept a bare answer or one fenced block, but never an empty doctor response. */
