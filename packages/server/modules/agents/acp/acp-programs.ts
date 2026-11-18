@@ -57,6 +57,10 @@ export interface AcpProgram {
   terminal?: Partial<AgentTerminal>;
   /** What the agent adds to ACP (subagents, background commands); plain when absent. */
   dialect?: () => AcpDialect;
+  /** A native session has one owner, including while its background work runs. */
+  exclusiveSession?: boolean;
+  /** Stream the answer immediately, but send the final done after background tasks finish. */
+  finishAfterBackground?: boolean;
   /** The optional dialect of the agent's forms; the plain part works without it. */
   forms?: AcpFormAdapter;
   /**

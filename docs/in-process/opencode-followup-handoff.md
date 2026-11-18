@@ -28,7 +28,7 @@
 Рабочий материал для передачи. Фикс лежит в рабочем дереве, **не закоммичен**; незавершённую
 работу по ошибкам и квотам (`docs/in-process/agent-errors.md`) не трогал.
 
-Смежные документы: [acp-background-lifecycle](acp-background-lifecycle.md),
+Смежные документы: [фоновые сабагенты Kimi](../usage.md#фоновые-сабагенты-kimi),
 [opencode-background-subagents](opencode-background-subagents.md),
 [agent-errors](agent-errors.md).
 
@@ -211,6 +211,11 @@ OpenCode запускает сам, и стримит его в тот же от
 
 ## 6. Как проверить
 
+В прогоне 18 ноября на OpenCode 2.0.24 с `deepseek/deepseek-v4-flash` фоновый сабагент
+завершился, а Projector отправил один итоговый `done`. OpenCode записал synthetic-сообщение
+и ответ родителя `FOLLOWUP_READY` в SQLite, но после `end_turn` в ACP-трейсе текста продолжения
+не было. Запрос разрешения в этом прогоне не возник.
+
 ### Тесты
 
 ```bash
@@ -290,8 +295,8 @@ sqlite3 ~/.local/share/projector/agent/history.sqlite \
 - **Новое сообщение во время фона.** `superseded` определяется по `user > firstUser`; собственное
   сообщение хода становится `firstUser`. Старый mapper перестаёт принимать апдейты, watcher
   отдаёт `superseded`, ход закрывается как `stopped`. Старый host при этом ещё жив (keep-alive) —
-  политика «отменять / ждать / инжектить» остаётся открытой
-  ([acp-background-lifecycle](acp-background-lifecycle.md) §D).
+  политика «отменять / ждать / инжектить» для OpenCode остаётся открытой. У Kimi действует
+  [очередь сообщений](../usage.md#фоновые-сабагенты-kimi).
 - **Permission во время шага-продолжения.** Сокет и `options.approve` живы, запрос доходит до
   страницы (ход ещё `busy`). Если страница закрыта, запрос ждёт до двух часов и отклоняется.
 - **Долгий шаг.** Пока шаг идёт, quiet-окно не применяется. Потолок — 20 мин; после него сокет

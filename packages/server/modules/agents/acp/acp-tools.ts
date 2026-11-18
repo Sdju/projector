@@ -11,6 +11,7 @@ import type { AcpConnection } from "./acp-client.ts";
 import { controlsFromSession } from "./acp-controls.ts";
 import { availableCommands, createAcpReplayCollector } from "./acp-events.ts";
 import { initializeAcp, startAcp, type AcpInitResult } from "./acp-process.ts";
+import { reserveAcpSession } from "./acp-session-owner.ts";
 import { acpProgram } from "./acp-programs.ts";
 
 /** How long an agent's controls are reused: spawning an agent just to list models is not free. */
@@ -26,19 +27,26 @@ async function withAgent<T>(
   cwd: string,
   work: (connection: AcpConnection, init: AcpInitResult) => Promise<T>,
   onUpdate?: (update: Record<string, unknown>) => void,
+  sessionId?: string,
 ): Promise<T> {
-  const connection = await startAcp(id, cwd, {
-    onNotification(method, params) {
-      if (method === "session/update") onUpdate?.((params.update ?? {}) as Record<string, unknown>);
-    },
-    onRequest() {
-      return { outcome: { outcome: "cancelled" } };
-    },
-  });
+  const release = await reserveAcpSession(id, sessionId);
   try {
-    return await work(connection, await initializeAcp(connection, id));
+    const connection = await startAcp(id, cwd, {
+      onNotification(method, params) {
+        if (method === "session/update")
+          onUpdate?.((params.update ?? {}) as Record<string, unknown>);
+      },
+      onRequest() {
+        return { outcome: { outcome: "cancelled" } };
+      },
+    });
+    try {
+      return await work(connection, await initializeAcp(connection, id));
+    } finally {
+      await connection.close();
+    }
   } finally {
-    await connection.close();
+    release();
   }
 }
 
@@ -265,11 +273,17 @@ export function acpDeleteSession(
   cwd: string,
   sessionId: string,
 ): Promise<void> {
-  return withAgent(id, cwd, async (connection, init) => {
-    if (!init.agentCapabilities?.sessionCapabilities?.delete)
-      throw new Error("Агент не умеет удалять сессии");
-    await connection.request("session/delete", { sessionId });
-  });
+  return withAgent(
+    id,
+    cwd,
+    async (connection, init) => {
+      if (!init.agentCapabilities?.sessionCapabilities?.delete)
+        throw new Error("Агент не умеет удалять сессии");
+      await connection.request("session/delete", { sessionId });
+    },
+    undefined,
+    sessionId,
+  );
 }
 
 /** The messages of a past session, replayed by the agent through `session/load`. */
@@ -289,5 +303,6 @@ export function acpLoadSession(
       return collector.turns;
     },
     (update) => collector.handleUpdate(update),
+    sessionId,
   );
 }

@@ -1,5 +1,10 @@
 import { acpProgram, type AcpProgram, registerAcpProgram } from "./acp-programs.ts";
-import { attachedImages, failureFromAcp, promptWithHistory } from "../../agent/index.ts";
+import {
+  attachedImages,
+  failureFromAcp,
+  promptWithHistory,
+  waitRunExit,
+} from "../../agent/index.ts";
 import { featureEnabled, featurePrompt } from "../../agent-features/index.ts";
 import { acpIdeMcpServer } from "../ide-mcp/index.ts";
 import { roleContext } from "../../agent-roles/index.ts";
@@ -18,7 +23,7 @@ import { elicitForm } from "./acp-elicitation.ts";
 import { type AcpConnection, type AcpError, NO_TIMEOUT } from "./acp-client.ts";
 import { applySelection, controlsFromSession, shownModel } from "./acp-controls.ts";
 import { isCompactCommand } from "./acp-dialect.ts";
-import { contentText, createAcpEventMapper, stopReasonError } from "./acp-events.ts";
+import { createAcpEventMapper, stopReasonError } from "./acp-events.ts";
 import { settleAcpAnswer } from "./acp-follow-up.ts";
 import { acpAdvertisedDelete, initializeAcp, startAcp } from "./acp-process.ts";
 import {
@@ -29,13 +34,11 @@ import {
   acpSessions,
 } from "./acp-tools.ts";
 import { promptBlocks } from "./acp-prompt.ts";
+import { reserveAcpSession } from "./acp-session-owner.ts";
 import { os } from "@ai-projector/core/modules/os/index.ts";
 
-interface PermissionOption {
-  optionId?: string;
-  kind?: string;
-}
-
+import { decidePermission } from "./acp-permission.ts";
+export { decidePermission, toolCallDetail } from "./acp-permission.ts";
 /** An external agent driven through its ACP server over stdio. */
 export function createAcpBackend(program: AcpProgram): AgentBackend {
   registerAcpProgram(program);
@@ -73,10 +76,11 @@ export function createAcpBackend(program: AcpProgram): AgentBackend {
 async function run(options: AgentRunOptions, id: AgentBackendId): Promise<void> {
   const program = acpProgram(id);
   const compactCommand = isCompactCommand(options.message, options.parts);
+  let sessionId = "";
   const mapper = createAcpEventMapper(options.emit, program.label, program.dialect?.(), {
     compactCommand,
+    sessionId: () => sessionId,
   });
-  let sessionId = "";
   let followUp: ReturnType<NonNullable<typeof program.prepareFollowUp>> | undefined;
   let settling = false;
   // `session/load` replays the whole conversation; those updates are history, not this answer.
@@ -86,39 +90,43 @@ async function run(options: AgentRunOptions, id: AgentBackendId): Promise<void> 
     if (connection && sessionId) connection.notify("session/cancel", { sessionId });
     void connection?.close();
   };
-  connection = await startAcp(
-    id,
-    options.cwd,
-    {
-      onNotification(method, params) {
-        if (replaying) return;
-        if (method === "session/update") {
-          const update = (params.update ?? {}) as Record<string, unknown>;
-          const sourceSession = String(params.sessionId ?? "");
-          if (settling && followUp && !followUp.acceptsUpdates(sourceSession, update)) return;
-          mapper.handleUpdate(sourceSession, update);
-          return;
-        }
-        acpProgram(id).notifications?.[method]?.(options, params);
+  const connect = () =>
+    startAcp(
+      id,
+      options.cwd,
+      {
+        onNotification(method, params) {
+          if (replaying) return;
+          if (method === "session/update") {
+            const update = (params.update ?? {}) as Record<string, unknown>;
+            const sourceSession = String(params.sessionId ?? "");
+            if (settling && followUp && !followUp.acceptsUpdates(sourceSession, update)) return;
+            mapper.handleUpdate(sourceSession, update);
+            return;
+          }
+          acpProgram(id).notifications?.[method]?.(options, params);
+        },
+        onRequest(method, params) {
+          const extension = acpProgram(id).extensions?.[method];
+          if (extension) return extension(options, params);
+          if (method === "elicitation/create")
+            return elicitForm(options, params, acpProgram(id).forms);
+          if (method !== "session/request_permission")
+            throw new Error(`Клиент не поддерживает ${method}`);
+          return decidePermission(options, params);
+        },
       },
-      onRequest(method, params) {
-        const extension = acpProgram(id).extensions?.[method];
-        if (extension) return extension(options, params);
-        if (method === "elicitation/create")
-          return elicitForm(options, params, acpProgram(id).forms);
-        if (method !== "session/request_permission")
-          throw new Error(`Клиент не поддерживает ${method}`);
-        return decidePermission(options, params);
-      },
-    },
-    options.run,
-  );
-  options.abort?.addEventListener("abort", abort, { once: true });
-  if (options.abort?.aborted) abort();
-
-  options.emit("status", { phase: "thinking", provider: program.label, model: "" });
+      options.run,
+    );
+  const release = await reserveAcpSession(id, options.sessionId, options.run?.id);
+  let releaseNew: (() => void) | undefined;
   let keepProcess = false;
   try {
+    options.abort?.throwIfAborted();
+    connection = await connect();
+    options.abort?.addEventListener("abort", abort, { once: true });
+    if (options.abort?.aborted) abort();
+    options.emit("status", { phase: "thinking", provider: program.label, model: "" });
     const init = await initializeAcp(connection, id);
     const [ideEnabled, widgetsEnabled, roleText] = await Promise.all([
       featureEnabled(id, "ide", options.features),
@@ -152,6 +160,8 @@ async function run(options: AgentRunOptions, id: AgentBackendId): Promise<void> 
       options.role?.mcp,
     );
     sessionId = session.sessionId;
+    if (sessionId !== options.sessionId)
+      releaseNew = await reserveAcpSession(id, sessionId, options.run?.id);
     options.emit("session", { id: sessionId, backend: id });
     // What the agent offers for this session, with the user's choices applied before the prompt.
     const offered = controlsFromSession(session.result);
@@ -203,6 +213,7 @@ async function run(options: AgentRunOptions, id: AgentBackendId): Promise<void> 
         answer: mapper,
         program,
         followUp,
+        disconnected: connection.disconnected,
         options,
       });
     } else {
@@ -218,7 +229,17 @@ async function run(options: AgentRunOptions, id: AgentBackendId): Promise<void> 
     }
   } finally {
     options.abort?.removeEventListener("abort", abort);
-    await connection.close({ stop: !keepProcess || !!options.abort?.aborted });
+    if (program.finishAfterBackground && mapper.pendingBackground)
+      mapper.stopBackground("Ход прерван до получения итога фоновой задачи");
+    try {
+      const stop = !keepProcess || !!options.abort?.aborted;
+      await connection?.close({ stop });
+      if (stop && connection && program.exclusiveSession && options.run)
+        await waitRunExit(options.run.id);
+    } finally {
+      releaseNew?.();
+      release();
+    }
   }
 }
 
@@ -289,90 +310,4 @@ function isAuthError(error: unknown): boolean {
   if (code === 401) return true;
   const message = error instanceof Error ? error.message : "";
   return /authenticat|auth required|not logged|login|log in|авториз/i.test(message);
-}
-
-/** Longest readable preview sent with a permission request. */
-const DETAIL_LIMIT = 8000;
-
-/**
- * A readable preview of what the tool will change. ACP carries edits and MCP arguments in
- * `toolCall.content` (`diff`/`content` blocks), which the raw input does not show.
- */
-export function toolCallDetail(toolCall: Record<string, unknown>): string | undefined {
-  const content = Array.isArray(toolCall.content) ? toolCall.content : [];
-  const parts = content
-    .map((item) => {
-      const block = item as {
-        type?: string;
-        content?: unknown;
-        path?: string;
-        oldText?: string | null;
-        newText?: string | null;
-      };
-      if (block.type === "diff") return diffText(block);
-      if (block.type === "content") return contentText(block.content);
-      return "";
-    })
-    .filter(Boolean);
-  if (!parts.length) return undefined;
-  return parts.join("\n\n").slice(0, DETAIL_LIMIT);
-}
-
-function diffText(block: {
-  path?: string;
-  oldText?: string | null;
-  newText?: string | null;
-}): string {
-  const path = block.path ?? "файл";
-  const removed = String(block.oldText ?? "")
-    .split("\n")
-    .map((line) => `-${line}`);
-  const added = String(block.newText ?? "")
-    .split("\n")
-    .map((line) => `+${line}`);
-  return [`--- ${path}`, `+++ ${path}`, ...removed, ...added].join("\n");
-}
-
-/** Prefer one-time allow/reject; `allow_always` only when the user chose "always". */
-export async function decidePermission(
-  options: AgentRunOptions,
-  params: Record<string, unknown>,
-): Promise<unknown> {
-  const toolCall = (params.toolCall ?? {}) as Record<string, unknown>;
-  const list = Array.isArray(params.options) ? (params.options as PermissionOption[]) : [];
-  const allowOnce = list.find((item) => item.kind === "allow_once");
-  const allowAlways = list.find((item) => item.kind === "allow_always");
-  const allow = allowOnce ?? allowAlways;
-  if (!options.approve || !allow) return { outcome: { outcome: "cancelled" } };
-  const kind = String(toolCall.kind ?? "").toLowerCase();
-  // The ACP title of a shell call is the command itself. Using it as the tool name repeats the
-  // same line three times in the card (title, tool label and preview), so keep the kind instead.
-  const tool = kind === "execute" ? "bash" : kind === "edit" ? "edit" : kind || "tool";
-  const input = (toolCall.rawInput ?? {}) as Record<string, unknown>;
-  const command = typeof input.command === "string" ? input.command : "";
-  const title =
-    kind === "execute"
-      ? "Выполнить команду в оболочке"
-      : typeof toolCall.title === "string"
-        ? toolCall.title
-        : undefined;
-  const answer = await options
-    .approve({
-      tool,
-      input,
-      ...(title ? { title } : {}),
-      detail: toolCallDetail(toolCall) ?? (command ? `$ ${command}` : undefined),
-      persistent: !!allowAlways,
-    })
-    .catch(() => false);
-  if (answer === false) {
-    const reject =
-      list.find((item) => item.kind === "reject_once") ??
-      list.find((item) => item.kind === "reject_always");
-    if (!reject?.optionId) return { outcome: { outcome: "cancelled" } };
-    return { outcome: { outcome: "selected", optionId: reject.optionId } };
-  }
-  const chosen = answer === "always" ? (allowAlways ?? allowOnce) : (allowOnce ?? allowAlways);
-  if (!chosen?.optionId) return { outcome: { outcome: "cancelled" } };
-  return { outcome: { outcome: "selected", optionId: chosen.optionId } };
 }

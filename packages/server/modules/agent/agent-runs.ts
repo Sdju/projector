@@ -60,6 +60,28 @@ export async function listLiveRuns(): Promise<LiveRun[]> {
   return runs.filter((run): run is LiveRun => !!run);
 }
 
+/** Checks persisted ownership too, so a restarted server cannot start a competing native session. */
+export async function hasLiveSession(
+  backend: AgentBackendId,
+  session: string,
+  except?: string,
+): Promise<boolean> {
+  const ids = await readdir(runsRoot()).catch(() => [] as string[]);
+  const owners = await Promise.all(
+    ids
+      .filter((id) => RUN_ID.test(id) && id !== except)
+      .map(async (id) => {
+        const run = await readRun(id);
+        return (
+          run?.backend === backend &&
+          (run.session ?? run.sessionId) === session &&
+          (await liveHost(id)) !== undefined
+        );
+      }),
+  );
+  return owners.some(Boolean);
+}
+
 /** The `chat` of a run that belongs to a background job (`job:<id>`). */
 export const JOB_CHAT = "job:";
 const RUN_ID = /^[0-9a-f]{12}$/;
@@ -141,6 +163,10 @@ export async function stopRun(id: string): Promise<void> {
   const pid = await liveHost(id);
   if (!pid) return;
   os.tools.killAgentTree(pid);
+  await waitRunExit(id);
+}
+
+export async function waitRunExit(id: string): Promise<void> {
   // Signalling is asynchronous: keep the record until the host actually releases the run.
   const deadline = Date.now() + 5000;
   while ((await liveHost(id)) !== undefined && Date.now() < deadline) await sleep(25);

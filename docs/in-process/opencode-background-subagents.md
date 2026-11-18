@@ -1,6 +1,6 @@
 # Фоновые сабагенты OpenCode
 
-Рабочий материал. Связано с [acp-background-lifecycle](acp-background-lifecycle.md) и UI Lens — [agent-lens.md](../agent-lens.md).
+Рабочий материал. См. [фоновые сабагенты Kimi](../usage.md#фоновые-сабагенты-kimi) и [UI Lens](../agent-lens.md).
 
 ## Факты
 

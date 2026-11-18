@@ -18,6 +18,7 @@ export interface AcpSettleOptions {
   answer: AcpAnswer;
   program: AcpProgram;
   followUp?: AcpFollowUp;
+  disconnected?: AbortSignal;
   options: Pick<AgentRunOptions, "abort" | "run" | "emit">;
 }
 
@@ -29,10 +30,20 @@ export async function settleAcpAnswer(options: AcpSettleOptions): Promise<boolea
   answer.finish();
   const followUp = answer.hadBackground ? options.followUp : undefined;
   if (!followUp) {
-    emit("done", { text: answer.text.trim(), added: [] });
+    const done = () => emit("done", { text: answer.text.trim(), added: [] });
+    if (!program.finishAfterBackground) done();
+    // A server restart may detach the host after end_turn, before the background wait finishes.
+    if (program.finishAfterBackground && answer.pendingBackground && run)
+      await markAcpKeepAlive(run.id);
     if (answer.pendingBackground)
       emit("status", { phase: "background", provider: program.label, model: "" });
-    await answer.waitBackground(abort);
+    const signals = [abort, options.disconnected].filter(
+      (signal): signal is AbortSignal => !!signal,
+    );
+    await answer.waitBackground(AbortSignal.any(signals));
+    if (abort?.aborted) return false;
+    if (answer.pendingBackground) options.disconnected?.throwIfAborted();
+    if (program.finishAfterBackground) done();
     if (run && answer.keepsProcess) await markAcpKeepAlive(run.id);
     return answer.keepsProcess;
   }

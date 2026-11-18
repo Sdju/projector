@@ -56,6 +56,39 @@ test("without hard background work the answer closes as before", async () => {
   expect(events.map(([event]) => event)).toEqual(["done"]);
 });
 
+test.each([false, true])(
+  "Kimi emits the final done only after the background wait (disconnected: %s)",
+  async (disconnect) => {
+    const events = [];
+    const connection = new AbortController();
+    let finish;
+    const subject = answer({
+      pendingBackground: 1,
+      waitBackground: (signal) =>
+        new Promise((resolve) => {
+          finish = resolve;
+          signal.addEventListener("abort", resolve, { once: true });
+        }),
+    });
+    const result = settleAcpAnswer({
+      answer: subject,
+      program: { label: "Kimi", finishAfterBackground: true },
+      disconnected: connection.signal,
+      options: { emit: (event) => events.push(event) },
+    });
+    expect(events).toEqual(["status"]);
+    if (disconnect) {
+      connection.abort(new Error("ACP disconnected"));
+      await expect(result).rejects.toThrow("ACP disconnected");
+      expect(events).toEqual(["status"]);
+    } else {
+      finish();
+      expect(await result).toBe(false);
+      expect(events).toEqual(["status", "done"]);
+    }
+  },
+);
+
 test.each(["timeout", "unavailable", "failed"])(
   "%s is reported as error, never done",
   async (status) => {

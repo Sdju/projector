@@ -47,6 +47,7 @@ export function createAcpConnection(child: AcpProcess, handlers: AcpConnectionHa
   let stderr = "";
   let nextId = 1;
   let closed = false;
+  const disconnected = new AbortController();
   const pending = new Map<
     number,
     { resolve: (value: unknown) => void; reject: (error: Error) => void; arm: () => void }
@@ -58,6 +59,7 @@ export function createAcpConnection(child: AcpProcess, handlers: AcpConnectionHa
     (error as AcpError).fatal = true;
     for (const waiter of pending.values()) waiter.reject(error);
     pending.clear();
+    disconnected.abort(error);
   };
   const write = (message: RpcMessage) => {
     if (!closed) child.stdin.write(JSON.stringify(message) + "\n");
@@ -173,6 +175,7 @@ export function createAcpConnection(child: AcpProcess, handlers: AcpConnectionHa
   }
 
   return {
+    disconnected: disconnected.signal,
     request,
     notify: (method: string, params: unknown) => write({ jsonrpc: "2.0", method, params }),
     respond,

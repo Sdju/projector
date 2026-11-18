@@ -8,12 +8,16 @@ import {
   createRun,
   listLiveRuns,
   readRun,
+  rememberSession,
   removeRun,
   runDirectory,
   stopRun,
+  waitRunExit,
 } from "../modules/agent/agent-runs.ts";
 import { startHosted, attachHosted } from "../modules/agent/hosted-process.ts";
 import { createAcpConnection } from "../modules/agents/acp/acp-client.ts";
+import { reserveAcpSession } from "../modules/agents/acp/acp-session-owner.ts";
+import "../modules/agents/kimi/index.ts";
 import { os } from "../../core/modules/os/index.ts";
 
 async function until(check) {
@@ -72,6 +76,28 @@ async function withHost(work) {
     await rm(directory, { recursive: true, force: true, maxRetries: 20, retryDelay: 200 });
   }
 }
+
+test.skipIf(process.platform === "win32")(
+  "an exclusive ACP session rejects competing requests before a host spawns and after restart",
+  async () => {
+    await withHost(async ({ id, first }) => {
+      await rememberSession(id, "owned-native-session");
+      await expect(reserveAcpSession("kimi", "owned-native-session")).rejects.toThrow("занята");
+      const release = await reserveAcpSession("kimi", "owned-native-session", id);
+      try {
+        await expect(reserveAcpSession("kimi", "owned-native-session", id)).rejects.toThrow(
+          "занята",
+        );
+      } finally {
+        release();
+      }
+      await first.terminate();
+      await waitRunExit(id);
+      const free = await reserveAcpSession("kimi", "owned-native-session");
+      free();
+    });
+  },
+);
 
 const handlers = { onNotification() {}, onRequest: () => ({}) };
 async function handshake(connection) {

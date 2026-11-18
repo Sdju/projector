@@ -1,4 +1,7 @@
 import { expect, test, vi } from "vite-plus/test";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import {
   createAcpEventMapper,
   createAcpReplayCollector,
@@ -6,6 +9,7 @@ import {
 import { extendPlainDialect, isCompactCommand } from "../modules/agents/acp/acp-dialect.ts";
 import { createCodexDialect } from "../modules/agents/codex/dialect.ts";
 import { createKimiDialect } from "../modules/agents/kimi/dialect.ts";
+import { kimiBackgroundState } from "../modules/agents/kimi/background-state.ts";
 import { createOpencodeDialect } from "../modules/agents/opencode/dialect.ts";
 
 /** A dialect that marks one tool as a tracked background agent until a later end patch. */
@@ -257,64 +261,95 @@ test("kimi leaves text that is not a numbered read untouched", () => {
   ]);
 });
 
-test("kimi background Agent is a soft keep-alive task, not a connection hold", async () => {
-  const events = [];
-  const mapper = createAcpEventMapper(
-    (type, data) => events.push([type, data]),
-    "Kimi",
-    createKimiDialect(),
-  );
-  mapper.handleUpdate("s", {
-    sessionUpdate: "tool_call",
-    toolCallId: "a1",
-    title: "Agent",
-    kind: "other",
-    status: "in_progress",
-    rawInput: {
-      description: "Fix trust",
-      subagent_type: "coder",
-      run_in_background: true,
-      prompt: "do it",
-    },
-  });
-  expect(events).toContainEqual([
-    "task",
-    {
+test.each([
+  ["completed", "done"],
+  ["failed", "error"],
+  ["lost", "stopped"],
+])("kimi background Agent holds ACP until the native task record is %s", async (native, chat) => {
+  const home = await mkdtemp(join(tmpdir(), "projector-kimi-tasks-"));
+  try {
+    const taskDirectory = join(home, ".kimi-code/sessions/wd_test/session_s/agents/main/tasks");
+    await mkdir(taskDirectory, { recursive: true });
+    const manifest = join(taskDirectory, "agent-x.json");
+    const events = [];
+    const mapper = createAcpEventMapper(
+      (type, data) => events.push([type, data]),
+      "Kimi",
+      createKimiDialect(kimiBackgroundState(home)),
+      { sessionId: () => "session_s" },
+    );
+    mapper.handleUpdate("s", {
+      sessionUpdate: "tool_call",
+      toolCallId: "a1",
+      title: "Agent",
+      kind: "other",
+      status: "in_progress",
+      rawInput: {
+        description: "Fix trust",
+        subagent_type: "coder",
+        run_in_background: true,
+        prompt: "do it",
+      },
+    });
+    expect(events).toContainEqual([
+      "task",
+      {
+        id: "a1",
+        kind: "agent",
+        title: "Fix trust",
+        status: "running",
+        background: true,
+        subagent: "coder",
+        prompt: "do it",
+        tool: "a1",
+      },
+    ]);
+    expect(mapper.pendingBackground).toBe(1);
+    expect(mapper.keepsProcess).toBe(true);
+    mapper.handleUpdate(
+      "s",
+      readResult(
+        "a1",
+        "task_id: agent-x\nstatus: running\nagent_id: agent-0\nactual_subagent_type: coder\nautomatic_notification: true\n\ndescription: Fix trust\n",
+      ),
+    );
+    expect(mapper.pendingBackground).toBe(1);
+    expect(mapper.keepsProcess).toBe(true);
+    const tasks = events.filter(([type]) => type === "task").map(([, data]) => data);
+    expect(tasks.at(-1)).toMatchObject({
       id: "a1",
-      kind: "agent",
-      title: "Fix trust",
       status: "running",
       background: true,
-      hold: false,
+      session: "agent-0",
       subagent: "coder",
-      prompt: "do it",
-      tool: "a1",
-    },
-  ]);
-  expect(mapper.pendingBackground).toBe(0);
-  expect(mapper.keepsProcess).toBe(true);
-  mapper.handleUpdate(
-    "s",
-    readResult(
-      "a1",
-      "task_id: agent-x\nstatus: running\nagent_id: agent-0\nactual_subagent_type: coder\nautomatic_notification: true\n\ndescription: Fix trust\n",
-    ),
-  );
-  expect(mapper.pendingBackground).toBe(0);
-  expect(mapper.keepsProcess).toBe(true);
-  await mapper.waitBackground();
-  const tasks = events.filter(([type]) => type === "task").map(([, data]) => data);
-  expect(tasks.at(-1)).toMatchObject({
-    id: "a1",
-    status: "running",
-    background: true,
-    hold: false,
-    session: "agent-0",
-    subagent: "coder",
-  });
+    });
+    await writeFile(manifest, "{");
+    expect(mapper.pollBackground()).toBe(1);
+    await writeFile(
+      manifest,
+      JSON.stringify({ kind: "agent", taskId: "other", status: "completed" }),
+    );
+    expect(mapper.pollBackground()).toBe(1);
+    const settled = mapper.waitBackground();
+    await writeFile(
+      manifest,
+      JSON.stringify({
+        kind: "agent",
+        taskId: "agent-x",
+        status: native,
+        endedAt: 123,
+      }),
+    );
+    expect(mapper.pollBackground()).toBe(0);
+    await settled;
+    expect(events.at(-1)).toEqual(["task", { id: "a1", status: chat, endedAt: 123 }]);
+    expect(mapper.keepsProcess).toBe(false);
+  } finally {
+    await rm(home, { recursive: true, force: true });
+  }
 });
 
-test("kimi background Agent terminal receipt clears the soft keep-alive task", async () => {
+test("kimi background Agent terminal receipt releases the connection hold", () => {
   const events = [];
   const mapper = createAcpEventMapper(
     (type, data) => events.push([type, data]),

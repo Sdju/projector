@@ -102,12 +102,14 @@ export function createAcpEventMapper(
   options: {
     /** The run is a `/compact` command: its summary is the answer, not just a note. */
     compactCommand?: boolean;
+    sessionId?: () => string;
   } = {},
 ) {
   let text = "";
   let model = "";
   const toolNames = new Map<string, string>();
   const background = createBackgroundHold();
+  const poll = () => emitTasks(dialect.poll?.(options.sessionId?.() ?? "") ?? []);
   const emitTasks = (patches: AcpTaskPatch[]) => {
     for (const patch of patches) {
       background.track(patch);
@@ -297,14 +299,16 @@ export function createAcpEventMapper(
      * connection must stay open so later `session/update` can clear the set.
      */
     pollBackground(): number {
-      emitTasks(dialect.poll?.() ?? []);
+      poll();
       return background.size;
     },
+    stopBackground(summary: string): void {
+      poll();
+      emitTasks(background.pendingIds.map((id) => ({ id, status: "stopped", summary })));
+    },
     waitBackground(signal?: AbortSignal): Promise<void> {
-      return background.wait(signal, () => {
-        const patches = dialect.poll?.() ?? [];
-        if (patches.length) emitTasks(patches);
-      });
+      if (background.size) poll();
+      return background.wait(signal, poll);
     },
   };
 }

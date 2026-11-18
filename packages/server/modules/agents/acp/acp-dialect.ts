@@ -110,7 +110,7 @@ export interface AcpDialect {
    * While the connection is held after `end_turn`, optional patches that clear background work
    * when the agent never reports it on the ACP wire (e.g. OpenCode idle_outcome).
    */
-  poll?(): AcpTaskPatch[];
+  poll?(sessionId: string): AcpTaskPatch[];
   /** When a replayed message was written, if its `messageId` tells (ms since the epoch). */
   time(update: AcpUpdate): number | undefined;
   /**

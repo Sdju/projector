@@ -10,6 +10,8 @@ export const kimiProgram = {
   command: "kimi",
   args: ["acp"],
   dialect: createKimiDialect,
+  exclusiveSession: true,
+  finishAfterBackground: true,
 };
 
 export const kimiBackend: AgentBackend = {

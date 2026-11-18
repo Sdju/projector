@@ -54,6 +54,9 @@ export function createBackgroundHold() {
     get keepsProcess() {
       return pending.size > 0 || soft.size > 0;
     },
+    get pendingIds(): readonly string[] {
+      return [...pending];
+    },
     wait(signal?: AbortSignal, poll?: () => void): Promise<void> {
       if (!pending.size || signal?.aborted) return Promise.resolve();
       return new Promise((resolve) => {

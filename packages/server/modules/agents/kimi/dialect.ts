@@ -1,4 +1,5 @@
 import { stripReadLineNumbers } from "@ai-projector/core/modules/agent-read/index.ts";
+import { kimiBackgroundState } from "./background-state.ts";
 import {
   extendPlainDialect,
   inputOf,
@@ -59,7 +60,7 @@ function agentReceipt(output: string) {
 function taskStatusOf(status: string): "running" | "done" | "error" | "stopped" | undefined {
   if (status === "running") return "running";
   if (status === "completed" || status === "done") return "done";
-  if (status === "failed" || status === "error") return "error";
+  if (status === "failed" || status === "error" || status === "timed_out") return "error";
   if (
     status === "lost" ||
     status === "killed" ||
@@ -71,14 +72,11 @@ function taskStatusOf(status: string): "running" | "done" | "error" | "stopped" 
   return undefined;
 }
 
-/**
- * Kimi Code: numbered reads, plus `Agent` / `run_in_background` as chat tasks. Background agents
- * report `status: running` and finish on a later turn, so they must not hold the ACP connection
- * (`hold: false`); the host keeps the process via keep-alive instead of SIGTERM.
- */
-export function createKimiDialect(): AcpDialect {
+/** Kimi can ask permission after end_turn; its local task records provide the final status. */
+export function createKimiDialect(readTask = kimiBackgroundState()): AcpDialect {
   const reads = new Set<string>();
   const open = new Map<string, { background: boolean; description: string }>();
+  const background = new Map<string, { taskId: string; deadline: number }>();
 
   return extendPlainDialect({
     call(update, id) {
@@ -92,7 +90,6 @@ export function createKimiDialect(): AcpDialect {
         title: agent.description,
         status: "running",
         background: agent.background,
-        ...(agent.background ? { hold: false } : {}),
         ...(agent.subagent && agent.subagent !== "resume" ? { subagent: agent.subagent } : {}),
         ...(agent.prompt ? { prompt: agent.prompt } : {}),
         ...(agent.resume ? { session: agent.resume } : {}),
@@ -108,10 +105,9 @@ export function createKimiDialect(): AcpDialect {
       if (!known) return [];
       const receipt = agentReceipt(output);
       const fromReceipt = receipt ? taskStatusOf(receipt.status) : undefined;
-      // Background start receipt (`status: running`): keep soft; completion is a later turn.
-      // Terminal receipts (`failed` / `completed` / `lost`) must clear the task even if launched
-      // with `run_in_background` — otherwise the island stays "running" after quota/provider stops.
-      if (fromReceipt === "running" || (known.background && !fromReceipt)) {
+      if (fromReceipt === "running") {
+        if (receipt?.taskId)
+          background.set(id, { taskId: receipt.taskId, deadline: Date.now() + 121 * 60_000 });
         return [
           {
             id,
@@ -119,7 +115,7 @@ export function createKimiDialect(): AcpDialect {
             title: receipt?.description ?? known.description,
             status: "running",
             background: true,
-            hold: false,
+            ...(!receipt?.taskId ? { hold: false } : {}),
             ...(receipt?.subagent ? { subagent: receipt.subagent } : {}),
             ...(receipt?.session ? { session: receipt.session } : {}),
             ...(shorten(output) ? { summary: shorten(receipt?.description ?? output) } : {}),
@@ -128,6 +124,7 @@ export function createKimiDialect(): AcpDialect {
         ];
       }
       open.delete(id);
+      background.delete(id);
       const summary = shorten(output);
       const status = fromReceipt ?? (update.status === "failed" ? "error" : ("done" as const));
       return [
@@ -135,13 +132,27 @@ export function createKimiDialect(): AcpDialect {
           id,
           status,
           background: known.background,
-          ...(known.background ? { hold: false } : {}),
           ...(receipt?.subagent ? { subagent: receipt.subagent } : {}),
           ...(receipt?.session ? { session: receipt.session } : {}),
           ...(summary ? { summary } : {}),
           ...(known.background || fromReceipt ? { tool: id } : {}),
         },
       ];
+    },
+    poll(sessionId) {
+      const patches: AcpTaskPatch[] = [];
+      for (const [id, { taskId, deadline }] of background) {
+        const record = readTask(sessionId, taskId);
+        const status = record && taskStatusOf(record.status);
+        if (status && status !== "running") {
+          patches.push({ id, status, ...(record?.endedAt ? { endedAt: record.endedAt } : {}) });
+        } else if (Date.now() >= deadline) {
+          patches.push({ id, status: "error", summary: "Kimi не записал итог фоновой задачи" });
+        } else continue;
+        background.delete(id);
+        open.delete(id);
+      }
+      return patches;
     },
   });
 }
