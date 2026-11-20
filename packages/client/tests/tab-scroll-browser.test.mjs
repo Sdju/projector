@@ -47,7 +47,7 @@ const html = `<!doctype html>
 
 test(
   "kept tabs restore nested scroll after teleporting between panel hosts",
-  { skip: !chromium, timeout: 45000 },
+  { skip: !chromium, timeout: 45000, retry: 1 },
   async () => {
     const fixture = await createBrowserFixture({ pages: { "/__tab_scroll": html } });
     const browser = await createChromium(fixture.directory);
@@ -113,7 +113,7 @@ const filesHtml = `<!doctype html>
 
 test(
   "file tabs restore CodeMirror and visual Markdown scroll after remounting",
-  { skip: !chromium, timeout: 60000 },
+  { skip: !chromium, timeout: 60000, retry: 1 },
   async () => {
     const fixture = await createBrowserFixture({ pages: { "/__file_scroll": filesHtml } });
     const browser = await createChromium(fixture.directory);

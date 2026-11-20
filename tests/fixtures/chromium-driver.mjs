@@ -161,8 +161,15 @@ export async function createChromium(directory) {
           mobile: false,
         }),
       async click(selector) {
+        // Scroll first: a target below the viewport would otherwise get a click outside it, and
+        // the chat fixture's height depends on how late the webfonts finish loading.
         const point = await evaluate(
-          `(() => { const r = document.querySelector(${JSON.stringify(selector)}).getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; })()`,
+          `(() => {
+            const element = document.querySelector(${JSON.stringify(selector)});
+            element.scrollIntoView({ block: "center", inline: "center" });
+            const r = element.getBoundingClientRect();
+            return { x: r.x + r.width / 2, y: r.y + r.height / 2 };
+          })()`,
         );
         await call("Input.dispatchMouseEvent", {
           type: "mousePressed",
