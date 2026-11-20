@@ -17,6 +17,21 @@ function loadOrders() {
   return loading;
 }
 
+/** Reorder only the slots occupied by the items on this panel. */
+export function reorderVisible(
+  order: string[],
+  visible: string[],
+  from: string,
+  to: string,
+  after: boolean,
+): string[] {
+  const shown = new Set(visible);
+  const reordered = order.filter((id) => shown.has(id) && id !== from);
+  reordered.splice(reordered.indexOf(to) + Number(after), 0, from);
+  let index = 0;
+  return order.map((id) => (shown.has(id) ? reordered[index++]! : id));
+}
+
 export function useActionOrder(scope: MaybeRefOrGetter<string>) {
   void loadOrders().catch(console.error);
   const order = computed(() => orders.value[toValue(scope)] ?? []);
@@ -27,14 +42,12 @@ export function useActionOrder(scope: MaybeRefOrGetter<string>) {
       return (ai < 0 ? order.value.length : ai) - (bi < 0 ? order.value.length : bi);
     });
   }
-  async function move(ids: string[], from: string, to: string, after: boolean) {
+  async function move(ids: string[], from: string, to: string, after: boolean, all = ids) {
     if (from === to || !ids.includes(from) || !ids.includes(to)) return;
     await update((saved) => {
       // Keep unavailable and hidden entries in the saved order.
-      const merged = [...new Set([...saved, ...ids])];
-      merged.splice(merged.indexOf(from), 1);
-      merged.splice(merged.indexOf(to) + (after ? 1 : 0), 0, from);
-      return merged;
+      const merged = [...new Set([...saved, ...all])];
+      return reorderVisible(merged, ids, from, to, after);
     });
   }
   async function update(change: (saved: string[]) => string[] | undefined) {

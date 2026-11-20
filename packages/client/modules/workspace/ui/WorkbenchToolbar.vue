@@ -17,6 +17,7 @@ import ContextMenu from "../../../common/ui/ContextMenu.vue";
 import { useIslandMenu } from "../../../common/utilities/island-menu.ts";
 import { useCommandScope } from "../../../common/utilities/commands.ts";
 import { useHiddenActions } from "../lib/hidden-actions.ts";
+import { useActionDrag } from "../lib/action-drag.ts";
 import { useActionOrder } from "../lib/action-order.ts";
 
 const props = defineProps<{
@@ -65,45 +66,19 @@ const visibleActions = computed(() =>
     (item) => item.id,
   ),
 );
-const dragging = ref("");
-const dropTarget = ref<{ id: string; after: boolean }>();
-function endDrag() {
-  dragging.value = "";
-  dropTarget.value = undefined;
-}
-function dragLeave(event: DragEvent) {
-  if (
-    !(event.relatedTarget instanceof Node) ||
-    !(event.currentTarget as HTMLElement).contains(event.relatedTarget)
-  )
-    dropTarget.value = undefined;
-}
-function dragOver(event: DragEvent, id: string) {
-  if (!dragging.value || dragging.value === id) {
-    dropTarget.value = undefined;
-    return;
-  }
-  event.preventDefault();
-  if (event.dataTransfer) event.dataTransfer.dropEffect = "move";
-  const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
-  dropTarget.value = { id, after: event.clientX > rect.left + rect.width / 2 };
-}
-
-function dragStart(event: DragEvent, id: string) {
-  dragging.value = id;
-  event.dataTransfer?.setData("text/plain", id);
-  if (event.dataTransfer) event.dataTransfer.effectAllowed = "move";
-}
-function drop(event: DragEvent, id: string) {
-  event.preventDefault();
-  const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
-  void commands.scope.executeCommand("ide.workbench.action.move", {
-    from: dragging.value,
-    to: id,
-    after: event.clientX > rect.left + rect.width / 2,
-  });
-  endDrag();
-}
+const dragging = ref<string>();
+const { dropTarget, dragStart, dragOver, dragLeave, drop, endDrag } = useActionDrag<string, string>(
+  {
+    dragging,
+    axis: "x",
+    mime: "text/plain",
+    sourceFor: (id) => id,
+    canDrop: (from, to) => from !== to,
+    move: (from, to, after) => {
+      void commands.scope.executeCommand("ide.workbench.action.move", { from, to, after });
+    },
+  },
+);
 const isHidden = (id: string) => visibility.hidden.value.includes(`toolbar:${id}`);
 const hiddenActions = computed(() => actions.value.filter((item) => isHidden(item.id)));
 const commands = useCommandScope("workbench-hidden-actions", () => ({ surface: "workbench" }));
@@ -129,6 +104,7 @@ commands.scope.registerCommand({
       value.from,
       value.to,
       value.after,
+      actions.value.map((item) => item.id),
     );
   },
 });

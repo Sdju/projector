@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import UiStatusDot from "../../../common/ui/UiStatusDot.vue";
-import { computed, ref, watch, type Component } from "vue";
+import { computed, ref, type Component } from "vue";
 import UiButton from "../../../common/ui/UiButton.vue";
 import UiIsland from "../../../common/ui/UiIsland.vue";
 import ContextMenu from "../../../common/ui/ContextMenu.vue";
@@ -16,6 +16,7 @@ import IconMenu from "~icons/lucide/menu";
 import IconEyeOff from "~icons/lucide/eye-off";
 import IconEye from "~icons/lucide/eye";
 import { useHiddenActions } from "../lib/hidden-actions.ts";
+import { useActionDrag } from "../lib/action-drag.ts";
 import type { SidebarLayout, SidebarSide } from "../lib/sidebar-layout.ts";
 import { groupSidebar } from "../../workspace-api/index.ts";
 
@@ -69,10 +70,17 @@ const overflow = useIslandMenu({ anchor: "left", initialFocus: ".section-item" }
 const visibility = useHiddenActions();
 const layout = props.layout;
 const dragging = layout.drag;
-const dragType = "application/x-projector-sidebar-section";
-const dropTarget = ref<{ id?: string; after: boolean }>();
-watch(dragging, () => {
-  dropTarget.value = undefined;
+const { dropTarget, dragStart, dragOver, dragLeave, drop, endDrag } = useActionDrag<
+  { id: string; side: SidebarSide },
+  string | undefined
+>({
+  dragging,
+  axis: "y",
+  mime: "application/x-projector-sidebar-section",
+  sourceFor: (id) => ({ id, side: props.side }),
+  canDrop: (from, to) => layout.canMove(from.id, props.side, to),
+  move: (from, to, after) =>
+    emit("command", "ide.workbench.section.move", { from: from.id, side: props.side, to, after }),
 });
 const oppositeSide = computed(() => (props.side === "left" ? "right" : "left"));
 const emptyDrop = computed(
@@ -81,49 +89,6 @@ const emptyDrop = computed(
     layout.canMove(dragging.value.id, props.side) &&
     !groups.value.some(({ id }) => layout.canMove(dragging.value!.id, props.side, id)),
 );
-function endDrag() {
-  dragging.value = undefined;
-  dropTarget.value = undefined;
-}
-function dragLeave(event: DragEvent) {
-  if (
-    !(event.relatedTarget instanceof Node) ||
-    !(event.currentTarget as HTMLElement).contains(event.relatedTarget)
-  )
-    dropTarget.value = undefined;
-}
-function dragOver(event: DragEvent, id?: string) {
-  const from = dragging.value?.id;
-  if (
-    !from ||
-    !event.dataTransfer?.types.includes(dragType) ||
-    !layout.canMove(from, props.side, id)
-  ) {
-    dropTarget.value = undefined;
-    return;
-  }
-  event.preventDefault();
-  event.dataTransfer.dropEffect = "move";
-  const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
-  dropTarget.value = { id, after: event.clientY > rect.top + rect.height / 2 };
-}
-
-function dragStart(event: DragEvent, id: string) {
-  dragging.value = { id, side: props.side };
-  event.dataTransfer?.setData(dragType, id);
-  if (event.dataTransfer) event.dataTransfer.effectAllowed = "move";
-}
-function drop(event: DragEvent, id?: string) {
-  dragOver(event, id);
-  if (!dropTarget.value || !dragging.value) return;
-  emit("command", "ide.workbench.section.move", {
-    from: dragging.value.id,
-    side: props.side,
-    to: id,
-    after: dropTarget.value.after,
-  });
-  endDrag();
-}
 const keyFor = (id: string) => `sidebar:${id}`;
 const settingsItem: SidebarItem = {
   id: "project-settings",
@@ -359,9 +324,9 @@ function choose(item: SidebarItem) {
       v-if="emptyDrop"
       class="side-group empty-drop"
       :class="{ 'drop-before': dropTarget && !dropTarget.id }"
-      @dragover="dragOver($event)"
+      @dragover="dragOver($event, undefined)"
       @dragleave="dragLeave"
-      @drop.stop="drop($event)"
+      @drop.stop="drop($event, undefined)"
     />
     <span :ref="overflow.trigger" class="overflow-trigger">
       <UiButton

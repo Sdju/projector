@@ -19,7 +19,12 @@ const html = `<!doctype html>
     id: "sidebar-test",
     layout: "editor",
     aside: workspaceAside,
-    sidebar: [{ id: "child", group: "files", kind: "test", title: "Child" }],
+    sidebar: [
+      { id: "child", group: "files", kind: "test", title: "Child" },
+      { id: "hidden-test", kind: "test", title: "Hidden" },
+      { id: "anchor-test", kind: "test", title: "Anchor" },
+      { id: "last-test", kind: "test", title: "Last" },
+    ],
     utility: [{ id: "utility", kind: "test", title: "Utility" }],
     providers: { files: {
       assetUrl: (path) => path,
@@ -30,6 +35,15 @@ const html = `<!doctype html>
   });
   const fetchApi = window.fetch.bind(window);
   window.fetch = (url, options) => {
+    if (url === "/api/ide/hidden-actions") {
+      let hidden = JSON.parse(sessionStorage.getItem("hidden-fixture") ?? "[]");
+      if (options?.method === "PUT") {
+        const { id, hidden: hide } = JSON.parse(options.body);
+        hidden = hide ? [...new Set([...hidden, id])] : hidden.filter((key) => key !== id);
+        sessionStorage.setItem("hidden-fixture", JSON.stringify(hidden));
+      }
+      return Promise.resolve(Response.json({ hidden }));
+    }
     if (url !== "/api/ide/action-order") return fetchApi(url, options);
     const data = JSON.parse(sessionStorage.getItem("order-fixture") ?? "{}");
     if (options?.method === "PUT") {
@@ -80,7 +94,7 @@ const waitFor = (browser, expression) =>
   expect.poll(() => browser.evaluate(expression), { timeout: 8000 }).toBe(true);
 
 test(
-  "sidebar groups move between rails without remounting and restore their saved side",
+  "sidebar groups keep their side and both panels preserve hidden positions across reordering",
   { skip: !chromium, timeout: 45000 },
   async ({ onTestFinished }) => {
     const fixture = await createBrowserFixture({
@@ -103,10 +117,10 @@ test(
     await waitFor(browser, exists(terminals));
     await browser.evaluate('window.originalFileView = document.querySelector("#file-view")');
 
-    const point = (selector, y = 0.5) =>
+    const point = (selector, y = 0.5, x = 0.5) =>
       browser.evaluate(`(() => {
         const r = document.querySelector(${JSON.stringify(selector)}).getBoundingClientRect();
-        return { x: r.x + r.width / 2, y: r.y + r.height * ${y} };
+        return { x: r.x + r.width * ${x}, y: r.y + r.height * ${y} };
       })()`);
     const mouse = (type, at, button = "left") =>
       browser.call("Input.dispatchMouseEvent", {
@@ -177,6 +191,76 @@ test(
     await waitFor(browser, exists(filesLeft));
     expect(await browser.evaluate(exists(section(left, "Child")))).toBe(true);
     expect(await browser.evaluate(exists(filesRight))).toBe(false);
+    await browser.evaluate(`(() => {
+      sessionStorage.setItem("order-fixture", JSON.stringify({
+        toolbar: ["media", "analytics", "settings", "layout"],
+        "sidebar-layout:sidebar-test": ["left:files", "left:hidden-test", "left:anchor-test", "left:last-test"],
+      }));
+      sessionStorage.setItem("hidden-fixture", JSON.stringify(["toolbar:analytics", "sidebar:hidden-test"]));
+    })()`);
+    await browser.open(fixture.url("/__sidebar"));
+    const media = '.sortable-action button[aria-label="Генерация медиа"]';
+    const settings = '.sortable-action button[aria-label="Настройки Projector"]';
+    const analytics = '.sortable-action button[aria-label="Аналитика расхода"]';
+    const hidden = section(left, "Hidden");
+    const anchor = section(left, "Anchor");
+    const last = section(left, "Last");
+    await waitFor(
+      browser,
+      `${exists(last)} && ${exists(settings)} && !${exists(hidden)} && !${exists(analytics)}`,
+    );
+
+    await startDrag(last);
+    const sidebarInsert = await point(anchor, 0.2);
+    await mouse("mouseMoved", sidebarInsert);
+    await mouse("mouseMoved", { ...sidebarInsert, y: sidebarInsert.y + 1 });
+    await waitFor(browser, exists(`${left} .side-group.drop-before`));
+    await mouse("mouseReleased", sidebarInsert);
+    await waitFor(
+      browser,
+      'JSON.parse(sessionStorage.getItem("order-fixture"))["sidebar-layout:sidebar-test"][2] === "left:last-test"',
+    );
+
+    const from = await point(settings);
+    await mouse("mousePressed", from);
+    await mouse("mouseMoved", { ...from, y: from.y + 8 });
+    await waitFor(browser, exists(".sortable-action.dragging"));
+    const toolbarInsert = await point(media, 0.2, 0.2);
+    await mouse("mouseMoved", toolbarInsert);
+    await expect
+      .poll(
+        async () => {
+          await mouse("mouseMoved", toolbarInsert);
+          return browser.evaluate(exists(".sortable-action.drop-before"));
+        },
+        { timeout: 8000 },
+      )
+      .toBe(true);
+    await mouse("mouseReleased", toolbarInsert);
+    await waitFor(
+      browser,
+      'JSON.parse(sessionStorage.getItem("order-fixture")).toolbar[0] === "settings"',
+    );
+
+    await browser.open(fixture.url("/__sidebar"));
+    await waitFor(
+      browser,
+      `${exists(last)} && ${exists(settings)} && !${exists(hidden)} && !${exists(analytics)}`,
+    );
+    await browser.click('[data-command="ide.workbench.actions.hidden.toggle"]');
+    await browser.click('[aria-label="Вернуть «Аналитика расхода»"]');
+    await waitFor(browser, exists(analytics));
+    await browser.click(`${left} [data-command="ide.workbench.section.hidden.toggle"]`);
+    await browser.click('[aria-label="Вернуть «Hidden»"]');
+    await waitFor(browser, exists(hidden));
+    const precedes = (first, second) =>
+      `Boolean(document.querySelector(${JSON.stringify(first)}).compareDocumentPosition(document.querySelector(${JSON.stringify(second)})) & Node.DOCUMENT_POSITION_FOLLOWING)`;
+    expect(
+      await browser.evaluate(`${precedes(settings, analytics)} && ${precedes(analytics, media)}`),
+    ).toBe(true);
+    expect(await browser.evaluate(`${precedes(hidden, last)} && ${precedes(last, anchor)}`)).toBe(
+      true,
+    );
     expect(browser.errors.filter((error) => "exception" in error)).toEqual([]);
   },
 );

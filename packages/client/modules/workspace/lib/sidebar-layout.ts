@@ -6,7 +6,8 @@ import {
 } from "../../workspace-api/index.ts";
 import { commandArgs } from "../../../common/utilities/commands.ts";
 import type { RegisterWorkspaceCommand } from "./right-panel.ts";
-import { useActionOrder } from "./action-order.ts";
+import { useHiddenActions } from "./hidden-actions.ts";
+import { reorderVisible, useActionOrder } from "./action-order.ts";
 
 export type SidebarSide = "left" | "right";
 
@@ -26,6 +27,9 @@ function createSidebarLayout(options: {
 }) {
   const legacy = useActionOrder("sidebar");
   const saved = useActionOrder(() => `sidebar-layout:${options.projectId()}`);
+  const visibility = useHiddenActions();
+  const visible = (group: { members: string[] }) =>
+    group.members.some((id) => !visibility.hidden.value.includes(`sidebar:${id}`));
   const drag = shallowRef<{ id: string; side: SidebarSide }>();
   const groups = computed(() =>
     groupSidebar([...options.left.list(), ...options.right.list()]).map(([root, ...children]) => ({
@@ -50,12 +54,18 @@ function createSidebarLayout(options: {
   }
   function canMove(from: string, side: SidebarSide, to?: string) {
     const source = groupOf(from);
-    if (!source) return false;
+    if (!source || !visible(source)) return false;
     const cross = sideOf(from) !== side;
     if (cross && (!options.canTransfer() || !options.left.has(source.id))) return false;
     if (!to) return cross;
     const target = groupOf(to);
-    if (!target || source === target || sideOf(to) !== side || source.utility !== target.utility)
+    if (
+      !target ||
+      !visible(target) ||
+      source === target ||
+      sideOf(to) !== side ||
+      source.utility !== target.utility
+    )
       return false;
     // A fallback rail can show both sets, but reordering it must retain their desktop sides.
     return options.rightAvailable() || assigned(source.id) === assigned(target.id);
@@ -68,11 +78,15 @@ function createSidebarLayout(options: {
     const target = to ? groupOf(to) : undefined;
     const cross = sideOf(from) !== side;
     if (!cross && target && !saved.order.value.length) {
+      const all = sort(groups.value.filter((group) => sideOf(group.id) === side));
       await legacy.move(
-        sort(groups.value.filter((group) => sideOf(group.id) === side)).map((group) => group.id),
+        all
+          .filter((group) => visible(group) && group.utility === source.utility)
+          .map((group) => group.id),
         source.id,
         target.id,
         !!after,
+        all.map((group) => group.id),
       );
       return false;
     }
@@ -83,6 +97,23 @@ function createSidebarLayout(options: {
       const destination = cross ? side : current;
       const ids = legacy.sort(groups.value, (group) => group.id);
       const entries = new Set([...order, ...ids.map(({ id }) => entry(assigned(id, order), id))]);
+      if (!cross && target) {
+        const visibleIds = ids
+          .filter(
+            (group) =>
+              visible(group) &&
+              group.utility === source.utility &&
+              assigned(group.id, order) === destination,
+          )
+          .map((group) => entry(destination, group.id));
+        return reorderVisible(
+          [...entries],
+          visibleIds,
+          entry(current, source.id),
+          entry(destination, target.id),
+          !!after,
+        );
+      }
       entries.delete(entry(current, source.id));
       const updated = [...entries];
       const anchor = target ? updated.indexOf(entry(destination, target.id)) : -1;
