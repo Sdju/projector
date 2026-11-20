@@ -25,8 +25,10 @@ const require = createRequire(join(ROOT, "package.json"));
 
 function catalogVersion() {
   const workspace = readFileSync(join(ROOT, "pnpm-workspace.yaml"), "utf8");
-  const match = workspace.match(/vite:\s*npm:@voidzero-dev\/vite-plus-core@([^\s]+)/);
-  return match?.[1] ?? "1.6.0";
+  // Ключ каталога может быть в кавычках: `"vite": npm:@voidzero-dev/vite-plus-core@…`.
+  const match = workspace.match(/^\s*"?vite"?\s*:\s*npm:@voidzero-dev\/vite-plus-core@(\S+)\s*$/m);
+  if (!match) throw new Error("ensure-vite-plus-core: не найден vite в каталоге pnpm");
+  return match[1];
 }
 
 function tarballUrl() {
@@ -162,14 +164,19 @@ async function repair() {
   }
 }
 
-if (present()) {
-  console.log("ensure-vite-plus-core: ok");
-  process.exit(0);
-}
+try {
+  if (present()) {
+    console.log("ensure-vite-plus-core: ok");
+    process.exit(0);
+  }
 
-console.warn("ensure-vite-plus-core: нет bin/vite.js, восстанавливаю из кэша или npm…");
-const ok = await repair();
-if (!ok) {
-  console.error("ensure-vite-plus-core: не удалось восстановить. Выполните pnpm install");
+  console.warn("ensure-vite-plus-core: нет bin/vite.js, восстанавливаю из кэша или npm…");
+  const ok = await repair();
+  if (!ok) {
+    console.error("ensure-vite-plus-core: не удалось восстановить. Выполните pnpm install");
+    process.exit(1);
+  }
+} catch (error) {
+  console.error(error instanceof Error ? error.message : error);
   process.exit(1);
 }
