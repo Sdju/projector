@@ -51,13 +51,13 @@ pnpm -C packages/ide pack --pack-destination ../../artifacts
 pnpm -C packages/native pack --pack-destination ../../artifacts
 pnpm -C packages/hub pack --pack-destination ../../artifacts
 
-npm install -g ./artifacts/projector-ai-ide-0.13.0.tgz
+npm install -g ./artifacts/projector-ai-ide-0.14.0.tgz
 projector --browser
 
-npm install -g ./artifacts/projector-ai-native-0.13.0.tgz
+npm install -g ./artifacts/projector-ai-native-0.14.0.tgz
 projector --native
 
-npm install -g ./artifacts/projector-ai-hub-0.13.0.tgz
+npm install -g ./artifacts/projector-ai-hub-0.14.0.tgz
 projector-hub
 ```
 
