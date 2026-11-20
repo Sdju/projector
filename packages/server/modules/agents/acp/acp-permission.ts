@@ -1,5 +1,5 @@
 import type { AgentRunOptions } from "../../agent/index.ts";
-import { contentText } from "./acp-events.ts";
+import { contentText } from "./acp-content.ts";
 
 interface PermissionOption {
   optionId?: string;

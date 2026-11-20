@@ -1157,3 +1157,39 @@ test("waitBackground resolves immediately when abort fires", async () => {
   await waiting;
   expect(mapper.pendingBackground).toBe(1);
 });
+
+test("live and replay decode the same ACP text, diff and raw output", () => {
+  const events = [];
+  const live = createAcpEventMapper((event, data) => events.push({ event, data }), "Test ACP");
+  const replay = createAcpReplayCollector("test", "test-session");
+  const updates = [
+    { sessionUpdate: "agent_message_chunk", content: [{ text: "Part " }, { text: "one" }] },
+    {
+      sessionUpdate: "tool_call",
+      toolCallId: "diff",
+      title: "Edit",
+      status: "completed",
+      content: [
+        { type: "content", content: { text: "Changed" } },
+        { type: "diff", path: 42, oldText: "before", newText: "after" },
+      ],
+      rawOutput: "metadata",
+    },
+    {
+      sessionUpdate: "tool_call",
+      toolCallId: "raw",
+      title: "Run",
+      status: "completed",
+      rawOutput: { exitCode: 0 },
+    },
+  ];
+  for (const update of updates) {
+    live.handleUpdate("test-session", update);
+    replay.handleUpdate(update);
+  }
+  const [turn] = replay.turns;
+  expect(turn.text).toBe(live.text);
+  expect(turn.tools.map((tool) => tool.detail)).toEqual(
+    events.filter(({ event }) => event === "tool-result").map(({ data }) => data.output),
+  );
+});

@@ -1,10 +1,5 @@
 import { randomUUID } from "node:crypto";
 import { stat } from "node:fs/promises";
-import { answerPreview } from "@ai-projector/core/modules/agent-answer/index.ts";
-import {
-  isAgentFailure,
-  type AgentFailure,
-} from "@ai-projector/core/modules/agent-failure/index.ts";
 import { resolveJudgeSettings } from "@ai-projector/core/modules/agent-judge/index.ts";
 import {
   createRun,
@@ -15,13 +10,12 @@ import {
   trackRun,
 } from "./agent-runs.ts";
 import type { AgentRunRecord } from "./agent-runs.ts";
-import type { AgentEventName } from "./backend.ts";
 import {
   createApprovalBridge,
   createQuestionBridge,
   createSecretBridge,
 } from "./command-bridge.ts";
-import { failureFromError, makeFailure } from "./failure.ts";
+import { collectRunResult } from "./run-result.ts";
 import { chatMetaOf, readChatFeatures } from "./history-store.ts";
 import { readAgentHistory } from "./history.ts";
 import { readChatJudge } from "./judge-store.ts";
@@ -30,12 +24,7 @@ import { isAgentAvailable, runAgent } from "./registry.ts";
 import type { AgentHistoryTurn } from "../providers/index.ts";
 import type { RunDriver } from "./run-hub.ts";
 import { driveRun } from "./run-hub.ts";
-import {
-  hasAnswerForm,
-  listRecentRuns,
-  recordRecentRun,
-  setRecentRunResume,
-} from "./recent-runs.ts";
+import { listRecentRuns, setRecentRunResume } from "./recent-runs.ts";
 import type { RecentRun } from "./recent-runs.ts";
 import { preferences } from "../preferences/index.ts";
 import { createJudgedApproval, readJudgeSettings } from "../judge/index.ts";
@@ -138,10 +127,9 @@ async function startResume(entry: RecentRun): Promise<void> {
   let runId: string | undefined;
   let driver: RunDriver | undefined;
   let untrack: (() => void) | undefined;
-  let failure: AgentFailure | undefined;
-  let collected = "";
-  let finalText: string | undefined;
-  let lastSession: string | undefined;
+  const result = collectRunResult((session) => {
+    if (runId) void rememberSession(runId, session).catch(() => {});
+  });
   try {
     // The plan is claimed before anything else: a page that wakes up now must not send too.
     if (!(await setRecentRunResume(chat, null))) return;
@@ -168,36 +156,7 @@ async function startResume(entry: RecentRun): Promise<void> {
     runId = id;
     driver = driveRun(id, { emit() {}, close() {} });
     untrack = trackRun(id, () => abort.abort());
-    const emit = (event: AgentEventName, data: unknown) => {
-      let payload = data;
-      // The page and the saved turn get the same safe failure, never a raw provider error.
-      if (event === "error") {
-        const body = (data ?? {}) as {
-          error?: unknown;
-          failure?: unknown;
-          status?: unknown;
-          code?: unknown;
-        };
-        const text = typeof body.error === "string" ? body.error : "Ошибка агента";
-        const info: AgentFailure = isAgentFailure(body.failure)
-          ? body.failure
-          : makeFailure({
-              message: text,
-              status: typeof body.status === "number" ? body.status : null,
-              code: typeof body.code === "string" ? body.code : null,
-            });
-        failure = info;
-        payload = { error: info.message, failure: info };
-      }
-      const body = (payload ?? {}) as Record<string, unknown>;
-      if (event === "session" && typeof body.id === "string") {
-        lastSession = body.id;
-        void rememberSession(id, body.id).catch(() => {});
-      } else if (event === "text" && typeof body.text === "string") collected += body.text;
-      else if (event === "done" && typeof body.text === "string" && body.text)
-        finalText = body.text;
-      driver?.publish(event, payload);
-    };
+    const emit = result.capture((event, data) => driver?.publish(event, data));
     await runAgent({
       ...record,
       backend,
@@ -251,7 +210,7 @@ async function startResume(entry: RecentRun): Promise<void> {
     });
   } catch (error) {
     // An emitted failure is the agent's own verdict; a thrown one is classified here.
-    failure ??= failureFromError(error);
+    result.fail(error);
   } finally {
     driver?.finish();
     untrack?.();
@@ -259,36 +218,26 @@ async function startResume(entry: RecentRun): Promise<void> {
     schedulePrune();
   }
 
-  const status = abort.signal.aborted ? "stopped" : failure ? "error" : "done";
-  const answer = (finalText ?? collected).trim();
-  const preview = answerPreview(answer, 300);
   const stored = runId ? await readRun(runId).catch(() => null) : null;
-  const session = stored?.session ?? lastSession ?? entry.session;
+  const session = stored?.session ?? result.session ?? entry.session;
   // A person may have started a newer run while this one was finishing: its record must win.
   const live = await listLiveRuns().catch(() => []);
   if (live.some((item) => item.chat === chat && item.id !== runId)) return;
-  try {
-    await recordRecentRun({
+  await result.record(
+    {
       id: runId ?? randomUUID(),
       backend,
       projectId: entry.projectId,
       chat,
       topic: entry.topic || CONTINUE_MESSAGE,
-      status,
-      // A failed continuation keeps its class and reset time, so the user can plan another one.
-      ...(status === "error" && failure ? { error: failure.message, failure } : {}),
-      ...(preview ? { resultPreview: preview } : {}),
-      ...(status === "done" && answer && hasAnswerForm(answer) ? { awaitingReply: true } : {}),
       ...(session ? { session } : {}),
-      ...(cwd ? { cwd } : {}),
+      cwd,
       ...(entry.selection ? { selection: entry.selection } : {}),
       ...(entry.permissionMode ? { permissionMode: entry.permissionMode } : {}),
       startedAt,
-      endedAt: Date.now(),
-    });
-  } catch {
-    // The continuation itself is over; a write failure must not take the server down.
-  }
+    },
+    abort.signal.aborted,
+  );
 }
 
 const host = globalThis as typeof globalThis & {

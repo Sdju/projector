@@ -1,48 +1,7 @@
 import { createReplay, sanitizeHarnessTurns } from "../../agent/index.ts";
 import { createPlainDialect, type AcpDialect, type AcpTaskPatch } from "./acp-dialect.ts";
 
-function contentText(content: unknown): string {
-  if (typeof content === "string") return content;
-  if (Array.isArray(content))
-    return content
-      .map((part) => (part as { text?: string } | null)?.text ?? "")
-      .filter(Boolean)
-      .join("");
-  const block = content as { text?: string } | null;
-  return typeof block?.text === "string" ? block.text : "";
-}
-
-function toolOutput(update: Record<string, unknown>): string {
-  const content = Array.isArray(update.content) ? update.content : [];
-  const text = content
-    .map((item) => {
-      const block = item as {
-        type?: string;
-        content?: unknown;
-        path?: unknown;
-        oldText?: unknown;
-        newText?: unknown;
-      };
-      if (block.type === "content") return contentText(block.content);
-      if (block.type === "diff")
-        return [
-          typeof block.path === "string" ? block.path : "",
-          ...(typeof block.oldText === "string"
-            ? block.oldText.split("\n").map((line) => `- ${line}`)
-            : []),
-          ...(typeof block.newText === "string"
-            ? block.newText.split("\n").map((line) => `+ ${line}`)
-            : []),
-        ].join("\n");
-      return "";
-    })
-    .filter(Boolean)
-    .join("\n");
-  if (text) return text;
-  if (typeof update.rawOutput === "string") return update.rawOutput;
-  if (update.rawOutput != null) return JSON.stringify(update.rawOutput, null, 2);
-  return "";
-}
+import { contentText, toolOutput } from "./acp-content.ts";
 
 function toolDetail(input: unknown): string {
   if (input == null) return "";
