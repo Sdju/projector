@@ -1,5 +1,4 @@
 import { randomBytes } from "node:crypto";
-import { rename, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { dataDir } from "@ai-projector/core/modules/app-paths/index.ts";
 import {
@@ -21,6 +20,7 @@ import {
   type TrustedProjectFileSpec,
   type TrustRecord,
 } from "../trusted-project-file/index.ts";
+import { writeFileAtomic } from "../atomic-files/index.ts";
 
 /** Presets a project keeps in its repository; inert until the user trusts this exact file. */
 export const projectPresetsTrustFile = () => join(dataDir(), "agent", "preset-trust.json");
@@ -107,12 +107,9 @@ async function writePresets(root: string, presets: AgentPreset[]): Promise<void>
     projectPresetsRelativeFile,
     "Папка .projector указывает за пределы проекта",
   );
-  const temporary = `${file}.${randomBytes(4).toString("hex")}.tmp`;
-  await writeFile(temporary, `${JSON.stringify({ version: 1, presets }, null, 2)}\n`, {
-    encoding: "utf8",
+  await writeFileAtomic(file, `${JSON.stringify({ version: 1, presets }, null, 2)}\n`, {
     mode: 0o644,
   });
-  await rename(temporary, file);
 }
 
 async function modify(

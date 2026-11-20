@@ -12,6 +12,25 @@ export interface AtomicWriteOptions {
   ownerOnly?: boolean;
 }
 
+const TRANSIENT_RENAME_CODES = new Set(["EPERM", "EACCES", "EBUSY"]);
+
+/**
+ * Windows can briefly keep a handle on the old file (a concurrent read, indexing or a scanner),
+ * and the same rename succeeds a moment later. POSIX does not retry: there the error is real.
+ */
+async function renameReplacing(from: string, to: string): Promise<void> {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      await rename(from, to);
+      return;
+    } catch (error) {
+      const code = (error as NodeJS.ErrnoException).code;
+      if (attempt >= 9 || !code || !TRANSIENT_RENAME_CODES.has(code)) throw error;
+      await new Promise((resolve) => setTimeout(resolve, 20 * (attempt + 1)));
+    }
+  }
+}
+
 /** Written in full and flushed to disk before the rename replaces the previous file. */
 export async function writeFileAtomic(
   file: string,
@@ -28,7 +47,7 @@ export async function writeFileAtomic(
     } finally {
       await handle.close();
     }
-    await rename(temporary, file);
+    await renameReplacing(temporary, file);
   } catch (error) {
     await rm(temporary, { force: true });
     throw error;
