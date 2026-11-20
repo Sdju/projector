@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import UiPanel from "../../../common/ui/UiPanel.vue";
 import UiToolbar from "../../../common/ui/UiToolbar.vue";
-import { computed } from "vue";
+import { computed, nextTick, onMounted, ref } from "vue";
 import { workspaceSiteUrl } from "../../workspace-api/index.ts";
 import { shortRevision } from "@ai-projector/core/modules/workspace/index.ts";
 import { useTabHost, useWorkspaceTabs } from "../lib/tab-views.ts";
@@ -57,6 +57,32 @@ const subtitle = computed(() =>
 const hasStatusLine = computed(
   () => !props.file.virtual && !props.file.binary && !props.file.image && !props.file.archive,
 );
+const body = ref<HTMLElement>();
+const scrollKey = () => (isMarkdown(props.file) ? (props.file.markdownMode ?? "document") : "file");
+function captureScroll() {
+  if (!body.value) return;
+  const elements = [body.value, ...body.value.querySelectorAll<HTMLElement>("*")];
+  props.file.scroll ??= {};
+  props.file.scroll[scrollKey()] = elements
+    .map((element, index) => ({ element, index }))
+    .filter(({ element }) => element.scrollTop || element.scrollLeft)
+    .map(({ element, index }) => ({ index, top: element.scrollTop, left: element.scrollLeft }));
+}
+function restoreScroll() {
+  void nextTick(() => {
+    if (!body.value) return;
+    const positions = props.file.scroll?.[scrollKey()];
+    if (!positions?.length) return;
+    const elements = [body.value, ...body.value.querySelectorAll<HTMLElement>("*")];
+    for (const position of positions) {
+      const element = elements[position.index];
+      if (!element) continue;
+      element.scrollTop = position.top;
+      element.scrollLeft = position.left;
+    }
+  });
+}
+onMounted(restoreScroll);
 </script>
 
 <template>
@@ -86,7 +112,12 @@ const hasStatusLine = computed(
         Оставить мою версию
       </button>
     </UiToolbar>
-    <div class="panel-body" :data-own-keys="view?.ownKeys || undefined">
+    <div
+      ref="body"
+      class="panel-body"
+      :data-own-keys="view?.ownKeys || undefined"
+      @scroll.capture="captureScroll"
+    >
       <TabReadoutScope v-if="view" :tab-key="file.key">
         <component :is="view.component" v-bind="view.props?.(file, host)" />
       </TabReadoutScope>
@@ -149,6 +180,7 @@ const hasStatusLine = computed(
         @command="(id, args) => host.run(id, args)"
         @save="emit('save')"
         @open="emit('open', $event)"
+        @ready="restoreScroll"
       />
       <CodeViewer
         v-else-if="!file.virtual"
@@ -181,6 +213,7 @@ const hasStatusLine = computed(
         :column="file.column"
         @change="emit('change', $event)"
         @save="emit('save')"
+        @ready="restoreScroll"
       />
     </div>
     <EditorStatusLine

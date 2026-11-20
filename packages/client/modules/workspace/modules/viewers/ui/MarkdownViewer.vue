@@ -28,6 +28,7 @@ const emit = defineEmits<{
   save: [];
   command: [id: string, args?: unknown];
   open: [path: string];
+  ready: [];
 }>();
 const editorError = ref("");
 function focusOut(event: FocusEvent) {
@@ -70,6 +71,7 @@ function focusOut(event: FocusEvent) {
         @source="emit('mode', 'source')"
         @command="(id, args) => emit('command', id, args)"
         @error="editorError = $event"
+        @ready="emit('ready')"
       />
       <CodeViewer
         v-if="mode === 'source'"
@@ -82,6 +84,7 @@ function focusOut(event: FocusEvent) {
         :editable="editable !== false"
         @change="emit('change', $event)"
         @save="emit('save')"
+        @ready="emit('ready')"
       />
     </div>
   </UiPanel>

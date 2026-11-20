@@ -34,6 +34,9 @@ export interface OpenFile extends FileContent {
   key: string;
   draft?: string;
   markdownMode?: "document" | "source";
+  scroll?: Partial<
+    Record<"file" | "document" | "source", { index: number; top: number; left: number }[]>
+  >;
   /** Счётчик ручных перезагрузок страницы в iframe. */
   htmlReload?: number;
   /** Файл на диске расходится с правками во вкладке (`disk`) или недоступен (`error`). */

@@ -48,6 +48,7 @@ const emit = defineEmits<{
   open: [path: string];
   error: [message: string];
   source: [];
+  ready: [];
   command: [id: string, args?: unknown];
 }>();
 const root = ref<HTMLElement>();
@@ -277,6 +278,7 @@ onMounted(async () => {
     scroller?.addEventListener("focusout", scheduleSelectionReport);
     scroller?.addEventListener("focusin", scheduleSelectionReport);
     ready = true;
+    emit("ready");
     // Props may change while the asynchronously created editor is mounting.
     if (props.content !== currentContent) setContent(props.content);
   } catch (error) {

@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import ProjectorIcon from "../../../common/icons/ProjectorIcon.vue";
 import UiLoader from "../../../common/ui/UiLoader.vue";
-import UiPanel from "../../../common/ui/UiPanel.vue";
 import { computed } from "vue";
 import UiButton from "../../../common/ui/UiButton.vue";
 import UiEmpty from "../../../common/ui/UiEmpty.vue";
@@ -19,7 +18,7 @@ import FilePanel from "./FilePanel.vue";
 import NewSessionMenu from "./NewSessionMenu.vue";
 import SessionTiles from "./SessionTiles.vue";
 import PanelHost from "./PanelHost.vue";
-import TabReadoutScope from "../../../common/ui/TabReadoutScope.vue";
+import KeptPanel from "./KeptPanel.vue";
 
 const props = defineProps<{
   projectId: string;
@@ -190,18 +189,16 @@ const asideKey = computed(() => {
     </template>
   </DockView>
   <div class="keep-alive" hidden>
-    <Teleport v-for="tab in kept" :key="tab.key" :to="hostOf(tab.key)" :disabled="!hostOf(tab.key)">
-      <component
-        :is="viewOf(tab)?.scroll ? 'div' : UiPanel"
-        v-bind="viewOf(tab)?.scroll ? {} : { as: 'div', sizing: 'flex' }"
-        :class="viewOf(tab)?.scroll ? 'kept-scroll' : 'kept-panel'"
-        :data-own-keys="viewOf(tab)?.ownKeys || undefined"
-      >
-        <TabReadoutScope :tab-key="tab.key">
-          <component :is="viewOf(tab)!.component" v-bind="viewOf(tab)!.props?.(tab, host)" />
-        </TabReadoutScope>
-      </component>
-    </Teleport>
+    <KeptPanel
+      v-for="tab in kept"
+      :id="tab.key"
+      :key="tab.key"
+      :to="hostOf(tab.key)"
+      :component="viewOf(tab)!.component"
+      :view-props="viewOf(tab)!.props?.(tab, host)"
+      :scroll="viewOf(tab)?.scroll"
+      :own-keys="viewOf(tab)?.ownKeys"
+    />
   </div>
 </template>
 
@@ -220,11 +217,5 @@ const asideKey = computed(() => {
 }
 .session-state.failed {
   color: var(--err);
-}
-.kept-scroll {
-  container-type: inline-size;
-  height: 100%;
-  overflow: auto;
-  padding: var(--sp-4);
 }
 </style>

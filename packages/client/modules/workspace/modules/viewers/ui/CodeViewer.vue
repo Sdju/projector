@@ -50,7 +50,7 @@ const props = defineProps<{
   projectId?: string;
   revision?: number;
 }>();
-const emit = defineEmits<{ change: [content: string]; save: [] }>();
+const emit = defineEmits<{ change: [content: string]; save: []; ready: [] }>();
 const container = ref<HTMLElement>();
 let view: EditorView | undefined;
 let merge: MergeView | undefined;
@@ -362,6 +362,7 @@ function focusOut(event: FocusEvent) {
 }
 onMounted(() => {
   render();
+  emit("ready");
   void loadEditorTheme().catch(() => undefined);
   void loadAppearanceFonts().catch(() => undefined);
 });
