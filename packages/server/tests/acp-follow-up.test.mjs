@@ -1,8 +1,15 @@
+import { EventEmitter } from "node:events";
+import { PassThrough } from "node:stream";
 import { expect, test, vi } from "vite-plus/test";
+import { createAcpConnection } from "../modules/agents/acp/acp-client.ts";
 import { settleAcpAnswer } from "../modules/agents/acp/acp-follow-up.ts";
 import { createAcpEventMapper } from "../modules/agents/acp/acp-events.ts";
 import { createPlainDialect } from "../modules/agents/acp/acp-dialect.ts";
-import { watchOpenCodeFollowUp } from "../modules/agents/opencode/sessions.ts";
+import { decidePermission } from "../modules/agents/acp/acp-permission.ts";
+import {
+  prepareOpenCodeFollowUp,
+  watchOpenCodeFollowUp,
+} from "../modules/agents/opencode/sessions.ts";
 
 function answer(overrides = {}) {
   return {
@@ -109,6 +116,26 @@ test("aborted observation emits no success", async () => {
   expect(events).toEqual([]);
 });
 
+test("losing the ACP connection during a continuation emits an error", async () => {
+  const disconnected = new AbortController();
+  const emit = vi.fn();
+  const result = settleAcpAnswer({
+    answer: answer({ hadBackground: true }),
+    program,
+    followUp: {
+      wait: ({ signal }) =>
+        new Promise((resolve) =>
+          signal.addEventListener("abort", () => resolve({ status: "aborted" }), { once: true }),
+        ),
+    },
+    disconnected: disconnected.signal,
+    options: { emit },
+  });
+  disconnected.abort();
+  await expect(result).resolves.toBe(true);
+  expect(emit.mock.calls.map(([event]) => event)).toEqual(["error"]);
+});
+
 test("a missing keep-alive marker is visible, never silent success", async () => {
   const wait = vi.fn();
   const { result, events } = setup(answer({ hadBackground: true }), wait, {
@@ -147,7 +174,6 @@ test("a second background child is polled and holds the same answer until its re
         wait: (options) =>
           watchOpenCodeFollowUp("main", {
             ...options,
-            baseline: { ...state, seq: 0, idle: 0 },
             read: () => state,
             intervalMs: 10,
             quietMs: 20,
@@ -179,6 +205,108 @@ test("a second background child is polled and holds the same answer until its re
     expect(events.filter(([event]) => event === "done")).toEqual([
       ["done", { text: "Оба отчёта получены.", added: [] }],
     ]);
+  } finally {
+    vi.useRealTimers();
+  }
+});
+
+test("streamed continuation and outstanding permission keep the connection open after the final child", async () => {
+  vi.useFakeTimers();
+  try {
+    const events = [];
+    const emit = (event, data) => events.push([event, data]);
+    let patches = [];
+    const dialect = {
+      ...createPlainDialect(),
+      call: () => [{ id: "child", status: "running", background: true }],
+      poll: () => patches.splice(0),
+    };
+    const mapper = createAcpEventMapper(emit, "OpenCode", dialect);
+    mapper.handleUpdate("main", {
+      sessionUpdate: "tool_call",
+      toolCallId: "child",
+      title: "subagent",
+      status: "in_progress",
+    });
+    let state = { last: "idle", seq: 0, idle: 0, user: 0, firstUser: 0, interrupted: false };
+    const followUp = prepareOpenCodeFollowUp("main", () => state);
+    state = { ...state, last: "assistant", seq: 5, idle: 3, user: 1, firstUser: 1 };
+    const child = Object.assign(new EventEmitter(), {
+      stdin: new PassThrough(),
+      stdout: new PassThrough(),
+      stderr: new PassThrough(),
+      detach: vi.fn(),
+    });
+    const replies = [];
+    child.stdin.on("data", (chunk) => replies.push(JSON.parse(chunk.toString())));
+    let approve;
+    const connection = createAcpConnection(child, {
+      onNotification(_method, { sessionId, update }) {
+        if (followUp.acceptsUpdates(sessionId, update)) mapper.handleUpdate(sessionId, update);
+      },
+      onRequest: (_method, params) =>
+        decidePermission(
+          {
+            approve: () =>
+              new Promise((resolve) => {
+                approve = resolve;
+              }),
+          },
+          params,
+        ),
+    });
+    const receive = (message) => child.stdout.write(JSON.stringify(message) + "\n");
+    const chunk = (value) =>
+      receive({
+        method: "session/update",
+        params: {
+          sessionId: "main",
+          update: {
+            sessionUpdate: "agent_message_chunk",
+            messageId: "parent",
+            content: { type: "text", text: value },
+          },
+        },
+      });
+    const result = settleAcpAnswer({
+      answer: mapper,
+      program,
+      followUp,
+      disconnected: connection.disconnected,
+      incomingActivity: connection.incomingActivity,
+      options: { emit },
+    }).then(async (keepProcess) => {
+      await connection.close({ stop: !keepProcess });
+      return keepProcess;
+    });
+    const done = () => events.filter(([event]) => event === "done");
+    patches = [{ id: "child", status: "done" }];
+    await vi.advanceTimersByTimeAsync(4900);
+    chunk("Первая часть. ");
+    await vi.advanceTimersByTimeAsync(800);
+    chunk("Вторая часть. ");
+    await vi.advanceTimersByTimeAsync(2400);
+    expect(done()).toEqual([]);
+    receive({
+      id: 7,
+      method: "session/request_permission",
+      params: { options: [{ kind: "allow_once", optionId: "allow" }] },
+    });
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(done()).toEqual([]);
+    expect(child.detach).not.toHaveBeenCalled();
+
+    const outcome = { outcome: { outcome: "selected", optionId: "allow" } };
+    approve(true);
+    await vi.advanceTimersByTimeAsync(2000);
+    expect(replies).toEqual([{ jsonrpc: "2.0", id: 7, result: outcome }]);
+    expect(done()).toEqual([]);
+    chunk("Готово.");
+    await vi.advanceTimersByTimeAsync(4000);
+    expect(await result).toBe(true);
+    expect(child.detach).toHaveBeenCalledOnce();
+    expect(done()).toEqual([["done", { text: "Первая часть. Вторая часть. Готово.", added: [] }]]);
+    expect(events.some(([event]) => event === "error")).toBe(false);
   } finally {
     vi.useRealTimers();
   }

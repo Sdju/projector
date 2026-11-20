@@ -95,6 +95,8 @@ export type AcpFollowUpResult =
 export interface AcpFollowUpOptions {
   signal?: AbortSignal;
   onStart?: () => void;
+  /** Agent requests awaiting a client reply, including user approvals. */
+  incomingActivity?: () => { pending: number; lastReplyAt: number };
   /** Poll child completions on every iteration, including children spawned by continuations. */
   pending: () => number;
 }

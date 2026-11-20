@@ -20,8 +20,8 @@ export const opencodeProgram = {
   dialect: createOpencodeDialect,
   // ACP v2 compaction updates carry the summary; older builds fall back to `_meta` markers.
   clientCapabilities: { session: { compaction: {} } },
-  // A finished child wakes the parent session: OpenCode writes a synthetic user message and
-  // starts another step on the same connection, which the run keeps reading until it settles.
+  // A finished child can wake the parent session. Let its report and ACP traffic settle before
+  // detaching; work that continues only in SQLite can outlive the answer via keep-alive.
   prepareFollowUp: prepareOpenCodeFollowUp,
 };
 

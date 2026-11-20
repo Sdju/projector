@@ -214,6 +214,7 @@ async function run(options: AgentRunOptions, id: AgentBackendId): Promise<void> 
         program,
         followUp,
         disconnected: connection.disconnected,
+        incomingActivity: connection.incomingActivity,
         options,
       });
     } else {

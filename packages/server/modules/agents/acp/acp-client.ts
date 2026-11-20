@@ -47,6 +47,8 @@ export function createAcpConnection(child: AcpProcess, handlers: AcpConnectionHa
   let stderr = "";
   let nextId = 1;
   let closed = false;
+  let incomingRequests = 0;
+  let lastIncomingReplyAt = 0;
   const disconnected = new AbortController();
   const pending = new Map<
     number,
@@ -75,6 +77,7 @@ export function createAcpConnection(child: AcpProcess, handlers: AcpConnectionHa
   async function dispatch(message: RpcMessage): Promise<void> {
     touch();
     if (message.method && message.id !== undefined) {
+      incomingRequests++;
       try {
         const result = await handlers.onRequest(
           message.method,
@@ -83,6 +86,9 @@ export function createAcpConnection(child: AcpProcess, handlers: AcpConnectionHa
         respond(message.id, result ?? {});
       } catch (error) {
         respondError(message.id, -32000, error instanceof Error ? error.message : "Ошибка клиента");
+      } finally {
+        incomingRequests--;
+        lastIncomingReplyAt = Date.now();
       }
       return;
     }
@@ -176,6 +182,7 @@ export function createAcpConnection(child: AcpProcess, handlers: AcpConnectionHa
 
   return {
     disconnected: disconnected.signal,
+    incomingActivity: () => ({ pending: incomingRequests, lastReplyAt: lastIncomingReplyAt }),
     request,
     notify: (method: string, params: unknown) => write({ jsonrpc: "2.0", method, params }),
     respond,

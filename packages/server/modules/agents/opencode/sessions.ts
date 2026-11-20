@@ -182,7 +182,7 @@ export function openCodeStepState(sessionId: string, after = 0): OpenCodeStepSta
   }
 }
 
-/** How long to wait for the wake-up step at all, and how long a finished chain stays quiet. */
+/** Minimum report window, ACP quiet window, and observation deadline for pending children. */
 const FOLLOW_UP_START_MS = 5_000;
 const FOLLOW_UP_QUIET_MS = 3_000;
 const FOLLOW_UP_TOTAL_MS = 20 * 60_000;
@@ -202,9 +202,8 @@ function pause(ms: number, signal?: AbortSignal): Promise<void> {
 }
 
 export interface OpenCodeFollowUpOptions extends Partial<AcpFollowUpOptions> {
-  /** Snapshot taken before sending this run's prompt. */
-  baseline?: OpenCodeStepState;
   read?: (sessionId: string) => OpenCodeStepState | undefined;
+  lastUpdateAt?: () => number;
   intervalMs?: number;
   startMs?: number;
   quietMs?: number;
@@ -223,6 +222,7 @@ export function prepareOpenCodeFollowUp(
   const baseline = readState(sessionId);
   let lostUpdate = false;
   let replaced = false;
+  let lastUpdateAt = 0;
   // Reuse ownership only for adjacent chunks of the same message in the same source session.
   // Structural events invalidate every source, so no elapsed-time window can admit a new turn.
   const messages = new Map<string, string>();
@@ -243,21 +243,29 @@ export function prepareOpenCodeFollowUp(
       const childId = typeof child?.id === "string" ? child.id : "";
       const source = JSON.stringify([sourceSession, childId]);
       const reusable = chunk && !!messageId && !!sourceSession;
-      if (reusable && messages.get(source) === messageId) return true;
-      // Missing identity is a conservative fallback, never a cache entry.
-      if (!reusable) messages.clear();
-      const state = read();
-      // Once a chunk could not be attributed, later reads cannot repair the lost content.
-      if (!state) lostUpdate = true;
-      if (!state || replaced) return false;
-      if (reusable) messages.set(source, messageId);
+      if (!reusable || messages.get(source) !== messageId) {
+        // Missing identity is a conservative fallback, never a cache entry.
+        if (!reusable) messages.clear();
+        const state = read();
+        // Once a chunk could not be attributed, later reads cannot repair the lost content.
+        if (!state) lostUpdate = true;
+        if (!state || replaced) return false;
+        if (reusable) messages.set(source, messageId);
+      }
+      lastUpdateAt = Date.now();
       return true;
     },
-    wait: (options) => watchOpenCodeFollowUp(sessionId, { ...options, baseline, read }),
+    wait: (options) =>
+      baseline
+        ? watchOpenCodeFollowUp(sessionId, { ...options, read, lastUpdateAt: () => lastUpdateAt })
+        : Promise.resolve({
+            status: "unavailable",
+            error: "Не удалось прочитать состояние продолжения OpenCode",
+          }),
   };
 }
 
-/** Observe both parent and children until idle; time and storage failures are never success. */
+/** Observe tracked children until their final report; autonomous parent work may outlive the answer. */
 export async function watchOpenCodeFollowUp(
   sessionId: string,
   options: OpenCodeFollowUpOptions = {},
@@ -268,21 +276,12 @@ export async function watchOpenCodeFollowUp(
   const quietMs = options.quietMs ?? FOLLOW_UP_QUIET_MS;
   const totalMs = options.totalMs ?? FOLLOW_UP_TOTAL_MS;
   const started = Date.now();
-  const baseline = options.baseline ?? read(sessionId);
-  if (!baseline)
-    return { status: "unavailable", error: "Не удалось прочитать состояние продолжения OpenCode" };
   let quietAt: number | undefined;
-  let previousPending = 0;
-  let waitingSince = started;
+  let childrenClearedAt: number | undefined;
   let notified = false;
   let missed = 0;
   for (;;) {
     if (options.signal?.aborted) return { status: "aborted" };
-    if (Date.now() - started >= totalMs)
-      return {
-        status: "timeout",
-        error: "Истекло время наблюдения за продолжением OpenCode; агент может ещё работать",
-      };
     const state = read(sessionId);
     if (!state) {
       quietAt = undefined;
@@ -294,24 +293,34 @@ export async function watchOpenCodeFollowUp(
       if (state.interrupted)
         return { status: "failed", error: "Продолжение OpenCode прервано с ошибкой" };
       const pending = options.pending?.() ?? 0;
-      if (previousPending > 0 && pending === 0) waitingSince = Date.now();
-      previousPending = pending;
+      const incoming = options.incomingActivity?.();
+      const now = Date.now();
       const running = state.last !== "idle" && state.seq > state.idle;
       if (running && !notified) {
         options.onStart?.();
         notified = true;
       }
       if (!running) notified = false;
-      if (pending || running) quietAt = undefined;
-      else {
-        quietAt ??= Date.now();
-        // A child can commit idle before its report reaches the parent. Keep a grace period
-        // after every final child, even if an earlier parent step already wrote idle.
-        if (
-          state.idle > baseline.idle &&
-          Date.now() - quietAt >= quietMs &&
-          Date.now() - waitingSince >= startMs
-        )
+      if (pending) {
+        childrenClearedAt = undefined;
+        quietAt = undefined;
+        if (!incoming?.pending && now - started >= totalMs)
+          return {
+            status: "timeout",
+            error: "Истекло время наблюдения за продолжением OpenCode; агент может ещё работать",
+          };
+      } else {
+        childrenClearedAt ??= now;
+        if (incoming?.pending) quietAt = undefined;
+        else
+          quietAt = Math.max(
+            quietAt ?? now,
+            options.lastUpdateAt?.() ?? 0,
+            incoming?.lastReplyAt ?? 0,
+          );
+        // After end_turn the parent may keep working in SQLite alone. Allow time for the child
+        // report and for accepted ACP updates or replies to settle before detaching.
+        if (quietAt !== undefined && now - quietAt >= quietMs && now - childrenClearedAt >= startMs)
           return { status: "completed" };
       }
     }

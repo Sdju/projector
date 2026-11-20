@@ -336,7 +336,6 @@ describe("OpenCode follow-up step after a background report", () => {
     try {
       const idle = { last: "idle", seq: 9, idle: 9, user: 4, firstUser: 4, interrupted: false };
       const watch = watchOpenCodeFollowUp("ses_main", {
-        baseline: { ...idle, seq: 3, idle: 3 },
         read: () => idle,
         intervalMs: 10,
         startMs: 30,
@@ -350,28 +349,79 @@ describe("OpenCode follow-up step after a background report", () => {
     }
   });
 
-  test.each(["running", "child"])(
-    "%s reaching the observation limit is not completed",
-    async (kind) => {
+  test("a child reaching the observation limit is not completed", async () => {
+    vi.useFakeTimers();
+    try {
+      const idle = { last: "idle", seq: 3, idle: 3, user: 1, firstUser: 1, interrupted: false };
+      const watch = watchOpenCodeFollowUp("ses_main", {
+        read: () => idle,
+        pending: () => 1,
+        intervalMs: 10,
+        startMs: 30,
+        quietMs: 20,
+        totalMs: 100,
+      });
+      await vi.advanceTimersByTimeAsync(110);
+      await expect(watch).resolves.toMatchObject({ status: "timeout" });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  test("an observed child finishing at the deadline still gets its report window", async () => {
+    vi.useFakeTimers();
+    try {
+      const idle = { last: "idle", seq: 3, idle: 3, user: 1, firstUser: 1, interrupted: false };
+      let pending = 1;
+      const finished = vi.fn();
+      const watch = watchOpenCodeFollowUp("ses_main", {
+        read: () => idle,
+        pending: () => pending,
+        intervalMs: 10,
+        startMs: 30,
+        quietMs: 20,
+        totalMs: 100,
+      }).then(finished);
+      await vi.advanceTimersByTimeAsync(99);
+      pending = 0;
+      await vi.advanceTimersByTimeAsync(30);
+      expect(finished).not.toHaveBeenCalled();
+      await vi.advanceTimersByTimeAsync(1);
+      await watch;
+      expect(finished).toHaveBeenCalledWith({ status: "completed" });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  test("silent autonomous work settles without a new idle row after the prompt", async () => {
+    const directory = join(root, "no-new-idle");
+    await transcript(directory, [{ id: "old-idle", type: "idle", seq: 3 }]);
+    process.env.XDG_DATA_HOME = directory;
+    const observer = prepareOpenCodeFollowUp("ses_main");
+    const db = new DatabaseSync(openCodeDatabasePath());
+    try {
+      db.exec(`INSERT INTO session_message VALUES
+        ('prompt', 'ses_main', 'user', 4, 0, 0, '{}'),
+        ('first-answer', 'ses_main', 'assistant', 5, 0, 0, '{}'),
+        ('report', 'ses_main', 'synthetic', 6, 0, 0, '{}'),
+        ('continuation', 'ses_main', 'assistant', 7, 0, 0, '{}')`);
+      expect(openCodeStepState("ses_main", 3)).toMatchObject({
+        last: "assistant",
+        seq: 7,
+        idle: 3,
+      });
       vi.useFakeTimers();
-      try {
-        const idle = { last: "idle", seq: 3, idle: 3, user: 1, firstUser: 1, interrupted: false };
-        const watch = watchOpenCodeFollowUp("ses_main", {
-          baseline: { ...idle, seq: 0, idle: 0 },
-          read: () => (kind === "running" ? { ...idle, last: "assistant", seq: 4 } : idle),
-          pending: () => (kind === "child" ? 1 : 0),
-          intervalMs: 10,
-          startMs: 30,
-          quietMs: 20,
-          totalMs: 100,
-        });
-        await vi.advanceTimersByTimeAsync(110);
-        await expect(watch).resolves.toMatchObject({ status: "timeout" });
-      } finally {
-        vi.useRealTimers();
-      }
-    },
-  );
+      let pending = 1;
+      const result = observer.wait({ pending: () => pending });
+      pending = 0;
+      await vi.advanceTimersByTimeAsync(6000);
+      await expect(result).resolves.toEqual({ status: "completed" });
+    } finally {
+      vi.useRealTimers();
+      db.close();
+    }
+  });
 
   test("lost reads never satisfy the quiet window", async () => {
     vi.useFakeTimers();
@@ -379,7 +429,6 @@ describe("OpenCode follow-up step after a background report", () => {
       const idle = { last: "idle", seq: 3, idle: 3, user: 1, firstUser: 1, interrupted: false };
       let reads = 0;
       const watch = watchOpenCodeFollowUp("ses_main", {
-        baseline: { ...idle, seq: 0, idle: 0 },
         read: () => (reads++ === 0 ? idle : undefined),
         intervalMs: 10,
         startMs: 30,
@@ -456,7 +505,7 @@ describe("OpenCode follow-up step after a background report", () => {
     expect(openCodeStepState("ses_main")).toBeUndefined();
   });
 
-  test("the wake-up step is followed to its idle marker and the answer grows", async () => {
+  test("the wake-up step sends one start notice during the report window", async () => {
     vi.useFakeTimers();
     try {
       const steps = [
@@ -468,7 +517,6 @@ describe("OpenCode follow-up step after a background report", () => {
       let index = 0;
       const starts = [];
       const watch = watchOpenCodeFollowUp("ses_main", {
-        baseline: { last: "idle", seq: 0, idle: 0, user: 0, firstUser: 0, interrupted: false },
         read: () => steps[Math.min(index++, steps.length - 1)],
         intervalMs: 10,
         startMs: 100,
@@ -490,7 +538,6 @@ describe("OpenCode follow-up step after a background report", () => {
     try {
       const idle = { last: "idle", seq: 3, idle: 3, interrupted: false };
       const watch = watchOpenCodeFollowUp("ses_main", {
-        baseline: { last: "idle", seq: 0, idle: 0, user: 0, firstUser: 0, interrupted: false },
         read: () => idle,
         intervalMs: 10,
         startMs: 100,
@@ -513,7 +560,6 @@ describe("OpenCode follow-up step after a background report", () => {
       ];
       let index = 0;
       const watch = watchOpenCodeFollowUp("ses_main", {
-        baseline: { last: "idle", seq: 0, idle: 0, user: 0, firstUser: 0, interrupted: false },
         read: () => steps[Math.min(index++, steps.length - 1)],
         intervalMs: 10,
         startMs: 100,
@@ -531,7 +577,6 @@ describe("OpenCode follow-up step after a background report", () => {
     vi.useFakeTimers();
     try {
       const watch = watchOpenCodeFollowUp("ses_main", {
-        baseline: { last: "idle", seq: 0, idle: 0, user: 0, firstUser: 0, interrupted: false },
         read: () => ({ last: "user", seq: 4, idle: 3, interrupted: false, user: 4, firstUser: 1 }),
         intervalMs: 10,
         startMs: 100,
@@ -554,7 +599,6 @@ describe("OpenCode follow-up step after a background report", () => {
       ];
       let index = 0;
       const watch = watchOpenCodeFollowUp("ses_main", {
-        baseline: { last: "idle", seq: 0, idle: 0, user: 0, firstUser: 0, interrupted: false },
         read: () => steps[Math.min(index++, steps.length - 1)],
         intervalMs: 10,
         startMs: 100,

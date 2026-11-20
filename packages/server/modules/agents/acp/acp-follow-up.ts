@@ -1,5 +1,5 @@
 import type { AgentEmitter, AgentRunOptions } from "../../agent/index.ts";
-import type { AcpProgram, AcpFollowUp } from "./acp-programs.ts";
+import type { AcpProgram, AcpFollowUp, AcpFollowUpOptions } from "./acp-programs.ts";
 import { markAcpKeepAlive } from "./acp-keep-alive.ts";
 
 /** The part of an ACP answer the end of a run reads. */
@@ -19,14 +19,18 @@ export interface AcpSettleOptions {
   program: AcpProgram;
   followUp?: AcpFollowUp;
   disconnected?: AbortSignal;
+  incomingActivity?: AcpFollowUpOptions["incomingActivity"];
   options: Pick<AgentRunOptions, "abort" | "run" | "emit">;
 }
 
-/** Keep one live run until the answer and all autonomous background continuations settle. */
+/** Keep one live run until the answer and tracked background work settle. */
 export async function settleAcpAnswer(options: AcpSettleOptions): Promise<boolean> {
   const { answer, program } = options;
   const { abort, run } = options.options;
   const emit: AgentEmitter = options.options.emit;
+  const signal = AbortSignal.any(
+    [abort, options.disconnected].filter((value): value is AbortSignal => !!value),
+  );
   answer.finish();
   const followUp = answer.hadBackground ? options.followUp : undefined;
   if (!followUp) {
@@ -37,10 +41,7 @@ export async function settleAcpAnswer(options: AcpSettleOptions): Promise<boolea
       await markAcpKeepAlive(run.id);
     if (answer.pendingBackground)
       emit("status", { phase: "background", provider: program.label, model: "" });
-    const signals = [abort, options.disconnected].filter(
-      (signal): signal is AbortSignal => !!signal,
-    );
-    await answer.waitBackground(AbortSignal.any(signals));
+    await answer.waitBackground(signal);
     if (abort?.aborted) return false;
     if (answer.pendingBackground) options.disconnected?.throwIfAborted();
     if (program.finishAfterBackground) done();
@@ -58,16 +59,19 @@ export async function settleAcpAnswer(options: AcpSettleOptions): Promise<boolea
   if (answer.pendingBackground)
     emit("status", { phase: "background", provider: program.label, model: "" });
   const result = await followUp.wait({
-    signal: abort,
+    signal,
     pending: () => answer.pollBackground(),
+    incomingActivity: options.incomingActivity,
     onStart: () => {
       if (!abort?.aborted)
         emit("status", { phase: "thinking", provider: program.label, model: "" });
     },
   });
-  if (abort?.aborted || result.status === "aborted") return true;
-  if ("error" in result) emit("error", { error: result.error });
-  else {
+  if (abort?.aborted) return true;
+  if (options.disconnected?.aborted)
+    emit("error", { error: "Потеряно ACP-соединение во время продолжения ответа" });
+  else if ("error" in result) emit("error", { error: result.error });
+  else if (result.status !== "aborted") {
     answer.finish();
     emit("done", {
       text: answer.text.trim(),
