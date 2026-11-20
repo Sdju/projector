@@ -1,4 +1,4 @@
-import { computed, onBeforeUnmount, watchEffect, type Ref } from "vue";
+import { computed, onBeforeUnmount, watchEffect } from "vue";
 import { defineTab, type SidebarType, type TabRegistry } from "../../workspace-api/index.ts";
 import type { SidebarHost, SidebarViews } from "./sidebar-views.ts";
 import {
@@ -80,8 +80,7 @@ export interface PluginWorkspaceCommands {
     meta?: { description?: string; arguments?: Record<string, string> },
   ) => unknown;
   openTab(id: string, params?: Record<string, unknown>): void;
-  section: Ref<string>;
-  showSidebar(): void;
+  showSection(id: string): void;
 }
 
 /** Adds plugin tab kinds, their open commands and plugin IDE commands for this workspace. */
@@ -177,8 +176,7 @@ export function registerPluginWorkspaceCommands(host: PluginWorkspaceCommands): 
             `Открыть панель «${contribution.declaration.title}»`,
             () => {
               const id = pluginPanelKind(contribution.packageName, contribution.declaration.id);
-              host.section.value = id;
-              host.showSidebar();
+              host.showSection(id);
             },
             () => true,
             undefined,

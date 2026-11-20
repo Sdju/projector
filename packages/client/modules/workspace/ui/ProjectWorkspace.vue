@@ -3,7 +3,7 @@ import UiLoader from "../../../common/ui/UiLoader.vue";
 import UiButton from "../../../common/ui/UiButton.vue";
 import UiResizeHandle from "../../../common/ui/UiResizeHandle.vue";
 import IconMinimize from "~icons/lucide/minimize-2";
-import { computed, onBeforeUnmount, ref } from "vue";
+import { computed, nextTick, onBeforeUnmount, ref } from "vue";
 import {
   workspaceProfile,
   profileCapabilities,
@@ -40,6 +40,7 @@ import { createPanelHosts } from "../panel-hosts.ts";
 import { TerminalCloseDialog } from "../../terminal/index.ts";
 import { useDocker } from "../../docker/index.ts";
 import { sidebarSections, type SidebarViews } from "../lib/sidebar-views.ts";
+import { useWorkspaceSidebarLayout } from "../lib/sidebar-layout.ts";
 import { useWorkspaceAsidePanel } from "../lib/workspace-aside.ts";
 import { provideLastSession } from "../lib/session-launchers.ts";
 import { registerTreeCommands } from "../lib/tree-commands.ts";
@@ -158,8 +159,7 @@ function openTree(scope: FileScope) {
       params: { scope },
       closable: true,
     });
-  section.value = id;
-  showSidebar();
+  showSection(id);
 }
 function openCommitTree(hash: string) {
   openTree({ kind: "commit", rev: hash });
@@ -178,8 +178,7 @@ function openSearch(scope: FileScope) {
       params: { scope },
       closable: true,
     });
-  section.value = id;
-  showSidebar();
+  showSection(id);
 }
 /** Rebuilds temporary sections from a session; view kinds and scopes are derived, not trusted. */
 function restoreSections(saved: SidebarType[]) {
@@ -214,21 +213,18 @@ function closeSection(id: string) {
   const index = extraSections.value.findIndex((type) => type.id === id);
   if (index < 0) return;
   const [removed] = extraSections.value.splice(index, 1);
-  if (section.value === id)
-    section.value =
-      removed?.group && sections.value.has(removed.group)
-        ? removed.group
-        : capabilities.git
-          ? "git"
-          : "files";
+  if (removed?.group && sections.value.has(removed.group)) {
+    if (section.value === id) section.value = removed.group;
+    if (asideSection.value === id) asideSection.value = removed.group;
+  } else if (section.value === id && sidebarLayout.sideOf("git") === "left" && capabilities.git)
+    section.value = "git";
 }
 /** Adds or updates a temporary sidebar section and reveals it; tab views own its contents. */
 function openSection(type: SidebarType) {
   const index = extraSections.value.findIndex((item) => item.id === type.id);
   if (index >= 0) extraSections.value.splice(index, 1, type);
   else extraSections.value.push(type);
-  section.value = type.id;
-  showSidebar();
+  showSection(type.id);
 }
 const revision = ref(0);
 const isDirty = (file: OpenFile) =>
@@ -249,6 +245,9 @@ const workbench = useWorkbenchLayout({
   closeTab: (key) => files.closeTab(key),
   closeManyTabs: (ids) => files.closeManyTabs(ids),
   showSidebar,
+  onRevealAside: () => {
+    if (asideVisible.value && asideRegistry.has("terminals")) showSection("terminals");
+  },
   register: registerEditor,
 });
 const {
@@ -266,6 +265,8 @@ const {
   hidden: asideHidden,
   middle: asideBottom,
   shown: asideShown,
+  visible: asideVisible,
+  show: showAside,
   asideTarget,
   section: asideSection,
   registry: asideRegistry,
@@ -279,8 +280,30 @@ const {
   layout,
   register: registerEditor,
   views: props.asideViews,
-  refresh: () => asidePanel.value?.refreshSection(),
+  addedSections: () => movedSections.value,
+  refresh: (id = asideSection.value) =>
+    asideRegistry.has(id)
+      ? asidePanel.value?.refreshSection(id)
+      : sidebar.value?.refreshSection(id),
 });
+const {
+  layout: sidebarLayout,
+  movedSections,
+  rightSections,
+  showSection,
+} = useWorkspaceSidebarLayout({
+  projectId: () => props.projectId,
+  sections,
+  asideRegistry,
+  section,
+  asideSection,
+  showSidebar,
+  showAside,
+  rightAvailable: () => asideVisible.value,
+  canTransfer: () => asideShown.value && !asideBottom.value && !zenMode.value,
+  register: registerEditor,
+});
+const rightViews = computed(() => ({ ...mergedSidebarViews.value, ...asideViews.value }));
 const files = useOpenFiles({
   projectId: () => props.projectId,
   tabs,
@@ -330,19 +353,12 @@ const { tabActions, editorKeydown, editorFocus } = registerEditorCommands({
   selectTab: (key) => revealPanel(key),
   onOpenTab: () => (mobileSidebarOpen.value = false),
   toggleMarkdownSource,
-  revealInTree: (path, scope) => {
-    if (scope && !isLiveScope(scope)) {
-      const id = `tree:${fileScopeKey(scope)}`;
-      if (sections.value.has(id)) {
-        section.value = id;
-        showSidebar();
-        sidebar.value?.reveal(path, id);
-      }
-      return;
-    }
-    section.value = "files";
-    showSidebar();
-    sidebar.value?.reveal(path);
+  revealInTree: async (path, scope) => {
+    const id = scope && !isLiveScope(scope) ? `tree:${fileScopeKey(scope)}` : "files";
+    if (!sections.value.has(id)) return;
+    showSection(id);
+    await nextTick();
+    sidebar.value?.reveal(path, id);
   },
   tabTypes,
 });
@@ -350,16 +366,12 @@ registerPluginWorkspaceCommands({
   tabTypes,
   registerEditor,
   openTab,
-  section,
-  showSidebar,
+  showSection,
 });
 editorCommands.scope.activate();
 const docker = useDocker(props.projectId, {
   enabled: capabilities.docker,
-  sidebar: () => {
-    section.value = "docker";
-    showSidebar();
-  },
+  sidebar: () => showSection("docker"),
   open: () => openTab("docker"),
   terminal: async (session) => {
     await terminals.refresh();
@@ -372,29 +384,6 @@ registerEditor(
   "Обновить раздел боковой панели",
   () => sidebar.value?.refreshSection(),
   () => true,
-);
-registerEditor(
-  "ide.workbench.section.show",
-  "Открыть раздел боковой панели",
-  (value) => {
-    const id = commandArgs(value).section;
-    if (typeof id !== "string" || !sections.value.has(id))
-      throw new Error(
-        `section: ${sections.value
-          .list()
-          .map((type) => type.id)
-          .join(", ")}`,
-      );
-    section.value = id;
-    showSidebar();
-  },
-  () => true,
-  undefined,
-  {
-    description:
-      "Переключает боковую панель на раздел проекта (файлы, поиск, Git и другие, если они есть у проекта) и показывает её.",
-    arguments: { section: "Идентификатор раздела: files, search, git, docker, issues и т. д." },
-  },
 );
 registerTreeCommands({
   projectId: props.projectId,
@@ -490,7 +479,9 @@ const { refresh, entryMoved } = useWorkspaceRefresh({
   active: () => active.value,
   activeKey: () => activeKey.value,
   revision,
-  section,
+  section: computed(() =>
+    sidebarLayout.sideOf("search") === "right" ? asideSection.value : section.value,
+  ),
   searchPanel: () => sidebar.value,
   loadGit,
 });
@@ -546,6 +537,9 @@ onBeforeUnmount(() => {
         :project-id="projectId"
         :capabilities="capabilities"
         :sections="sections"
+        :layout="sidebarLayout"
+        :right-target="asidePanel?.panelTarget"
+        :right-section="asideSection"
         :views="mergedSidebarViews"
         :hidden="sidebarInvisible"
         :rail="!mobile"
@@ -596,8 +590,13 @@ onBeforeUnmount(() => {
       side="right"
       :project-id="projectId"
       :capabilities="capabilities"
-      :sections="asideRegistry"
-      :views="asideViews"
+      :sections="rightSections"
+      :layout="sidebarLayout"
+      :owned-sections="asideRegistry"
+      :views="rightViews"
+      :external-refreshing="
+        !asideRegistry.has(asideSection) && sidebar?.sectionRefreshing(asideSection)
+      "
       :hidden="asideHidden"
       :rail="!asideBottom"
       :active="active"
@@ -610,7 +609,11 @@ onBeforeUnmount(() => {
       :execute-command="(id, args) => editorCommands.scope.executeCommand(id, args)"
       toggle-command="ide.workbench.aside.toggle"
       refresh-command="ide.workbench.aside.refresh"
-      close-command="ide.workbench.aside.section.close"
+      :close-command="
+        asideRegistry.has(asideSection)
+          ? 'ide.workbench.aside.section.close'
+          : 'ide.workbench.section.close'
+      "
       @command="
         (id, args) =>
           (id.startsWith('ide.docker.') ? docker.commands : editorCommands).run(id, args)

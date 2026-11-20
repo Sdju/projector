@@ -32,7 +32,6 @@ import { registerTabReader } from "./tab-reader.ts";
 export interface WorkbenchLayoutContext {
   projectId: () => string;
   capabilities: Readonly<WorkspaceCapabilities>;
-  /** Dock preset of the profile. */
   layout: WorkspaceProfile["layout"];
   tabs: Ref<OpenFile[]>;
   /** Куда поместить следующую открытую вкладку: заполняется при перетаскивании файла на блок. */
@@ -43,6 +42,7 @@ export interface WorkbenchLayoutContext {
   closeTab: (key: string) => Promise<void>;
   closeManyTabs: (ids: string[]) => Promise<void>;
   showSidebar: () => void;
+  onRevealAside?: () => void;
   register: (
     id: string,
     title: string,
@@ -139,7 +139,6 @@ export function useWorkbenchLayout(ctx: WorkbenchLayoutContext) {
     { flush: "sync", immediate: true },
   );
   const focusedGroup = computed(() => findDockGroup(layout.value, layout.value.focused));
-  /** Файл активной вкладки в блоке с фокусом; пусто, если там терминал или блок пуст. */
   const activeKey = computed({
     get: () => {
       const id = focusedGroup.value?.active ?? "";
@@ -161,6 +160,7 @@ export function useWorkbenchLayout(ctx: WorkbenchLayoutContext) {
         : addPanel(layout.value, id, place(id, layout.value));
     const group = groupOfPanel(layout.value, id);
     if (group) lastGroup[roleOf(id)] = group.id;
+    if (group?.panel) ctx.onRevealAside?.();
   }
   async function createTerminal(program: TerminalProgram) {
     const created = await terminals.create(program);

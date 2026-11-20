@@ -45,7 +45,7 @@ export interface EditorCommandContext {
   onOpenTab?: () => void;
   toggleMarkdownSource: () => void;
   /** Показывает файл в дереве: открывает сайдбар и раздел этого снимка. */
-  revealInTree: (path: string, scope?: FileScope) => void;
+  revealInTree: (path: string, scope?: FileScope) => void | Promise<void>;
   tabTypes: TabRegistry;
 }
 
@@ -82,7 +82,7 @@ export function registerEditorCommands(ctx: EditorCommandContext) {
       if (args.directory === true) {
         if (args.external === true)
           throw new Error("Внешнюю папку нельзя показать в дереве проекта");
-        ctx.revealInTree(args.path);
+        return ctx.revealInTree(args.path);
       } else
         return ctx.openFileAt(args.path, line, endLine, lineArg(args.column, "column"), {
           external: args.external === true,
@@ -150,9 +150,7 @@ export function registerEditorCommands(ctx: EditorCommandContext) {
   register(
     "ide.editor.file.reveal",
     "Показать в дереве файлов",
-    (args) => {
-      ctx.revealInTree(commandFile(args)!.path, commandFile(args)!.scope);
-    },
+    (args) => ctx.revealInTree(commandFile(args)!.path, commandFile(args)!.scope),
     (args) => !!commandFile(args) && !commandFile(args)!.external,
   );
   register(
@@ -161,7 +159,7 @@ export function registerEditorCommands(ctx: EditorCommandContext) {
     (value) => {
       const { path } = commandArgs(value);
       if (typeof path !== "string" || !path.trim()) throw new Error("Укажите path");
-      ctx.revealInTree(path);
+      return ctx.revealInTree(path);
     },
     () => true,
     undefined,

@@ -1,11 +1,16 @@
 import { computed, ref, type Ref } from "vue";
 import { useMediaQuery } from "@vueuse/core";
 import { commandArgs } from "../../../common/utilities/commands.ts";
-import type { SidebarRegistry, WorkspaceCapability } from "../../workspace-api/index.ts";
+import type {
+  SidebarRegistry,
+  SidebarType,
+  WorkspaceCapability,
+} from "../../workspace-api/index.ts";
 
 export interface WorkspaceAsideContext {
   /** Sections the profile puts on the right rail. */
   registry: SidebarRegistry;
+  addedSections?: () => SidebarType[];
   mobile: Ref<boolean>;
   /** The «Правая панель» setting is on (a project may override it). */
   enabled: () => boolean;
@@ -18,7 +23,7 @@ export interface WorkspaceAsideContext {
     meta?: { description?: string; arguments?: Record<string, string> },
   ) => unknown;
   /** Reloads the selected section; the panel ref belongs to the workspace. */
-  refresh: () => unknown;
+  refresh: (id?: string) => unknown;
 }
 
 /**
@@ -46,28 +51,23 @@ export function useWorkspaceAside(ctx: WorkspaceAsideContext) {
     "Открыть раздел правой панели",
     (value) => {
       const id = commandArgs(value).section;
-      if (typeof id !== "string" || !ctx.registry.has(id))
-        throw new Error(
-          `section: ${ctx.registry
-            .list()
-            .map((type) => type.id)
-            .join(", ")}`,
-        );
+      const sections = [...ctx.registry.list(), ...(ctx.addedSections?.() ?? [])];
+      if (typeof id !== "string" || !sections.some((type) => type.id === id))
+        throw new Error(`section: ${sections.map((type) => type.id).join(", ")}`);
       section.value = id;
       show();
     },
     () => visible.value,
     undefined,
     {
-      description:
-        "Открывает раздел правой панели терминалов и показывает её. Сейчас у локального проекта один раздел — terminals.",
+      description: "Открывает раздел правой панели и показывает её.",
       arguments: { section: "Идентификатор раздела правой панели" },
     },
   );
   ctx.register(
     "ide.workbench.aside.refresh",
     "Обновить раздел правой панели",
-    () => ctx.refresh(),
+    () => ctx.refresh(section.value),
     () => visible.value && !hidden.value,
   );
   ctx.register(

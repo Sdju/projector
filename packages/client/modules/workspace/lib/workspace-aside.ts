@@ -6,6 +6,7 @@ import type {
   WorkspaceCapabilities,
   WorkspaceProfile,
   SidebarRegistry,
+  SidebarType,
 } from "../../workspace-api/index.ts";
 import { useWorkspaceAside } from "./aside-panels.ts";
 import { registerRightPanelCommands, type RegisterWorkspaceCommand } from "./right-panel.ts";
@@ -24,8 +25,9 @@ export interface WorkspaceAsidePanelContext {
   register: RegisterWorkspaceCommand;
   /** Views of the sections the embedding page owns. */
   views?: SidebarViews;
+  addedSections?: () => SidebarType[];
   /** Reloads the selected section; the panel ref belongs to the workspace. */
-  refresh: () => unknown;
+  refresh: (id?: string) => unknown;
 }
 
 /**
@@ -49,6 +51,7 @@ export function useWorkspaceAsidePanel(ctx: WorkspaceAsidePanelContext) {
   }));
   const state = useWorkspaceAside({
     registry,
+    addedSections: ctx.addedSections,
     mobile: ctx.mobile,
     enabled: ctx.enabled,
     register: ctx.register,
@@ -64,7 +67,10 @@ export function useWorkspaceAsidePanel(ctx: WorkspaceAsidePanelContext) {
     () => dockGroups(ctx.layout.value).find((group) => group.panel)?.panels.length ?? 0,
   );
   watch(terminalCount, (count, previous) => {
-    if (state.visible.value && count > (previous ?? 0)) state.show();
+    if (state.visible.value && count > (previous ?? 0)) {
+      if (registry.has("terminals")) state.section.value = "terminals";
+      state.show();
+    }
   });
   /** A folded bottom panel has no compact switcher, so closing it removes the whole row. */
   const shown = computed(() => state.visible.value && !(state.middle.value && state.hidden.value));

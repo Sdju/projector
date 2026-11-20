@@ -1,6 +1,5 @@
 <script setup lang="ts">
-import { computed, provide, shallowReactive, ref, watch } from "vue";
-import { sectionRefreshKey } from "../../../common/ui/UiSectionRefresh.vue";
+import { computed, shallowReactive, ref } from "vue";
 import type { SidebarRegistry, WorkspaceCapabilities } from "../../workspace-api/index.ts";
 import type { GitBranchesState, GitHistoryState, GitOverviewState } from "../modules/git/index.ts";
 import type { useGitChangeSync } from "../lib/git-change-sync.ts";
@@ -8,7 +7,9 @@ import type { useOpenFiles } from "../lib/open-files.ts";
 import type { OpenFile } from "../open-file.ts";
 import type { FileScope } from "@ai-projector/core/modules/workspace/index.ts";
 import { baseSidebarViews, type SidebarHost, type SidebarViews } from "../lib/sidebar-views.ts";
+import type { SidebarLayout, SidebarSide } from "../lib/sidebar-layout.ts";
 import SidebarTabs from "./SidebarTabs.vue";
+import SidebarSection from "./SidebarSection.vue";
 import UiSpinner from "../../../common/ui/UiSpinner.vue";
 import IconRefresh from "~icons/lucide/rotate-cw";
 import IconX from "~icons/lucide/x";
@@ -25,6 +26,12 @@ const props = defineProps<{
   projectId: string;
   capabilities: Readonly<WorkspaceCapabilities>;
   sections: SidebarRegistry;
+  layout: SidebarLayout;
+  /** The right rail displays moved sections owned by the left sidebar. */
+  ownedSections?: SidebarRegistry;
+  rightTarget?: HTMLElement;
+  rightSection?: string;
+  externalRefreshing?: boolean;
   hidden: boolean;
   active?: OpenFile;
   revision: number;
@@ -40,7 +47,7 @@ const props = defineProps<{
   /** Разделы — вертикальная полоса-остров слева; иначе вкладки сверху панели (мобильный вид). */
   rail?: boolean;
   /** Сторона рабочей области: полоса и панель разворачиваются зеркально. */
-  side?: "left" | "right";
+  side?: SidebarSide;
   /** Команда, сворачивающая и раскрывающая панель с полосы разделов. */
   toggleCommand?: string;
   /** Команда кнопки обновления раздела. */
@@ -61,7 +68,9 @@ const emit = defineEmits<{
 }>();
 const views = computed<SidebarViews>(() => ({ ...baseSidebarViews, ...props.views }));
 const panels = shallowReactive(new Map<string, SidebarPanel>());
-const localRefreshing = ref(false);
+const localRefreshing = shallowReactive(new Set<string>());
+const panelTarget = ref<HTMLElement>();
+const side = computed(() => props.side ?? "left");
 const host: SidebarHost = {
   get projectId() {
     return props.projectId;
@@ -125,7 +134,7 @@ const items = computed(() => {
   for (const type of props.sections.list()) {
     const kind = type.kind ?? type.id;
     const view = views.value[kind];
-    if (!view) continue;
+    if (!view || props.layout.sideOf(type.id) !== side.value) continue;
     result.push({
       id: type.id,
       title: type.title,
@@ -151,27 +160,29 @@ const activeView = computed(() => {
 });
 const setPanel = (id: string, panel: unknown) =>
   panel ? panels.set(id, panel as SidebarPanel) : panels.delete(id);
-const refreshing = computed(() => localRefreshing.value || !!panels.get(section.value)?.refreshing);
+const sectionRefreshing = (id: string) => localRefreshing.has(id) || !!panels.get(id)?.refreshing;
+const refreshing = computed(() => props.externalRefreshing || sectionRefreshing(section.value));
 const refreshCommandId = computed(() => props.refreshCommand ?? "ide.workbench.sidebar.refresh");
-provide(sectionRefreshKey, {
-  refreshing,
-  command: refreshCommandId,
-  run: () => emit("command", refreshCommandId.value),
-});
-async function refresh() {
-  if (localRefreshing.value) return;
-  const view = viewOf(section.value);
-  const result = view?.refresh ? view.refresh(host, panels.get(section.value)) : emit("refresh");
+const mountedSections = computed(() =>
+  (props.ownedSections ?? props.sections).list().flatMap((type) => {
+    const view = viewOf(type.id);
+    return view ? [{ type, view }] : [];
+  }),
+);
+const goesRight = (id: string) => side.value === "left" && props.layout.sideOf(id) === "right";
+async function refresh(id = section.value) {
+  if (localRefreshing.has(id)) return;
+  const view = viewOf(id);
+  const result = view?.refresh ? view.refresh(host, panels.get(id)) : emit("refresh");
   if (result && typeof result === "object" && "then" in result) {
-    localRefreshing.value = true;
+    localRefreshing.add(id);
     try {
       await result;
     } finally {
-      localRefreshing.value = false;
+      localRefreshing.delete(id);
     }
   }
 }
-watch(section, (id) => viewOf(id)?.activate?.(host));
 /** Как в WebStorm: клик по активному разделу сворачивает панель, клик при свёрнутой — раскрывает. */
 function select(id: string) {
   if (!props.rail) {
@@ -185,6 +196,8 @@ function select(id: string) {
 
 defineExpose({
   refreshSection: refresh,
+  sectionRefreshing,
+  panelTarget,
   reveal: (path: string, id = "files") =>
     (panels.get(id)?.reveal as (path: string) => void)?.(path),
   refreshSearch: () => panels.get("search")?.refresh?.(),
@@ -201,6 +214,8 @@ defineExpose({
   >
     <SidebarTabs
       :section="section"
+      :side="side"
+      :layout="layout"
       :items="items"
       :vertical="rail"
       :collapsed="rail && hidden"
@@ -212,7 +227,7 @@ defineExpose({
       @update:section="select"
       @command="(id, args) => emit('command', id, args)"
     />
-    <div v-show="!rail || !hidden" class="panel">
+    <div v-show="!rail || !hidden" ref="panelTarget" class="panel">
       <div v-if="activeType?.closable" class="panel-head">
         <component
           :is="activeView?.icon"
@@ -261,14 +276,29 @@ defineExpose({
         <UiSpinner v-if="refreshing" />
         <IconRefresh v-else aria-hidden="true" />
       </button>
-      <component
-        :is="views[item.kind].component"
-        v-for="item in items"
-        :key="item.id"
-        v-show="section === item.id"
-        :ref="(panel: unknown) => setPanel(item.id, panel)"
-        v-bind="views[item.kind].props(host, section === item.id, props.sections.get(item.id))"
-      />
+      <Teleport
+        v-for="{ type, view } in mountedSections"
+        :key="type.id"
+        :to="rightTarget ?? panelTarget"
+        :disabled="!goesRight(type.id) || !rightTarget"
+      >
+        <SidebarSection
+          :type="type"
+          :view="view"
+          :host="host"
+          :selected="
+            goesRight(type.id) ? !!rightTarget && rightSection === type.id : section === type.id
+          "
+          :refreshing="sectionRefreshing(type.id)"
+          :refresh-command="goesRight(type.id) ? 'ide.workbench.aside.refresh' : refreshCommandId"
+          @panel="setPanel(type.id, $event)"
+          @refresh="
+            emit('command', goesRight(type.id) ? 'ide.workbench.aside.refresh' : refreshCommandId, {
+              section: type.id,
+            })
+          "
+        />
+      </Teleport>
     </div>
   </aside>
 </template>

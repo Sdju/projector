@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import UiStatusDot from "../../../common/ui/UiStatusDot.vue";
-import { computed, ref, type Component } from "vue";
+import { computed, ref, watch, type Component } from "vue";
 import UiButton from "../../../common/ui/UiButton.vue";
 import UiIsland from "../../../common/ui/UiIsland.vue";
 import ContextMenu from "../../../common/ui/ContextMenu.vue";
@@ -16,7 +16,7 @@ import IconMenu from "~icons/lucide/menu";
 import IconEyeOff from "~icons/lucide/eye-off";
 import IconEye from "~icons/lucide/eye";
 import { useHiddenActions } from "../lib/hidden-actions.ts";
-import { useActionOrder } from "../lib/action-order.ts";
+import type { SidebarLayout, SidebarSide } from "../lib/sidebar-layout.ts";
 import { groupSidebar } from "../../workspace-api/index.ts";
 
 export interface SidebarItem {
@@ -36,6 +36,8 @@ export interface SidebarItem {
 }
 const props = defineProps<{
   section: string;
+  side: SidebarSide;
+  layout: SidebarLayout;
   items: SidebarItem[];
   /** Вертикальная полоса-остров слева от панели; без неё — горизонтальные вкладки (мобильный вид). */
   vertical?: boolean;
@@ -65,11 +67,22 @@ const picker = useIslandMenu({
 });
 const overflow = useIslandMenu({ anchor: "left", initialFocus: ".section-item" });
 const visibility = useHiddenActions();
-const ordering = useActionOrder("sidebar");
-const dragging = ref("");
-const dropTarget = ref<{ id: string; after: boolean }>();
+const layout = props.layout;
+const dragging = layout.drag;
+const dragType = "application/x-projector-sidebar-section";
+const dropTarget = ref<{ id?: string; after: boolean }>();
+watch(dragging, () => {
+  dropTarget.value = undefined;
+});
+const oppositeSide = computed(() => (props.side === "left" ? "right" : "left"));
+const emptyDrop = computed(
+  () =>
+    dragging.value &&
+    layout.canMove(dragging.value.id, props.side) &&
+    !groups.value.some(({ id }) => layout.canMove(dragging.value!.id, props.side, id)),
+);
 function endDrag() {
-  dragging.value = "";
+  dragging.value = undefined;
   dropTarget.value = undefined;
 }
 function dragLeave(event: DragEvent) {
@@ -79,31 +92,35 @@ function dragLeave(event: DragEvent) {
   )
     dropTarget.value = undefined;
 }
-function dragOver(event: DragEvent, id: string) {
-  const from = groups.value.find((group) => group[0]?.id === dragging.value);
-  const to = groups.value.find((group) => group[0]?.id === id);
-  if (!from || !to || dragging.value === id || !!from[0]?.utility !== !!to[0]?.utility) {
+function dragOver(event: DragEvent, id?: string) {
+  const from = dragging.value?.id;
+  if (
+    !from ||
+    !event.dataTransfer?.types.includes(dragType) ||
+    !layout.canMove(from, props.side, id)
+  ) {
     dropTarget.value = undefined;
     return;
   }
   event.preventDefault();
-  if (event.dataTransfer) event.dataTransfer.dropEffect = "move";
+  event.dataTransfer.dropEffect = "move";
   const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
   dropTarget.value = { id, after: event.clientY > rect.top + rect.height / 2 };
 }
 
 function dragStart(event: DragEvent, id: string) {
-  dragging.value = id;
-  event.dataTransfer?.setData("text/plain", id);
+  dragging.value = { id, side: props.side };
+  event.dataTransfer?.setData(dragType, id);
   if (event.dataTransfer) event.dataTransfer.effectAllowed = "move";
 }
-function drop(event: DragEvent, id: string) {
-  event.preventDefault();
-  const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
-  void commands.scope.executeCommand("ide.workbench.section.move", {
-    from: dragging.value,
+function drop(event: DragEvent, id?: string) {
+  dragOver(event, id);
+  if (!dropTarget.value || !dragging.value) return;
+  emit("command", "ide.workbench.section.move", {
+    from: dragging.value.id,
+    side: props.side,
     to: id,
-    after: event.clientY > rect.top + rect.height / 2,
+    after: dropTarget.value.after,
   });
   endDrag();
 }
@@ -122,24 +139,22 @@ const hiddenItems = computed(() =>
 );
 /** Служебные разделы идут после проектных; на полосе они образуют нижнюю группу. */
 const groups = computed(() => {
-  const all = groupSidebar(
-    props.items.filter(
-      (item) => !props.vertical || !visibility.hidden.value.includes(keyFor(item.id)),
-    ),
-  );
+  const all = groupSidebar(props.items)
+    .map(([root, ...children]) => ({
+      id: root!.id,
+      utility: !!root!.utility,
+      items: [root!, ...children].filter(
+        (item) => !props.vertical || !visibility.hidden.value.includes(keyFor(item.id)),
+      ),
+    }))
+    .filter((group) => group.items.length);
   return [
-    ...ordering.sort(
-      all.filter((group) => !group[0]?.utility),
-      (group) => group[0]!.id,
-    ),
-    ...ordering.sort(
-      all.filter((group) => group[0]?.utility),
-      (group) => group[0]!.id,
-    ),
+    ...layout.sort(all.filter((group) => !group.utility)),
+    ...layout.sort(all.filter((group) => group.utility)),
   ];
 });
-const firstUtility = computed(() => groups.value.find((group) => group[0]?.utility));
-const ordered = computed(() => groups.value.flat());
+const firstUtility = computed(() => groups.value.find((group) => group.utility));
+const ordered = computed(() => groups.value.flatMap((group) => group.items));
 const current = computed(() => ordered.value.find((item) => item.id === props.section));
 const otherBadges = computed(() =>
   ordered.value.some((item) => item.id !== props.section && item.badge),
@@ -147,34 +162,6 @@ const otherBadges = computed(() =>
 const commands = useCommandScope(props.scopeId ?? "sidebar-sections", () => ({
   surface: "workbench",
 }));
-commands.scope.registerCommand({
-  id: "ide.workbench.section.move",
-  title: "Переместить раздел боковой панели",
-  description: "Меняет порядок групп разделов боковой панели и сохраняет его.",
-  arguments: {
-    from: "string: перемещаемый раздел",
-    to: "string: соседний раздел",
-    after: "boolean: разместить после",
-  },
-  run: async (args) => {
-    const value = args as { from?: unknown; to?: unknown; after?: unknown };
-    if (
-      typeof value?.from !== "string" ||
-      typeof value.to !== "string" ||
-      typeof value.after !== "boolean"
-    )
-      throw new Error("Укажите from, to и after");
-    const from = groups.value.find((group) => group[0]?.id === value.from);
-    const to = groups.value.find((group) => group[0]?.id === value.to);
-    if (!from || !to || !!from[0]?.utility !== !!to[0]?.utility) return;
-    await ordering.move(
-      groups.value.map((group) => group[0]!.id),
-      value.from,
-      value.to,
-      value.after,
-    );
-  },
-});
 commands.scope.registerCommand({
   id: "ide.workbench.section.picker.toggle",
   title: "Открыть или закрыть выбор раздела",
@@ -207,6 +194,21 @@ const menuItems = computed<ContextMenuItem[]>(() => {
   const item = menuTarget.value;
   if (!item) return [];
   return [
+    ...(layout.canMove(item.id, oppositeSide.value)
+      ? [
+          {
+            id: "section.move",
+            label: `Переместить ${oppositeSide.value === "right" ? "вправо" : "влево"}`,
+            command: "ide.workbench.section.move",
+            args: { from: item.id, side: oppositeSide.value },
+            run: () =>
+              emit("command", "ide.workbench.section.move", {
+                from: item.id,
+                side: oppositeSide.value,
+              }),
+          },
+        ]
+      : []),
     {
       id: "section.hide",
       label: `Скрыть «${item.title}»`,
@@ -315,24 +317,24 @@ function choose(item: SidebarItem) {
     </button>
   </UiIsland>
   <nav v-else class="side-tabs vertical" :aria-label="label ?? 'Разделы проекта'">
-    <template v-for="group in groups" :key="group[0]?.id">
+    <template v-for="group in groups" :key="group.id">
       <i v-if="group === firstUtility" class="rail-divider" aria-hidden="true" />
       <div
         class="side-group"
         :class="{
-          grouped: group.length > 1,
-          dragging: dragging === group[0]?.id,
-          'drop-before': dropTarget?.id === group[0]?.id && !dropTarget.after,
-          'drop-after': dropTarget?.id === group[0]?.id && dropTarget.after,
+          grouped: group.items.length > 1,
+          dragging: dragging?.id === group.id && dragging.side === side,
+          'drop-before': dropTarget?.id === group.id && !dropTarget.after,
+          'drop-after': dropTarget?.id === group.id && dropTarget.after,
         }"
         draggable="true"
-        @dragstart="dragStart($event, group[0]!.id)"
+        @dragstart="dragStart($event, group.id)"
         @dragend="endDrag"
-        @dragover="dragOver($event, group[0]!.id)"
+        @dragover="dragOver($event, group.id)"
         @dragleave="dragLeave"
-        @drop.stop="drop($event, group[0]!.id)"
+        @drop.stop="drop($event, group.id)"
       >
-        <template v-for="(item, index) in group" :key="item.id">
+        <template v-for="(item, index) in group.items" :key="item.id">
           <i v-if="index" class="side-separator" aria-hidden="true" />
           <button
             :class="{ selected: section === item.id && !collapsed }"
@@ -353,6 +355,14 @@ function choose(item: SidebarItem) {
         </template>
       </div>
     </template>
+    <div
+      v-if="emptyDrop"
+      class="side-group empty-drop"
+      :class="{ 'drop-before': dropTarget && !dropTarget.id }"
+      @dragover="dragOver($event)"
+      @dragleave="dragLeave"
+      @drop.stop="drop($event)"
+    />
     <span :ref="overflow.trigger" class="overflow-trigger">
       <UiButton
         shape="icon"
@@ -436,6 +446,11 @@ function choose(item: SidebarItem) {
   bottom: -3px;
 }
 
+.side-group.empty-drop {
+  min-height: 28px;
+  flex-shrink: 0;
+  border: 1px dashed var(--line-strong);
+}
 .side-group.dragging {
   opacity: 0.4;
 }
