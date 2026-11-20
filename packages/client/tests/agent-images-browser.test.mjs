@@ -11,6 +11,7 @@ const html = `<!doctype html>
   import { createApp, h, ref } from "vue";
   import AgentMessage from "/packages/client/modules/agent-turns/ui/AgentMessage.vue";
   import { chatProjectKey } from "/packages/client/modules/chat-images/index.ts";
+  import { applyAppearance } from "/packages/client/modules/appearance/index.ts";
   const text = ref("");
   const app = createApp({
     setup: () => () => h(AgentMessage, { text: text.value, streaming: false }),
@@ -19,6 +20,7 @@ const html = `<!doctype html>
   app.mount("#fixture");
   window.fixture = {
     ready: true,
+    applyAppearance,
     set(value) {
       text.value = value;
     },
@@ -129,6 +131,23 @@ test.concurrent(
     expect(viewer.backgroundValue).toBe("transparent");
     expect(viewer.options).toContain("Прозрачный");
     expect(viewer.hasClose).toBe(true);
+
+    await browser.evaluate("window.fixture.applyAppearance('frozen-glass')");
+    const glass = await browser.evaluate(`(() => {
+      const dialog = document.querySelector('dialog[open]');
+      return {
+        dialog: getComputedStyle(dialog).backgroundColor,
+        blur: getComputedStyle(dialog).backdropFilter,
+        header: getComputedStyle(dialog.querySelector('.modal-head')).backgroundColor,
+        canvas: getComputedStyle(dialog.querySelector('.image-canvas')).backgroundColor,
+      };
+    })()`);
+    expect(glass).toEqual({
+      dialog: "rgba(19, 40, 62, 0.55)",
+      blur: "blur(18px)",
+      header: "rgba(0, 0, 0, 0)",
+      canvas: "rgba(0, 0, 0, 0)",
+    });
 
     // The close button removes the viewer.
     await browser.click(".image-modal-close");

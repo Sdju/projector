@@ -270,7 +270,7 @@ defineExpose({
   position: relative;
   border: 1px solid var(--line);
   border-radius: var(--r-lg);
-  background: var(--bg-2);
+  background: var(--theme-inset-background, var(--bg-2));
   padding: 2px var(--sp-1) var(--sp-1);
   transition:
     border-color var(--t-fast),

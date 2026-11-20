@@ -515,6 +515,10 @@ onBeforeUnmount(() => {
   min-height: 0;
   overflow: hidden;
 }
+[data-theme-effects] .code-viewer :deep(.cm-editor),
+[data-theme-effects] .code-viewer :deep(.cm-gutters) {
+  background-color: var(--theme-panel-background);
+}
 .code-viewer :deep(.selection-chat) {
   display: inline-flex;
   align-items: center;

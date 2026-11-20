@@ -47,7 +47,8 @@ defineExpose({
   padding: var(--sp-5);
   border: 1px solid var(--line);
   border-radius: var(--r-lg);
-  background: var(--bg-2);
+  background: var(--popup-surface-tint, var(--bg-2));
+  backdrop-filter: var(--popup-surface-filter, none);
   color: var(--text);
   box-shadow: var(--shadow-modal);
 }

@@ -123,7 +123,7 @@ const spark = computed(() => {
   padding: var(--sp-3);
   border: 1px solid var(--line);
   border-radius: var(--r-md);
-  background: var(--bg-2);
+  background: var(--theme-inset-background, var(--bg-2));
   color: var(--muted);
 }
 .tone-spare {

@@ -252,6 +252,7 @@ window.fixture = {
     if (!editor) return null;
     return {
       bg: getComputedStyle(editor).backgroundColor,
+      gutters: getComputedStyle(editor.querySelector('.cm-gutters')).backgroundColor,
       color: getComputedStyle(editor).color,
       syntax: [...document.querySelectorAll('.cm-line span')]
         .map((node) => getComputedStyle(node).color)
@@ -315,6 +316,21 @@ test(
       }))`);
       expect(soft.classic).toBe(false);
       expect(soft.syntax).toContain("rgb(184, 171, 119)");
+      await browser.evaluate("window.fixture.apply('frozen-glass')");
+      for (const theme of ["projector-soft", "projector", "one-dark"]) {
+        await browser.evaluate(`window.fixture.theme(${JSON.stringify(theme)})`);
+        const glass = await browser.evaluate(
+          "new Promise(resolve => requestAnimationFrame(() => resolve(window.fixture.read())))",
+        );
+        expect(glass.bg).toBe("rgba(0, 0, 0, 0)");
+        expect(glass.gutters).toBe("rgba(0, 0, 0, 0)");
+      }
+      await browser.evaluate(
+        "window.fixture.theme('projector-soft'); window.fixture.apply('dark')",
+      );
+      await expect
+        .poll(async () => (await browser.evaluate("window.fixture.read()"))?.bg)
+        .toBe("rgb(16, 16, 15)");
       expect(await browser.evaluate("window.marker")).toBe(marker);
     } finally {
       await browser.close();
@@ -331,27 +347,30 @@ const markdownHtml = `<!doctype html>
 <pre id="result">WAITING</pre>
 <script type="module">
 import '/packages/client/app/styles.css';
-import { createApp, h } from 'vue';
+import { createApp, h, ref } from 'vue';
 import VisualMarkdownEditor from '/packages/client/modules/workspace/modules/viewers/ui/VisualMarkdownEditor.vue';
 import { applyAppearance, initAppearance } from '/packages/client/modules/appearance/index.ts';
 initAppearance();
+const editable = ref(true);
 createApp({
   render: () => h(VisualMarkdownEditor, {
     content: '\\u0060\\u0060\\u0060js\\nconst alive = true;\\n\\u0060\\u0060\\u0060\\n',
     path: 'probe.md',
     projectId: 'test',
-    editable: true,
+    editable: editable.value,
   }),
 }).mount('#markdown');
 window.fixture = {
   ready: true,
   apply: applyAppearance,
+  readOnly: () => { editable.value = false; },
   read: () => {
     const editor = document.querySelector('.milkdown-code-block .cm-editor');
     const block = document.querySelector('.milkdown-code-block');
     if (!editor || !block) return null;
     return {
       bg: getComputedStyle(block).backgroundColor,
+      documentBg: getComputedStyle(document.querySelector('.milkdown')).backgroundColor,
       color: getComputedStyle(editor).color,
       syntax: [...editor.querySelectorAll('.cm-line span')]
         .map((node) => getComputedStyle(node).color)
@@ -397,6 +416,18 @@ test(
       }))`);
       expect(contrast.bg).toBe("rgb(0, 0, 0)");
       expect(contrast.syntax).toContain("rgb(255, 212, 92)");
+      expect(contrast.documentBg).toBe("rgba(0, 0, 0, 0)");
+      await browser.evaluate("window.fixture.readOnly(); window.fixture.apply('frozen-glass')");
+      await expect
+        .poll(() =>
+          browser.evaluate(
+            "Boolean(document.querySelector('.visual-markdown.readonly .ProseMirror'))",
+          ),
+        )
+        .toBe(true);
+      const glass = await browser.evaluate("window.fixture.read()");
+      expect(glass.documentBg).toBe("rgba(0, 0, 0, 0)");
+      expect(glass.bg).toBe("rgb(11, 25, 42)");
       expect(await browser.evaluate("window.marker")).toBe(marker);
     } finally {
       await browser.close();
@@ -872,6 +903,7 @@ window.fixture = {
     return {
       changed: changed ? getComputedStyle(changed).backgroundColor : null,
       deleted: deleted ? getComputedStyle(deleted).backgroundColor : null,
+      canvases: [...document.querySelectorAll('.cm-editor')].map(node => getComputedStyle(node).backgroundColor),
     };
   },
 };
@@ -900,6 +932,14 @@ test(
         resolve(window.fixture.read());
       }))`);
       expect(light.changed).not.toBe(dark.changed);
+      await browser.evaluate("window.fixture.apply('frozen-glass')");
+      const glass = await browser.evaluate("window.fixture.read()");
+      expect(glass.canvases).toEqual(["rgba(0, 0, 0, 0)"]);
+      expect(glass.changed).not.toBe("rgba(0, 0, 0, 0)");
+      await browser.click('button[aria-label="Две колонки"]');
+      await expect
+        .poll(async () => (await browser.evaluate("window.fixture.read()")).canvases)
+        .toEqual(["rgba(0, 0, 0, 0)", "rgba(0, 0, 0, 0)"]);
       expect(await browser.evaluate("window.marker")).toBe(marker);
     } finally {
       await browser.close();

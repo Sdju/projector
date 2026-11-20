@@ -359,6 +359,42 @@ select option {
   background: var(--bg-2);
 }
 
+@supports (appearance: base-select) and selector(::picker(select)) {
+  [data-theme-effects] select:not([multiple]):is(:not([size]), [size="1"]),
+  [data-theme-effects] select:not([multiple]):is(:not([size]), [size="1"])::picker(select) {
+    appearance: base-select;
+  }
+
+  [data-theme-effects] select:not([multiple]):is(:not([size]), [size="1"])::picker-icon {
+    display: none;
+  }
+
+  [data-theme-effects] select:not([multiple]):is(:not([size]), [size="1"])::picker(select) {
+    max-inline-size: calc(100vw - var(--sp-4) * 2);
+    padding: var(--sp-1);
+    border: 1px solid var(--line-strong);
+    border-radius: var(--r-md);
+    background: var(--popup-surface-tint);
+    backdrop-filter: var(--popup-surface-filter);
+    box-shadow: var(--shadow-popover);
+    color: var(--text);
+  }
+
+  [data-theme-effects] select:not([multiple]):is(:not([size]), [size="1"]) option {
+    padding: var(--sp-2);
+    border-radius: var(--r-sm);
+    background: transparent;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  [data-theme-effects]
+    select:not([multiple]):is(:not([size]), [size="1"])
+    option:not(:disabled):is(:hover, :focus-visible) {
+    background: var(--active);
+  }
+}
+
 /* Единый видимый фокус для клавиатуры. Компоненты не переопределяют outline. */
 :focus-visible {
   outline: 2px solid var(--focus);

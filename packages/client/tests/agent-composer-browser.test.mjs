@@ -27,6 +27,11 @@ test.concurrent(
 
     // The form took the place of the text field, and the fold sits in its top-right corner.
     await wait('document.querySelector(".composer-form .form-fold") !== null');
+    const composerSurface = () =>
+      browser.evaluate('getComputedStyle(document.querySelector(".composer")).backgroundColor');
+    expect(await composerSurface()).toBe("rgb(23, 23, 22)");
+    await browser.evaluate("document.documentElement.dataset.themeEffects = ''");
+    expect(await composerSurface()).toMatch(/\/\s*0\.38\)/);
     const box = await browser.evaluate(`(() => {
       const fold = document.querySelector(".composer-form .form-fold").getBoundingClientRect();
       const form = document.querySelector(".composer-form").getBoundingClientRect();

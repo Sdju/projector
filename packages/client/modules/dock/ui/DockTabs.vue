@@ -362,7 +362,7 @@ watch(
   height: 40px;
   flex-shrink: 0;
   overflow-x: auto;
-  background: var(--bg-sunken);
+  background: var(--theme-panel-background, var(--bg-sunken));
   border-bottom: 1px solid var(--line);
   scrollbar-width: thin;
 }
@@ -382,6 +382,9 @@ watch(
 .workspace-tab:hover {
   background: var(--bg-2);
 }
+[data-theme-effects] .workspace-tab:hover {
+  background: var(--hover);
+}
 /* Тесная полоса: одна выбранная вкладка занимает всё место, остальные — в списке справа */
 .workspace-tabs.compact {
   overflow: hidden;
@@ -399,7 +402,7 @@ watch(
   padding: 0 var(--sp-1);
   border-bottom: 1px solid var(--line);
   border-left: 1px solid var(--line);
-  background: var(--bg-sunken);
+  background: var(--theme-panel-background, var(--bg-sunken));
 }
 .picker-button {
   display: inline-flex;
@@ -461,6 +464,9 @@ watch(
 .workspace-tab.selected {
   border-top-color: var(--focus);
   background: var(--bg);
+}
+[data-theme-effects] .workspace-tab.selected {
+  background: var(--active);
 }
 .dim .workspace-tab.selected {
   border-top-color: var(--line-strong);

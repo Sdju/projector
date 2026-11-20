@@ -93,7 +93,7 @@ onMounted(() => dialog.value?.open());
   gap: var(--sp-2);
   padding: var(--sp-2) var(--sp-2) var(--sp-2) var(--sp-4);
   border-bottom: 1px solid var(--line);
-  background: var(--bg-2);
+  background: var(--theme-panel-background, var(--bg-2));
 }
 .modal-title {
   flex: 1;

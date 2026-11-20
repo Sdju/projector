@@ -318,7 +318,8 @@ watch(commits, (list) => {
   position: sticky;
   top: 0;
   z-index: 1;
-  background: var(--bg-sunken);
+  background: var(--popup-surface-tint, var(--bg-sunken));
+  backdrop-filter: var(--popup-surface-filter, none);
   display: flex;
   align-items: center;
   padding-right: var(--sp-3);

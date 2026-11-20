@@ -123,7 +123,7 @@ export default defineComponent({
   padding: 3px 8px;
   font-size: var(--fs-xs);
   color: var(--text);
-  background: var(--bg-sunken);
+  background: var(--theme-inset-background, var(--bg-sunken));
   border: 1px solid var(--line);
   border-radius: var(--r-sm);
 }

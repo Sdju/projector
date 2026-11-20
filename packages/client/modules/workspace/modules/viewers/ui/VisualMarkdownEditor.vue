@@ -532,6 +532,7 @@ onBeforeUnmount(() => {
 }
 .visual-markdown :deep(.milkdown) {
   container-type: inline-size;
+  background: transparent;
   --crepe-color-background: var(--bg);
   --crepe-color-on-background: var(--text);
   --crepe-color-surface: var(--bg-2);

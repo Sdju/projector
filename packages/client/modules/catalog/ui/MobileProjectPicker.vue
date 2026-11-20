@@ -5,6 +5,7 @@ import { useIdeCommands } from "../../ide/index.ts";
 import { useCommandScope, commandArgs } from "../../../common/utilities/commands.ts";
 import { useCompactViewport } from "../../../common/utilities/compact-viewport.ts";
 import { useSheetDismiss } from "../../../common/utilities/sheet-dismiss.ts";
+import UiPopupSurface from "../../../common/ui/UiPopupSurface.vue";
 import {
   useProjects,
   projectRoute,
@@ -23,7 +24,8 @@ const { api } = useIdeCommands();
 const { projects } = useProjects();
 const open = ref(false);
 const compact = useCompactViewport();
-const sheetElement = ref<HTMLElement>();
+const sheet = ref<InstanceType<typeof UiPopupSurface>>();
+const sheetElement = computed(() => sheet.value?.element);
 useSheetDismiss({
   element: sheetElement,
   enabled: compact,
@@ -89,8 +91,7 @@ const navigate = (path: string) =>
       @click="commands.run('ide.project.picker.toggle')"
     >
       <img :src="projectIconUrl(project)" alt="" width="22" height="22" />
-      <span class="u-truncate">{{ project.name }}</span
-      ><IconChevron aria-hidden="true" />
+      <span class="u-truncate">{{ project.name }}</span><IconChevron aria-hidden="true" />
     </button>
     <button
       v-if="open"
@@ -98,10 +99,11 @@ const navigate = (path: string) =>
       aria-label="Закрыть выбор проекта"
       @click="commands.run('ide.project.picker.toggle')"
     />
-    <div
+    <UiPopupSurface
       v-if="open"
-      ref="sheetElement"
+      ref="sheet"
       class="sheet mobile-sheet"
+      border="strong"
       @keydown.esc.stop="commands.run('ide.project.picker.toggle')"
     >
       <span v-if="compact" class="sheet-grabber" aria-hidden="true" />
@@ -137,7 +139,7 @@ const navigate = (path: string) =>
           Настройки
         </button>
       </nav>
-    </div>
+    </UiPopupSurface>
   </div>
 </template>
 
@@ -178,8 +180,6 @@ svg {
 }
 .sheet {
   z-index: calc(var(--z-popover) + 1);
-  background: var(--bg-2);
-  border: 1px solid var(--line-strong);
   padding: var(--sp-2);
 }
 .sheet-grabber {

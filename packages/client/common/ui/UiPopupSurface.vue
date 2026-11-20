@@ -35,7 +35,8 @@ defineExpose({
 .popup-surface {
   border: 1px solid var(--popup-border);
   border-radius: var(--popup-radius);
-  background: var(--popup-background);
+  background: var(--popup-surface-tint, var(--popup-background));
+  backdrop-filter: var(--popup-surface-filter, none);
   box-shadow: var(--shadow-popover);
 }
 .column {
