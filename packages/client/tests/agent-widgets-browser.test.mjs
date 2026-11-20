@@ -1274,7 +1274,7 @@ test.concurrent(
 <div id="fixture"></div>
 <script type="module">
 import '/packages/client/app/styles.css';
-import '/packages/client/modules/agent-turns/ui/agent-markdown.css';
+import '/packages/client/modules/markdown/ui/markdown.css';
 import { createApp, h } from 'vue';
 import UiCard from '/packages/client/common/ui/UiCard.vue';
 import SessionTiles from '/packages/client/modules/workspace/ui/SessionTiles.vue';

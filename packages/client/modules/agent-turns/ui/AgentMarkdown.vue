@@ -7,7 +7,6 @@ import { chatImageSource, chatProjectKey } from "../../chat-images/index.ts";
 import { chatLinkActionsKey } from "../../agent-core/index.ts";
 import { openExternalLink } from "../../../common/utilities/open-external-link.ts";
 import ContextMenu from "../../../common/ui/ContextMenu.vue";
-import "./agent-markdown.css";
 import type { ContextMenuItem } from "../../../common/ui/context-menu.ts";
 import ImageModal from "../../../common/ui/ImageModal.vue";
 import { MermaidModal, createMermaidBlock, type MermaidBlock } from "../../markdown/index.ts";
