@@ -85,12 +85,31 @@ function updateMeta(scheme: ThemeId, mode?: "dark" | "light") {
   if (background)
     document.querySelector('meta[name="theme-color"]')?.setAttribute("content", background);
 }
+
+function paintedColorMode(): "dark" | "light" {
+  return getComputedStyle(document.documentElement).colorScheme.includes("light")
+    ? "light"
+    : "dark";
+}
+
+/** Brand tab icon for the painted colour mode; project pages replace it with a project logo. */
+export function brandFaviconHref(mode: "dark" | "light" = paintedColorMode()): string {
+  return mode === "light" ? "/favicon-light.svg" : "/favicon.svg";
+}
+
+function isBrandFaviconHref(href: string): boolean {
+  const path = href.split(/[?#]/, 1)[0];
+  return path.endsWith("/favicon.svg") || path.endsWith("/favicon-light.svg");
+}
+
 /** Brand surfaces follow the painted scheme; the manifest chooses matching PWA icons. */
 function updateBrand(mode: "dark" | "light") {
   const light = mode === "light";
-  document
-    .getElementById("app-favicon")
-    ?.setAttribute("href", light ? "/favicon-light.svg" : "/favicon.svg");
+  const favicon = document.getElementById("app-favicon");
+  const faviconHref = favicon?.getAttribute("href") || "";
+  // A project page owns the tab icon; do not restore the brand mark over it.
+  if (favicon && (!faviconHref || isBrandFaviconHref(faviconHref)))
+    favicon.setAttribute("href", brandFaviconHref(mode));
   document
     .getElementById("app-touch-icon")
     ?.setAttribute(
@@ -262,7 +281,7 @@ export function initAppearance() {
   media = window.matchMedia("(prefers-color-scheme: light)");
   root.dataset.theme ??= resolveScheme(choice.value, media.matches);
   appearanceScheme.value = root.dataset.theme as ThemeId;
-  updateBrand(getComputedStyle(root).colorScheme.includes("light") ? "light" : "dark");
+  updateBrand(paintedColorMode());
   if (!root.style.getPropertyValue("--chat-fs"))
     root.style.setProperty("--chat-fs", `${appearanceFonts.value.chat}px`);
   media.addEventListener("change", () => {

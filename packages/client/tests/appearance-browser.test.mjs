@@ -169,6 +169,45 @@ test(
   },
 );
 
+test(
+  "repainting the scheme keeps a project tab icon and restores the brand mark after leave",
+  { skip: !chromium, timeout: 60000, retry: 1 },
+  async () => {
+    const fixture = await createBrowserFixture({ pages: { "/__appearance": html } });
+    const browser = await createChromium(fixture.directory);
+    try {
+      await browser.open(fixture.url("/__appearance"));
+      const projectIcon = "/api/projects/demo/icon?path=%2Ftmp%2Fdemo&name=demo";
+      await browser.evaluate(
+        `document.getElementById('app-favicon').removeAttribute('type');
+         document.getElementById('app-favicon').setAttribute('href', ${JSON.stringify(projectIcon)});
+         window.fixture.apply('light')`,
+      );
+      expect(await browser.evaluate("window.fixture.brand()")).toStrictEqual({
+        favicon: projectIcon,
+        manifest: "/manifest-light.webmanifest",
+        touch: "/icons/apple-touch-icon-light.png",
+        status: "default",
+      });
+
+      await browser.evaluate(
+        `document.getElementById('app-favicon').type = 'image/svg+xml';
+         document.getElementById('app-favicon').setAttribute('href', '/favicon-light.svg');
+         window.fixture.apply('dark')`,
+      );
+      expect(await browser.evaluate("window.fixture.brand()")).toStrictEqual({
+        favicon: "/favicon.svg",
+        manifest: "/manifest.webmanifest",
+        touch: "/icons/apple-touch-icon.png",
+        status: "black",
+      });
+    } finally {
+      await browser.close();
+      await fixture.close();
+    }
+  },
+);
+
 const contrastHtml = `<!doctype html>
 <html lang="ru" data-appearance="dark" data-theme="dark">
 <head><meta name="color-scheme" content="dark"><meta name="theme-color" content="#171716"><link rel="icon" href="data:,"></head>

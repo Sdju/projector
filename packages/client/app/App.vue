@@ -2,6 +2,7 @@
 import { computed, onMounted, onUnmounted, watchEffect } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { isLauncherWindow } from "../modules/launcher/index.ts";
+import { brandFaviconHref } from "../modules/appearance/index.ts";
 import {
   useProjects,
   projectPathFromParams,
@@ -91,9 +92,14 @@ watchEffect(() => {
   document.title = project ? `${project.name} — Projector` : `Projector — ${page}`;
   const favicon = document.querySelector<HTMLLinkElement>('link[rel="icon"]');
   if (favicon) {
-    // The project endpoint can return SVG, ICO, PNG or another image format.
-    favicon.removeAttribute("type");
-    favicon.href = project ? projectIconUrl(project) : "/favicon.svg";
+    if (project) {
+      // The project endpoint can return SVG, ICO, PNG or another image format.
+      favicon.removeAttribute("type");
+      favicon.setAttribute("href", projectIconUrl(project));
+    } else {
+      favicon.type = "image/svg+xml";
+      favicon.setAttribute("href", brandFaviconHref());
+    }
   }
 });
 let blurTimer: ReturnType<typeof setTimeout> | undefined;

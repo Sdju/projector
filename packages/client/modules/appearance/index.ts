@@ -5,6 +5,7 @@ export {
   applyAppearance,
   applyAppearanceFonts,
   bindProjectAppearance,
+  brandFaviconHref,
   currentAppearance,
   themeSettingsValues,
   globalAppearanceSettings,
