@@ -24,6 +24,7 @@ const tabSchema = z.object({
   params: z.record(z.string(), z.unknown()).optional(),
   commit: z.string().optional(),
   pull: z.number().int().positive().optional(),
+  pullBase: z.string().optional(),
   /** Saved before file scopes existed; converted to a commit scope on restore. */
   rev: z.string().optional(),
   scope: fileScopeSchema.optional(),

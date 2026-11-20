@@ -323,13 +323,13 @@ provideTabHost({
   openCommitDiff: (hash, path) => void files.openCommitFile(hash, path),
   openCommitTree,
   openCompareTree: (from, to) => openTree({ kind: "compare", from, to }),
-  openPullFile: (number, path, head, pinned) => {
+  openPullFile: (number, path, head, pinned, base) => {
     // Opening a file must not replace the merge request preview tab that led to it.
     const pull = tabs.value.find(
       (tab) => tab.virtual === "pull" && Number(tab.params?.number) === number,
     );
     if (pull) pull.preview = false;
-    void files.openPullFile(number, path, head, !pinned);
+    void files.openPullFile(number, path, head, !pinned, base);
   },
   openSection,
   run: (command, args) => editorCommands.run(command, args),

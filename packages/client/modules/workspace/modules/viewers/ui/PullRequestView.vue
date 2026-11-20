@@ -38,7 +38,13 @@ const props = withDefaults(
     noun?: string;
     /** Workspace actions: a temporary tree section and a base → head file tab. */
     onOpenSection?: (type: SidebarType) => void;
-    onOpenPullFile?: (number: number, path: string, head?: string, pinned?: boolean) => void;
+    onOpenPullFile?: (
+      number: number,
+      path: string,
+      head?: string,
+      pinned?: boolean,
+      base?: string,
+    ) => void;
     onOpenJob?: (job: { id: number; title: string }) => void;
   }>(),
   { host: "GitHub", short: "PR", noun: "pull request" },
@@ -53,6 +59,7 @@ const { detail, loading, error, reload } = useTrackerDetail(
   "pull",
   `Не удалось открыть ${props.noun}`,
 );
+const baseSha = computed(() => detail.value?.diffRefs?.baseSha ?? "");
 const headSha = computed(() => detail.value?.diffRefs?.headSha ?? "");
 const mergeStatus = computed(() => detail.value?.mergeStatus ?? "");
 const {
@@ -64,6 +71,7 @@ const {
   () => props.projectId,
   () => props.number,
   () => headSha.value,
+  () => baseSha.value,
 );
 const textFiles = computed(() =>
   (detail.value?.files ?? []).filter((file) => !file.binary && !file.tooLarge),
@@ -157,7 +165,7 @@ const openChangesTree = () => {
   });
 };
 const openFile = (path: string, pinned = false) =>
-  props.onOpenPullFile?.(props.number, path, headSha.value, pinned);
+  props.onOpenPullFile?.(props.number, path, headSha.value, pinned, baseSha.value);
 const openJob = (job: { id: number; title: string }) => props.onOpenJob?.(job);
 register(
   "ide.mergeRequest.refresh",

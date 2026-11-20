@@ -95,7 +95,7 @@ export interface SidebarHost {
   openCommitTree(hash: string): void;
   /** Opens a read-only search panel for a committed snapshot. */
   openSearch(scope: FileScope): void;
-  openPullFile(number: number, path: string, head?: string, pinned?: boolean): void;
+  openPullFile(number: number, path: string, head?: string, pinned?: boolean, base?: string): void;
   command(id: string, args?: unknown): void;
   /** Awaits a command of the editor scope; plugin panels get its real result and errors. */
   executeCommand?(id: string, args?: unknown): Promise<unknown>;
@@ -320,8 +320,8 @@ export const baseSidebarViews: SidebarViews = {
         number,
         head,
         snapshot: type?.params?.snapshot as PullRequestChanges | undefined,
-        onOpen: (path: string, pinned?: boolean, nextHead?: string) =>
-          host.openPullFile(number, path, nextHead || head, pinned),
+        onOpen: (path: string, pinned?: boolean, nextHead?: string, base?: string) =>
+          host.openPullFile(number, path, nextHead || head, pinned, base),
       };
     },
     refresh: (_, panel) => panel?.refresh?.(),

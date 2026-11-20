@@ -88,7 +88,14 @@ function mergeRequestProvider(repository: string, api: GitlabWorkspaceApi = defa
         return (api.readMergeRequestFiles ?? readMergeRequestFiles)(repository, number, signal);
       const path = params.path || "";
       if (!path) throw new Error("Укажите путь файла merge request");
-      return (api.readMergeRequestDiff ?? readMergeRequestDiff)(repository, number, path, signal);
+      return (api.readMergeRequestDiff ?? readMergeRequestDiff)(
+        repository,
+        number,
+        path,
+        signal,
+        params.head,
+        params.base,
+      );
     },
   };
 }

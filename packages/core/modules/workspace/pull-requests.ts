@@ -117,6 +117,7 @@ export interface PullRequestChanges {
 
 /** Two readable sides of one changed file, in the same shape as a commit comparison. */
 export interface PullRequestComparison extends CommitComparison {
+  baseSha?: string;
   binary: boolean;
   tooLarge: boolean;
 }

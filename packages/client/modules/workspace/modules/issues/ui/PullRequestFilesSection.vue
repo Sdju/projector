@@ -15,7 +15,7 @@ const props = defineProps<{
   head?: string;
   /** Снимок из уже открытой карточки MR: позволяет не повторять запрос к GitLab. */
   snapshot?: PullRequestChanges;
-  onOpen?: (path: string, pinned?: boolean, head?: string) => void;
+  onOpen?: (path: string, pinned?: boolean, head?: string, base?: string) => void;
 }>();
 
 const {
@@ -57,7 +57,7 @@ defineExpose({ reveal: (path: string) => tree.value?.reveal(path), refresh: relo
       :changes="files"
       :totals="summary"
       empty-text="Файлов нет"
-      @open="(path, pinned) => onOpen?.(path, pinned, head)"
+      @open="(path, pinned) => onOpen?.(path, pinned, head, changes?.diffRefs?.baseSha)"
     />
   </UiLoadablePanel>
 </template>

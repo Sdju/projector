@@ -31,6 +31,7 @@ import {
 } from "../../agent/index.ts";
 import { clientAgents } from "../../agents-integration/catalog/index.ts";
 import { BrowserPanel } from "../../browser/index.ts";
+import { JobView, PipelineView } from "../modules/pipelines/index.ts";
 import { EntryInfoTab } from "../modules/tree/index.ts";
 import {
   CommitOverview,
@@ -83,13 +84,74 @@ export interface TabHost {
   /** Opens the changed files of two snapshots in a sidebar section. */
   openCompareTree(from: string, to: string): void;
   /** Opens a changed file of a merge request as a read-only base → head tab. */
-  openPullFile(number: number, path: string, head?: string, pinned?: boolean): void;
+  openPullFile(number: number, path: string, head?: string, pinned?: boolean, base?: string): void;
   /** Adds a temporary sidebar section (a merge request tree, a pipeline panel). */
   openSection(type: SidebarType): void;
   /** Runs an editor command of this workspace (a button of a view is a command too). */
   run(command: string, args?: unknown): void;
   /** Awaits a command of the editor scope; plugin views get its real result and errors. */
   executeCommand?(command: string, args?: unknown): Promise<unknown>;
+}
+
+function pullTabView(provider?: "GitLab"): TabView {
+  return {
+    component: PullRequestView,
+    keepAlive: true,
+    props: (tab, host) => ({
+      projectId: host.projectId,
+      number: tab.params?.number,
+      ...(provider === "GitLab" ? { host: provider, short: "MR", noun: "merge request" } : {}),
+      onOpen: host.openFile,
+      onOpenSection: host.openSection,
+      onOpenPullFile: host.openPullFile,
+      onOpenJob: (job: { id: number; title: string }) =>
+        host.openTab("job", ciTabParams(job), { preview: false }),
+      onOpenPipeline: (pipeline: { id: number; title?: string }) =>
+        host.openTab("pipeline", ciTabParams(pipeline), { preview: false }),
+    }),
+  };
+}
+
+function releaseTabView(provider?: "GitHub" | "GitLab"): TabView {
+  return {
+    component: ReleaseView,
+    keepAlive: true,
+    props: (tab, host) => ({
+      projectId: host.projectId,
+      tag: typeof tab.params?.tag === "string" ? tab.params.tag : "",
+      host: provider,
+    }),
+  };
+}
+
+export function integrationTabViews(provider: "GitHub" | "GitLab"): TabViews {
+  const ciProps = (tab: OpenFile, host: TabHost) => ({
+    projectId: host.projectId,
+    id: tab.params?.id,
+    number: tab.params?.number,
+    host: provider,
+    onOpenFile: (file: { path: string; line?: number }) => host.openFile(file.path, file.line),
+  });
+  return {
+    ...(provider === "GitLab" ? { pull: pullTabView(provider) } : {}),
+    pipeline: {
+      component: PipelineView,
+      keepAlive: true,
+      props: (tab, host) => ({
+        ...ciProps(tab, host),
+        onOpenJob: (job: { id: number; title: string }, pinned?: boolean) =>
+          host.openTab("job", ciTabParams(job), { preview: !pinned }),
+        ...(provider === "GitHub"
+          ? {
+              onOpenPull: (pull: { number: number }) =>
+                host.openTab("pull", pull, { preview: false }),
+            }
+          : {}),
+      }),
+    },
+    job: { component: JobView, keepAlive: true, props: ciProps },
+    release: releaseTabView(provider),
+  };
 }
 
 /** Base views of a workspace; agent chats come from the catalog registered before mounting. */
@@ -173,21 +235,7 @@ export function baseTabViews(): TabViews {
         onOpen: host.openFile,
       }),
     },
-    pull: {
-      component: PullRequestView,
-      keepAlive: true,
-      props: (tab, host) => ({
-        projectId: host.projectId,
-        number: tab.params?.number,
-        onOpen: host.openFile,
-        onOpenSection: host.openSection,
-        onOpenPullFile: host.openPullFile,
-        onOpenJob: (job: { id: number; title: string }) =>
-          host.openTab("job", ciTabParams(job), { preview: false }),
-        onOpenPipeline: (pipeline: { id: number; title?: string }) =>
-          host.openTab("pipeline", ciTabParams(pipeline), { preview: false }),
-      }),
-    },
+    pull: pullTabView(),
     discussion: {
       component: DiscussionView,
       keepAlive: true,
@@ -197,14 +245,7 @@ export function baseTabViews(): TabViews {
         onOpen: host.openFile,
       }),
     },
-    release: {
-      component: ReleaseView,
-      keepAlive: true,
-      props: (tab, host) => ({
-        projectId: host.projectId,
-        tag: typeof tab.params?.tag === "string" ? tab.params.tag : "",
-      }),
-    },
+    release: releaseTabView(),
     commit: {
       component: CommitOverview,
       keepAlive: true,

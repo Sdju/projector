@@ -282,3 +282,37 @@ test("GitLab merge request diff turns an oversized side into tooLarge", async ()
     modified: "",
   });
 });
+
+test("a saved MR diff uses the historical file paths and both SHAs after a push", async () => {
+  await setup();
+  const oldHead = "c".repeat(40);
+  const oldBase = "d".repeat(40);
+  const oldVersion = { id: 12, head_commit_sha: oldHead, base_commit_sha: oldBase };
+  mockFetch((address) => {
+    const url = new URL(address);
+    const path = url.pathname;
+    if (path.endsWith("/merge_requests/7")) return Response.json(mergeRequest());
+    if (path.endsWith("/versions"))
+      return Response.json([{ id: 13, head_commit_sha: head, base_commit_sha: base }, oldVersion]);
+    if (path.endsWith("/versions/12"))
+      return Response.json({
+        ...oldVersion,
+        diffs: [{ old_path: "before.ts", new_path: "after.ts", renamed_file: true }],
+      });
+    if (path.includes("/repository/files/"))
+      return fileBody(`${url.searchParams.get("ref")}:${path.split("/").at(-1)}`);
+    return Response.json({}, { status: 404 });
+  });
+  const { browseGitlabMergeRequestDiff } = await import("../modules/gitlab/index.ts");
+  await expect(
+    browseGitlabMergeRequestDiff(repository, 7, "after.ts", oldHead, oldBase),
+  ).resolves.toMatchObject({
+    hash: oldHead,
+    baseSha: oldBase,
+    original: `${oldBase}:before.ts`,
+    modified: `${oldHead}:after.ts`,
+  });
+  await expect(
+    browseGitlabMergeRequestDiff(repository, 7, "after.ts", oldHead, base),
+  ).rejects.toMatchObject({ status: 409, message: expect.stringContaining("версия") });
+});

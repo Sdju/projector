@@ -60,6 +60,7 @@ export interface WorkspaceSessionContext {
     path: string,
     head?: string,
     preview?: boolean,
+    base?: string,
   ) => Promise<number | undefined>;
   fileGeneration: () => number;
   resetFiles: () => void;
@@ -98,6 +99,7 @@ export function useWorkspaceSession(ctx: WorkspaceSessionContext) {
             params: tab.params,
             commit: tab.commit,
             pull: tab.pull,
+            pullBase: tab.pullBase,
             scope: tab.scope,
             originalPath: tab.originalPath,
             external: tab.external,
@@ -129,8 +131,13 @@ export function useWorkspaceSession(ctx: WorkspaceSessionContext) {
           ctx.ensureTab(tab.virtual, tab.params ?? (tab.commit ? { hash: tab.commit } : undefined));
           continue;
         }
+        // Old sessions may have saved the returned SHA under a different requested tab key.
+        const pullPrefix = `${tab.path}:pull:${tab.pull}:`;
+        const savedHead = tab.key.startsWith(pullPrefix)
+          ? tab.key.slice(pullPrefix.length).split(":", 1)[0]
+          : tab.commit;
         const completed = tab.pull
-          ? await ctx.openPullFile(tab.pull, tab.path, tab.commit ?? "", false)
+          ? await ctx.openPullFile(tab.pull, tab.path, savedHead, false, tab.pullBase)
           : tab.commit
             ? await ctx.openCommitFile(tab.commit, tab.path, false)
             : await ctx.openFile(tab.path, undefined, undefined, tab.staged, {

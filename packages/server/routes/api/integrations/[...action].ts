@@ -299,6 +299,8 @@ export const routes: RouteDefinition[] = [
         text(url, "repository"),
         Number(url.searchParams.get("number")),
         text(url, "path"),
+        text(url, "head"),
+        text(url, "base"),
       ),
     );
   }),

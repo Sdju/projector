@@ -58,13 +58,13 @@ export function createDiffOpeners(ctx: DiffOpenersContext) {
     }
   }
 
-  async function openPullFile(number: number, path: string, head = "", preview = true) {
+  async function openPullFile(number: number, path: string, head = "", preview = true, base = "") {
     // Opening a file must not replace the merge request preview tab that led to it.
     const pull = ctx.tabs.value.find(
       (tab) => tab.virtual === "pull" && Number(tab.params?.number) === number,
     );
     if (pull) pull.preview = false;
-    const key = `${path}:pull:${number}${head ? `:${head}` : ""}`;
+    const key = `${path}:pull:${number}${head ? `:${head}` : ""}${base ? `:${base}` : ""}`;
     const existing = ctx.tabs.value.find((tab) => tab.key === key);
     if (existing) {
       if (!preview) existing.preview = false;
@@ -76,6 +76,8 @@ export function createDiffOpeners(ctx: DiffOpenersContext) {
       const data = await workspaceRequest(ctx.projectId(), "pull-diff", {
         number: String(number),
         path,
+        ...(head ? { head } : {}),
+        ...(base ? { base } : {}),
       });
       if (generation !== ctx.generation()) return;
       if (data.binary) throw new Error("Бинарный файл нельзя сравнить как текст");
@@ -89,6 +91,7 @@ export function createDiffOpeners(ctx: DiffOpenersContext) {
         commit: data.hash,
         parent: data.parent,
         pull: number,
+        pullBase: base || undefined,
         preview,
       });
       ctx.selectTab(key);

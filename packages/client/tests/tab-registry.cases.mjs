@@ -133,3 +133,22 @@ test("ensureTab refreshes the label of an already open tab", () => {
   expect(tabs.value[1].path).toBe("Pipeline #8");
   expect(tabs.value[1].params).toEqual({ id: 8, title: "Linux" });
 });
+
+test("CI views of GitHub and GitLab honor the pipeline job preview flag", async () => {
+  const { integrationTabViews } = await import("../modules/workspace/lib/tab-views.ts");
+  for (const provider of ["GitHub", "GitLab"]) {
+    const opened = [];
+    const view = integrationTabViews(provider);
+    const host = { projectId: "p", openTab: (...args) => opened.push(args) };
+    const props = view.pipeline.props({ params: { id: 19 } }, host);
+    const job = { id: 7, title: "Build" };
+    props.onOpenJob(job);
+    props.onOpenJob(job, true);
+    expect(opened).toEqual([
+      ["job", job, { preview: true }],
+      ["job", job, { preview: false }],
+    ]);
+    expect(props.host).toBe(provider);
+    expect(Boolean(props.onOpenPull)).toBe(provider === "GitHub");
+  }
+});

@@ -82,10 +82,18 @@ export const readMergeRequestDiff = (
   number: number,
   path: string,
   signal?: AbortSignal,
+  head?: string,
+  base?: string,
 ) =>
   readGitlab<PullRequestComparison>(
     "merge-request-diff",
-    { repository, number: String(number), path },
+    {
+      repository,
+      number: String(number),
+      path,
+      ...(head ? { head } : {}),
+      ...(base ? { base } : {}),
+    },
     signal,
   );
 export const readPipelines = (

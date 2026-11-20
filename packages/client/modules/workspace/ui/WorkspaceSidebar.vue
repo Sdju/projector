@@ -107,8 +107,8 @@ const host: SidebarHost = {
   },
   openCommitTree: (hash) => emit("openCommitTree", hash),
   openSearch: (scope) => emit("openSearch", scope),
-  openPullFile: (number, path, head, pinned) =>
-    props.files.openPullFile(number, path, head, !pinned),
+  openPullFile: (number, path, head, pinned, base) =>
+    props.files.openPullFile(number, path, head, !pinned, base),
   command: (id, args) => emit("command", id, args),
   executeCommand: (id, args) =>
     props.executeCommand

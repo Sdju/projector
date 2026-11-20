@@ -4,7 +4,7 @@ export {
   rightPanelPreference,
   saveRightPanelPreference,
 } from "./lib/right-panel.ts";
-export type { TabViews, TabView } from "./lib/tab-views.ts";
+export { integrationTabViews, type TabViews, type TabView } from "./lib/tab-views.ts";
 export type { SidebarHost, SidebarView, SidebarViews } from "./lib/sidebar-views.ts";
 export {
   EditorSettings,

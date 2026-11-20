@@ -23,6 +23,7 @@ import {
   type TrashDirectory,
   type TrashList,
 } from "@ai-projector/core/modules/workspace/index.ts";
+import { verifyPullDiff } from "./pull-diff.ts";
 import { createLocalWorkspaceProfile } from "./local.ts";
 export {
   READ_ACTION_DOMAINS,
@@ -169,7 +170,10 @@ async function readAction<R>(
   signal?: AbortSignal,
 ): Promise<R> {
   const provider = readProviderFor(workspaceProfile(projectId), action);
-  return (await provider.read(action, (params ?? {}) as WorkspaceParams, signal)) as R;
+  const args = (params ?? {}) as WorkspaceParams;
+  const result = await provider.read(action, args, signal);
+  if (action === "pull-diff") verifyPullDiff(args, result);
+  return result as R;
 }
 
 /** Читает действие workspace; имя действия связывает параметры и тип ответа. */

@@ -140,7 +140,7 @@ test("continuous activity is persisted by maxWait without a quiet interval", asy
   }
 });
 
-async function mobileWorkspace(saved, { mobile = true, terminals = true } = {}) {
+async function mobileWorkspace(saved, { mobile = true, terminals = true, install } = {}) {
   const { useWorkspaceSession } = await import("../modules/workspace/lib/workspace-session.ts");
   const { createDockLayout } = await import("../modules/dock/model/layout.ts");
   const values = new Map();
@@ -181,6 +181,7 @@ async function mobileWorkspace(saved, { mobile = true, terminals = true } = {}) 
     resetGit: () => {},
     reloadGit: () => {},
   };
+  install?.(ctx);
   scope.run(() => {
     // Mirrors registerMobileCommands: activating a tab shows the editor.
     watch(ctx.activeKey, (key) => key && (ctx.mobileSurface.value = "editor"));
@@ -241,5 +242,87 @@ test("a saved terminal surface falls back without terminals; desktop and old ses
     } finally {
       f.scope.stop();
     }
+  }
+});
+
+test("MR tabs restore their saved diff version and reject a mismatched provider response", async () => {
+  const { registerWorkspaceProfile } = await import("../modules/workspace-api/index.ts");
+  const { createDiffOpeners } = await import("../modules/workspace/lib/open-diff-files.ts");
+  const old = "a".repeat(40);
+  const current = "b".repeat(40);
+  const base = "c".repeat(40);
+  const wrongBase = "d".repeat(40);
+  const path = "app.ts";
+  const key = `${path}:pull:7:${old}`;
+  const requests = [];
+  const unregister = registerWorkspaceProfile("project", {
+    id: "mr-fixture",
+    layout: "editor",
+    providers: {
+      files: {},
+      pulls: {
+        read(_action, params) {
+          requests.push(params);
+          return Promise.resolve({
+            hash: params.head,
+            baseSha: base,
+            original: "before",
+            modified: params.head === old ? "old version" : "current version",
+          });
+        },
+      },
+    },
+  });
+  let files;
+  let failure;
+  let generation = 0;
+  const f = await mobileWorkspace(
+    {
+      activeKey: key,
+      section: "files",
+      tabs: [
+        { key, path, pull: 7, commit: current },
+        {
+          key: `${path}:pull:7:${current}:${base}`,
+          path,
+          pull: 7,
+          commit: current,
+          pullBase: base,
+        },
+      ],
+    },
+    {
+      install(ctx) {
+        files = createDiffOpeners({
+          ...ctx,
+          selectTab: (id) => (ctx.activeKey.value = id),
+          dropPreview() {},
+          generation: () => generation,
+          begin: () => ++generation,
+          finish() {},
+          fail(id, message) {
+            failure = message;
+            return id;
+          },
+        });
+        ctx.fileGeneration = () => generation;
+        ctx.openPullFile = files.openPullFile;
+      },
+    },
+  );
+  try {
+    await expect.poll(() => f.ctx.restoringSession.value).toBe(false);
+    expect(requests).toEqual([
+      { number: "7", path, head: old },
+      { number: "7", path, head: current, base },
+    ]);
+    expect(f.ctx.activeKey.value).toBe(key);
+    expect(f.ctx.tabs.value.map((tab) => tab.content)).toEqual(["old version", "current version"]);
+    await files.openPullFile(7, path, current, false, wrongBase);
+    expect(f.ctx.tabs.value).toHaveLength(2);
+    expect(failure).toContain("версия diff merge request недоступна");
+  } finally {
+    f.scope.stop();
+    unregister();
   }
 });

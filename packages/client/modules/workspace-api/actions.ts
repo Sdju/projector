@@ -131,7 +131,7 @@ export interface WorkspaceReadActions {
   pull: { params: WorkspaceParams & { number: string }; result: PullRequestDetail };
   "pull-files": { params: WorkspaceParams & { number: string }; result: PullRequestChanges };
   "pull-diff": {
-    params: WorkspaceParams & { number: string; path: string };
+    params: WorkspaceParams & { number: string; path: string; head?: string; base?: string };
     result: PullRequestComparison;
   };
   discussions: {

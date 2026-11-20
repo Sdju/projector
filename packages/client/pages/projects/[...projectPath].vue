@@ -21,12 +21,10 @@ import { RunMenu, useRunner } from "../../modules/runner/index.ts";
 import { DevcontainerTrust } from "../../modules/devcontainer/index.ts";
 import {
   ProjectWorkspace,
-  PullRequestView,
-  PipelineView,
-  JobView,
+  integrationTabViews,
   type TabViews,
 } from "../../modules/workspace/index.ts";
-import { ciTabParams, registerWorkspaceProfile } from "../../modules/workspace-api/index.ts";
+import { registerWorkspaceProfile } from "../../modules/workspace-api/index.ts";
 import {
   createGithubEnabledLocalProfile,
   GithubRepositoryInfoLoader,
@@ -61,85 +59,7 @@ const tabViews = computed<TabViews>(() => {
   const github = githubRepository.value;
   return {
     ...settingsTabViews,
-    ...(gitlab
-      ? {
-          pull: {
-            component: PullRequestView,
-            keepAlive: true,
-            props: (tab, host) => ({
-              projectId: host.projectId,
-              number: tab.params?.number,
-              host: "GitLab",
-              short: "MR",
-              noun: "merge request",
-              onOpen: host.openFile,
-              onOpenSection: host.openSection,
-              onOpenPullFile: host.openPullFile,
-              onOpenJob: (job: { id: number; title: string }) =>
-                host.openTab("job", ciTabParams(job), { preview: false }),
-              onOpenPipeline: (pipeline: { id: number; title?: string }) =>
-                host.openTab("pipeline", ciTabParams(pipeline), { preview: false }),
-            }),
-          },
-          pipeline: {
-            component: PipelineView,
-            keepAlive: true,
-            props: (tab, host) => ({
-              projectId: host.projectId,
-              id: tab.params?.id,
-              number: tab.params?.number,
-              host: "GitLab",
-              onOpenJob: (job: { id: number; title: string }, pinned?: boolean) =>
-                host.openTab("job", ciTabParams(job), { preview: !pinned }),
-              onOpenFile: (file: { path: string; line?: number }) =>
-                host.openFile(file.path, file.line),
-            }),
-          },
-          job: {
-            component: JobView,
-            keepAlive: true,
-            props: (tab, host) => ({
-              projectId: host.projectId,
-              id: tab.params?.id,
-              number: tab.params?.number,
-              host: "GitLab",
-              onOpenFile: (file: { path: string; line?: number }) =>
-                host.openFile(file.path, file.line),
-            }),
-          },
-        }
-      : github
-        ? {
-            pipeline: {
-              component: PipelineView,
-              keepAlive: true,
-              props: (tab, host) => ({
-                projectId: host.projectId,
-                id: tab.params?.id,
-                number: tab.params?.number,
-                host: "GitHub",
-                onOpenJob: (job: { id: number; title: string }, pinned?: boolean) =>
-                  host.openTab("job", ciTabParams(job), { preview: !pinned }),
-                onOpenFile: (file: { path: string; line?: number }) =>
-                  host.openFile(file.path, file.line),
-                onOpenPull: (pull: { number: number }) =>
-                  host.openTab("pull", pull, { preview: false }),
-              }),
-            },
-            job: {
-              component: JobView,
-              keepAlive: true,
-              props: (tab, host) => ({
-                projectId: host.projectId,
-                id: tab.params?.id,
-                number: tab.params?.number,
-                host: "GitHub",
-                onOpenFile: (file: { path: string; line?: number }) =>
-                  host.openFile(file.path, file.line),
-              }),
-            },
-          }
-        : {}),
+    ...(gitlab ? integrationTabViews("GitLab") : github ? integrationTabViews("GitHub") : {}),
     repository: gitlab
       ? {
           component: GitlabRepositoryInfoLoader,

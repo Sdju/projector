@@ -20,10 +20,10 @@ import {
   isBinaryDiff,
   nextPage,
   projectId,
-  readGitlabFileAt,
   safePath,
   type ApiDiff,
 } from "./browser.ts";
+import { diffVersion, readDiffFile } from "./merge-request-diff.ts";
 import { pipeline, type ApiPipeline } from "./pipelines.ts";
 import {
   awardReactions,
@@ -270,53 +270,25 @@ export async function browseGitlabMergeRequestDiff(
   repository: string,
   number: number,
   path: string,
+  head = "",
+  baseSha = "",
 ): Promise<PullRequestComparison> {
   const iid = mergeRequestNumber(number);
   safePath(path);
   const reader = await gitlabReader(repository);
   const id = projectId(reader.target.path);
-  const raw = await reader.get<ApiMergeRequest>(`/projects/${id}/merge_requests/${iid}`);
-  const refs = diffRefsOf(raw);
+  const mr = `/projects/${id}/merge_requests/${iid}`;
+  const raw = await reader.get<ApiMergeRequest>(mr);
+  const version = head ? await diffVersion(reader, mr, head, baseSha) : undefined;
+  const refs = version?.refs ?? diffRefsOf(raw);
   if (!refs)
     throw new HttpError(
       409,
       "GitLab ещё не подготовил diff merge request. Обновите карточку позже",
     );
-  const { files: diffs } = await mergeRequestDiffs(reader, id, iid);
-  const file = diffs.find((item) => item.new_path === path || item.old_path === path);
-  if (!file) throw new HttpError(404, "Файл не входит в этот merge request");
+  const diffs = version?.diffs ?? (await mergeRequestDiffs(reader, id, iid)).files;
   const headProject = raw.source_project_id ? String(raw.source_project_id) : id;
-  const base = { hash: refs.headSha, parent: refs.baseSha.slice(0, 7) };
-  if (file.too_large === true)
-    return { path, original: "", modified: "", ...base, binary: false, tooLarge: true };
-  if (isBinaryDiff(file))
-    return { path, original: "", modified: "", ...base, binary: true, tooLarge: false };
-  const read = async (project: string, ref: string, name: string) => {
-    try {
-      return await readGitlabFileAt(reader, project, ref, name);
-    } catch (error) {
-      if (error instanceof HttpError && error.status === 413) return undefined;
-      throw error;
-    }
-  };
-  const [originalSide, modifiedSide] = await Promise.all([
-    file.new_file ? { content: "", binary: false } : read(id, refs.baseSha, file.old_path),
-    file.deleted_file
-      ? { content: "", binary: false }
-      : read(headProject, refs.headSha, file.new_path),
-  ]);
-  if (!originalSide || !modifiedSide)
-    return { path, original: "", modified: "", ...base, binary: false, tooLarge: true };
-  if (originalSide.binary || modifiedSide.binary)
-    return { path, original: "", modified: "", ...base, binary: true, tooLarge: false };
-  return {
-    path,
-    original: originalSide.content,
-    modified: modifiedSide.content,
-    ...base,
-    binary: false,
-    tooLarge: false,
-  };
+  return readDiffFile(reader, id, headProject, refs, diffs, path, !!version);
 }
 
 /** One page of the project merge requests, most recently updated first. */

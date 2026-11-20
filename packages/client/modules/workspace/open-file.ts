@@ -17,6 +17,7 @@ export interface OpenFile extends FileContent {
   parent?: string;
   /** Номер merge request, к которому относится diff-вкладка. */
   pull?: number;
+  pullBase?: string;
   /** Снимок, из которого прочитан файл; отсутствует у рабочей копии. */
   scope?: FileScope;
   /** Old path of a renamed file in a comparison. */
