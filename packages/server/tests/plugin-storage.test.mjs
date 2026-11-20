@@ -106,7 +106,7 @@ test("запись переживает конкурентные изменен�
   await installed();
   const file = pluginStorageFile(pluginId);
   expect(file.startsWith(pluginStorageDirectory(pluginId))).toBe(true);
-  expect(pluginStorageDirectory(pluginId)).toContain(`/data/${key}`);
+  expect(pluginStorageDirectory(pluginId).replaceAll("\\", "/")).toContain(`/data/${key}`);
 
   await Promise.all(
     Array.from({ length: 20 }, (_, index) =>

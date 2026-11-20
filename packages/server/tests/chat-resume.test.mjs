@@ -15,8 +15,11 @@ const { dueResume, sweepChatResumes } = await import("../modules/agent/chat-resu
 const { registerAgentBackend } = await import("../modules/agent/registry.ts");
 const { writeAgentHistory } = await import("../modules/agent/history.ts");
 const { listRecentRuns, recordRecentRun } = await import("../modules/agent/recent-runs.ts");
+const { closeHistoryStore } = await import("../modules/agent/history-store.ts");
 
 afterAll(async () => {
+  // Windows refuses to remove an open SQLite file; the store keeps its handle for the process.
+  closeHistoryStore();
   await rm(root, { recursive: true, force: true });
 });
 
