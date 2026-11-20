@@ -1,3 +1,4 @@
+import type { ThemeSetting } from "./theme-settings.ts";
 import { assertAllowedKeys, assertRecord } from "./agent.ts";
 
 export const themeTokenNames = [
@@ -41,15 +42,18 @@ export interface PluginThemeContribution {
   description?: string;
   mode: "dark" | "light";
   tokens: string;
+  settings?: readonly ThemeSetting[];
 }
 
 export interface AvailableTheme {
   id: string;
   packageName: string;
+  source?: "file";
   title: string;
   description?: string;
   mode: "dark" | "light";
   tokens: ThemeTokens;
+  settings?: readonly ThemeSetting[];
 }
 
 const optionalTokens = new Set<ThemeTokenName>(["hover", "active"]);

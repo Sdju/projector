@@ -264,7 +264,7 @@ const zen = computed(() => zenMode.value && !!props.currentProject);
   min-height: 0;
   display: flex;
   flex-direction: column;
-  background: var(--canvas);
+  background: var(--theme-workspace-canvas, var(--canvas));
 }
 .workspace .top {
   margin-bottom: var(--island-gap);
@@ -353,7 +353,7 @@ const zen = computed(() => zenMode.value && !!props.currentProject);
       max(var(--island-gap), env(safe-area-inset-left));
     display: flex;
     flex-direction: column;
-    background: var(--canvas);
+    background: var(--theme-workspace-canvas, var(--canvas));
   }
   .workspace .top {
     padding-inline: 0;

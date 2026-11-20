@@ -209,7 +209,7 @@ defineExpose({
   <aside
     v-show="rail || !hidden"
     class="sidebar"
-    :class="{ 'with-rail': rail, 'side-right': side === 'right' }"
+    :class="{ 'with-rail': rail, 'side-right': side === 'right', 'theme-panel': !rail }"
     :aria-label="side === 'right' ? 'Дополнительные панели' : 'Обзор проекта'"
   >
     <SidebarTabs
@@ -227,7 +227,7 @@ defineExpose({
       @update:section="select"
       @command="(id, args) => emit('command', id, args)"
     />
-    <div v-show="!rail || !hidden" ref="panelTarget" class="panel">
+    <div v-show="!rail || !hidden" ref="panelTarget" class="panel" :class="{ 'theme-panel': rail }">
       <div v-if="activeType?.closable" class="panel-head">
         <component
           :is="activeView?.icon"
@@ -315,7 +315,7 @@ defineExpose({
   overflow: hidden;
   border: 1px solid var(--line);
   border-radius: var(--r-lg);
-  background: var(--bg);
+  background: var(--theme-panel-background, var(--bg));
 }
 /* Правая панель зеркалит левую: полоса разделов уходит к правому краю окна */
 .sidebar.side-right.with-rail {
@@ -342,7 +342,7 @@ defineExpose({
   overflow: hidden;
   border: 1px solid var(--line);
   border-radius: var(--r-lg);
-  background: var(--bg);
+  background: var(--theme-panel-background, var(--bg));
 }
 /* Источник временного раздела: не даёт перепутать снимок с рабочим деревом */
 .panel-head {

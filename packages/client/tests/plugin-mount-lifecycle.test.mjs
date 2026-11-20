@@ -1,10 +1,6 @@
 import { afterEach, expect, test } from "vite-plus/test";
-import {
-  addTab,
-  mountContribution,
-  runtimeTabs,
-  runtimeIssues,
-} from "../modules/plugin-runtime/store.ts";
+import { mountContribution } from "../modules/plugin-runtime/mount.ts";
+import { addTab, runtimeTabs, runtimeIssues } from "../modules/plugin-runtime/store.ts";
 
 afterEach(() => {
   runtimeTabs.value = [];

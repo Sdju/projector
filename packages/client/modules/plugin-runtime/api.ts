@@ -1,5 +1,6 @@
 import {
   isPluginHttpPath,
+  externalThemeId,
   pluginCommandPrefix,
   pluginPackageKey,
   pluginStorageFits,
@@ -16,6 +17,7 @@ import {
   addLanguage,
   addPanel,
   addTab,
+  addThemeSettings,
   commandIdIsFree,
   compileLanguageRules,
 } from "./store.ts";
@@ -48,6 +50,7 @@ export function createApi(plugin: RuntimePluginInfo, scope: Scope): PluginApi {
   const registeredLanguages = new Set<string>();
   const registeredPanels = new Set<string>();
   const registeredTabs = new Set<string>();
+  const registeredThemeSettings = new Set<string>();
   const registeredCommands = new Set<string>();
   const registeredAgents = new Set<string>();
 
@@ -134,6 +137,22 @@ export function createApi(plugin: RuntimePluginInfo, scope: Scope): PluginApi {
         const declaration = declared(plugin.tabs, contribution.id, "Вкладка");
         registeredTabs.add(contribution.id);
         const remove = addTab(plugin.id, declaration, contribution.mount as never, assetUrl);
+        scope.add(remove);
+        return { dispose: remove };
+      },
+    },
+    themeSettings: {
+      register(contribution) {
+        assertActive();
+        const id = externalThemeId(plugin.id, contribution.id);
+        if (!plugin.themes?.some((theme) => theme.id === id && theme.settings?.length))
+          throw new Error(`Тема ${contribution.id} не объявляет настройки`);
+        if (registeredThemeSettings.has(id))
+          throw new Error(`Виджет настроек темы ${contribution.id} уже зарегистрирован`);
+        if (typeof contribution.mount !== "function")
+          throw new Error(`Виджету настроек темы ${contribution.id} нужен mount`);
+        registeredThemeSettings.add(id);
+        const remove = addThemeSettings(id, plugin.id, contribution.mount, assetUrl);
         scope.add(remove);
         return { dispose: remove };
       },

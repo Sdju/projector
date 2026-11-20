@@ -14,6 +14,7 @@ export {
   runtimeLanguages,
   runtimePanels,
   runtimeTabs,
+  runtimeThemeSettings,
   findLanguage,
   findRuntimeAgent,
   reportIssue,
@@ -24,6 +25,7 @@ export {
   type ActiveTab,
   type PluginRuntimeIssue,
 } from "./store.ts";
+export { mountThemeSettings } from "./mount.ts";
 export { default as PluginContributionMount } from "./ui/PluginMount.vue";
 export { default as PluginUsageMount } from "./ui/PluginUsageMount.vue";
 

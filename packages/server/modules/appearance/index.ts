@@ -5,7 +5,9 @@ import {
   appearanceFile,
   defaultAppearance,
   defaultAppearanceFonts,
+  builtinAppearance,
   isAppearanceChoice,
+  isBuiltinAppearance,
   legacyTypographyFile,
   mergeAppearanceFonts,
   normalizeAppearance,
@@ -14,6 +16,7 @@ import {
   type AppearanceFonts,
   type AppearanceSettings,
 } from "@ai-projector/core/modules/appearance/index.ts";
+import { mergeThemeValues, type AvailableTheme } from "@ai-projector/core/modules/plugins/index.ts";
 import { writeFileAtomic, withFileLock } from "../atomic-files/index.ts";
 
 export { discoverUserThemes, findUserTheme, userThemesDirectory } from "./user-themes.ts";
@@ -42,6 +45,7 @@ export async function readAppearance(): Promise<AppearanceSettings> {
     return {
       choice: defaultAppearance,
       fonts: legacy ?? { ...defaultAppearanceFonts },
+      themeSettings: {},
     };
   }
 }
@@ -58,12 +62,11 @@ async function writeSettings(settings: AppearanceSettings): Promise<AppearanceSe
 }
 
 /**
- * Partial update: `choice` and/or `fonts`. Omitting a field keeps the saved value.
- * `fonts` itself is merged per key so a single slider can save without rewriting the rest.
+ * Partial update of appearance settings, with nested values merged per key.
  */
 export function writeAppearance(
-  patch: { choice?: unknown; fonts?: unknown },
-  availableThemeIds?: readonly string[],
+  patch: { choice?: unknown; fonts?: unknown; themeSettings?: unknown },
+  externalThemes?: readonly Pick<AvailableTheme, "id" | "settings">[],
 ): Promise<AppearanceSettings> {
   return withFileLock(appearancePath(), async () => {
     const current = await readAppearance();
@@ -71,16 +74,31 @@ export function writeAppearance(
     if (patch.choice !== undefined) {
       if (!isAppearanceChoice(patch.choice)) throw new Error("Неизвестная цветовая схема");
       if (
-        !["dark", "light", "contrast", "auto"].includes(patch.choice) &&
-        availableThemeIds &&
-        !availableThemeIds.includes(patch.choice)
+        !isBuiltinAppearance(patch.choice) &&
+        externalThemes &&
+        !externalThemes.some((theme) => theme.id === patch.choice)
       )
         throw new Error("Внешняя цветовая схема недоступна");
       choice = patch.choice;
     }
     const fonts =
       patch.fonts !== undefined ? mergeAppearanceFonts(current.fonts, patch.fonts) : current.fonts;
-    return writeSettings({ choice, fonts });
+    const themeSettings = { ...current.themeSettings };
+    if (patch.themeSettings !== undefined) {
+      if (
+        !patch.themeSettings ||
+        typeof patch.themeSettings !== "object" ||
+        Array.isArray(patch.themeSettings)
+      )
+        throw new Error("Укажите настройки по ID темы");
+      for (const [id, values] of Object.entries(patch.themeSettings)) {
+        const fields = (builtinAppearance(id) ?? externalThemes?.find((theme) => theme.id === id))
+          ?.settings;
+        if (!fields?.length) throw new Error("Настройки для этой темы недоступны");
+        themeSettings[id] = mergeThemeValues(fields, themeSettings[id], values);
+      }
+    }
+    return writeSettings({ choice, fonts, themeSettings });
   });
 }
 
@@ -89,6 +107,9 @@ export async function writeAppearanceChoice(
   value: unknown,
   availableThemeIds?: readonly string[],
 ): Promise<{ choice: AppearanceChoice }> {
-  const settings = await writeAppearance({ choice: value }, availableThemeIds);
+  const settings = await writeAppearance(
+    { choice: value },
+    availableThemeIds?.map((id) => ({ id })),
+  );
   return { choice: settings.choice };
 }

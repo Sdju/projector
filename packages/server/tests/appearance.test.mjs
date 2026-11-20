@@ -4,6 +4,7 @@ import { expect, onTestFinished, test } from "vite-plus/test";
 import {
   appearanceOptions,
   defaultAppearance,
+  normalizeAppearance,
   isAppearanceChoice,
   resolveScheme,
   schemeMode,
@@ -16,6 +17,7 @@ test("appearance choice validates and resolves the system scheme", () => {
     "dark",
     "light",
     "contrast",
+    "frozen-glass",
     "auto",
   ]);
   expect(defaultAppearance).toBe("dark");
@@ -52,6 +54,7 @@ test("appearance fonts are stored beside the colour scheme", async () => {
   expect(await readAppearance()).toStrictEqual({
     choice: "light",
     fonts: { chat: 16, editor: 13, terminal: 13 },
+    themeSettings: {},
   });
 });
 
@@ -74,7 +77,12 @@ test("appearance API reads and writes the saved choice", async () => {
   const initialBody = await initial.json();
   expect(initialBody.choice).toBe("dark");
   expect(initialBody.fonts).toStrictEqual({ chat: 13, editor: 13, terminal: 13 });
-  expect(initialBody.themes.map((theme) => theme.id)).toStrictEqual(["dark", "light", "contrast"]);
+  expect(initialBody.themes.map((theme) => theme.id)).toStrictEqual([
+    "dark",
+    "light",
+    "contrast",
+    "frozen-glass",
+  ]);
 
   const saved = await fetch(`${base}/api/appearance`, {
     method: "PUT",
@@ -96,6 +104,7 @@ test("appearance API reads and writes the saved choice", async () => {
   expect(await fonts.json()).toStrictEqual({
     choice: "light",
     fonts: { chat: 13, editor: 13, terminal: 18 },
+    themeSettings: {},
   });
 
   const invalid = await fetch(`${base}/api/appearance`, {
@@ -105,6 +114,33 @@ test("appearance API reads and writes the saved choice", async () => {
   });
   expect(invalid.status).toBe(400);
   expect(await readAppearanceChoice()).toBe("light");
+
+  const save = (body) =>
+    fetch(`${base}/api/appearance`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json", Origin: base },
+      body: JSON.stringify(body),
+    });
+  const backgroundUrl = "https://example.test/wallpaper.webp";
+  const frozenGlass = (values) => ({ themeSettings: { "frozen-glass": values } });
+  expect((await save({ choice: "frozen-glass", ...frozenGlass({ backgroundUrl }) })).status).toBe(
+    200,
+  );
+  expect((await save(frozenGlass({ blur: 24 }))).status).toBe(200);
+  expect((await save(frozenGlass({ backgroundUrl: "file:///tmp/image.jpg" }))).status).toBe(400);
+  expect((await save({ themeSettings: { light: { blur: 20 } } })).status).toBe(400);
+  expect(
+    normalizeAppearance({ frozenGlass: { backgroundUrl, blur: 24 } }).themeSettings,
+  ).toStrictEqual(frozenGlass({ backgroundUrl, blur: 24 }).themeSettings);
+  const settings = await (await fetch(`${base}/api/appearance`)).json();
+  expect(settings.choice).toBe("frozen-glass");
+  expect(settings.themeSettings["frozen-glass"]).toStrictEqual({ backgroundUrl, blur: 24 });
+  expect(settings.fonts.terminal).toBe(18);
+  const bootstrap = await (await fetch(`${base}/api/appearance/bootstrap.js`)).text();
+  expect(bootstrap).toContain('const choice = "frozen-glass"');
+  expect(bootstrap).toContain(backgroundUrl);
+  expect(bootstrap).toContain("blur(24px)");
+  expect((await save({ choice: "light" })).status).toBe(200);
 });
 
 test("user JSON and CSS themes are discovered and selectable", async () => {
@@ -122,7 +158,12 @@ test("user JSON and CSS themes are discovered and selectable", async () => {
   );
   await writeFile(
     join(directory, "ocean.json"),
-    JSON.stringify({ title: "Ocean", mode: "light", tokens }),
+    JSON.stringify({
+      title: "Ocean",
+      mode: "light",
+      tokens,
+      settings: [{ id: "softness", kind: "blur", title: "Мягкость", min: 2, max: 28, default: 10 }],
+    }),
   );
   await writeFile(
     join(directory, "night.css"),
@@ -153,7 +194,10 @@ test("user JSON and CSS themes are discovered and selectable", async () => {
   const saved = await fetch(`${base}/api/appearance`, {
     method: "PUT",
     headers: { "Content-Type": "application/json", Origin: base },
-    body: JSON.stringify({ choice: "user/ocean" }),
+    body: JSON.stringify({
+      choice: "user/ocean",
+      themeSettings: { "user/ocean": { softness: 21 } },
+    }),
   });
   expect(saved.status).toBe(200);
   expect(await readAppearanceChoice()).toBe("user/ocean");
@@ -161,6 +205,11 @@ test("user JSON and CSS themes are discovered and selectable", async () => {
   expect(bootstrap).toContain('const choice = "user/ocean"');
   expect(bootstrap).toContain('"--bg":"#f4ecd8"');
   expect(bootstrap).toContain('const mode = "light"');
+  expect(bootstrap).toContain('"--theme-backdrop":"blur(21px)"');
+  expect((await (await fetch(`${base}/api/appearance`)).json()).themeSettings).toMatchObject({
+    "user/ocean": { softness: 21 },
+    ...listed.themeSettings,
+  });
 });
 
 test("bootstrap script follows the saved choice on every request", async () => {
@@ -182,9 +231,8 @@ test("bootstrap script follows the saved choice on every request", async () => {
   expect(script).toContain('matchMedia("(prefers-color-scheme: light)")');
   expect(script).toContain("root.dataset.theme = scheme");
   expect(script).toContain('root.style.setProperty("--chat-fs", "13px")');
-  expect(script).toContain(
-    'const themeColors = {"dark":"#171716","light":"#efeee8","contrast":"#080808"}',
-  );
+  expect(script).toContain('"contrast":"#080808"');
+  expect(script).toContain('"frozen-glass":"#172a3f"');
   expect(script).toContain('meta[name="theme-color"]');
 
   await writeAppearanceChoice("light");
@@ -195,5 +243,5 @@ test("bootstrap script follows the saved choice on every request", async () => {
   await writeAppearanceChoice("contrast");
   const contrast = await (await fetch(`${base}/api/appearance/bootstrap.js`)).text();
   expect(contrast).toContain('const choice = "contrast"');
-  expect(contrast).toContain('const mode = scheme === "light" ? "light" : "dark"');
+  expect(contrast).toContain('const mode = "dark"');
 });

@@ -1,4 +1,5 @@
 import { expect, test } from "vite-plus/test";
+import { pluginAssetPath, pluginPackageKey } from "@ai-projector/core/modules/plugins/index.ts";
 import { createBrowserFixture } from "../../../tests/fixtures/browser-server.mjs";
 import { chromium, createChromium } from "../../../tests/fixtures/chromium-driver.mjs";
 
@@ -199,7 +200,7 @@ test(
     const browser = await createChromium(fixture.directory);
     try {
       await browser.open(fixture.url("/__appearance_contrast"));
-      for (const scheme of ["dark", "light", "contrast"]) {
+      for (const scheme of ["dark", "light", "contrast", "frozen-glass"]) {
         await browser.evaluate(`window.fixture.apply(${JSON.stringify(scheme)})`);
         const tokens = await browser.evaluate("window.fixture.tokens()");
         for (const surface of ["bg", "bg-2", "bg-3", "bg-4"])
@@ -549,22 +550,35 @@ test(
 const settingsHtml = `<!doctype html>
 <html lang="ru" data-appearance="dark" data-theme="dark">
 <head><meta name="color-scheme" content="dark"><meta name="theme-color" content="#171716"><link rel="icon" href="data:,"></head>
-<body style="margin:0;background:var(--bg)">
+<body>
 <div id="settings"></div>
 <pre id="result">WAITING</pre>
 <script type="module">
 import '/packages/client/app/styles.css';
-import { createApp } from 'vue';
+import { createApp, h, ref } from 'vue';
 import InterfaceSettings from '/packages/client/modules/launcher/InterfaceSettings.vue';
+import SettingsWorkbench from '/packages/client/modules/settings/SettingsWorkbench.vue';
 import { applyAppearance, initAppearance } from '/packages/client/modules/appearance/index.ts';
+import { createCommandService } from '/packages/core/modules/ide/index.ts';
+import { commandHostKey } from '/packages/client/common/utilities/commands.ts';
 initAppearance();
 const originalFetch = window.fetch;
+const appearance = {
+  choice: 'dark',
+  fonts: { chat: 13, editor: 13, terminal: 13 },
+  themeSettings: {},
+  themes: [],
+};
 window.fetch = async (input, options) => {
-  if (input === '/api/appearance') return Response.json({
-    choice: 'dark',
-    fonts: { chat: 13, editor: 13, terminal: 13 },
-    themes: [],
-  });
+  if (input === '/api/appearance') {
+    if (options?.method === 'PUT') {
+      const patch = JSON.parse(options.body);
+      if (patch.choice) appearance.choice = patch.choice;
+      for (const [id, values] of Object.entries(patch.themeSettings ?? {}))
+        appearance.themeSettings[id] = { ...appearance.themeSettings[id], ...values };
+    }
+    return Response.json(appearance);
+  }
   if (input === '/api/launcher/settings') return Response.json({
     mode: 'native',
     shortcut: 'Ctrl+Alt+Space',
@@ -572,10 +586,19 @@ window.fetch = async (input, options) => {
   });
   return originalFetch(input, options);
 };
-createApp(InterfaceSettings).mount('#settings');
+const sdk = createCommandService();
+const app = createApp({
+  render: () => h(SettingsWorkbench, {
+    selected: 'interface',
+    sections: [{ id: 'interface', title: 'Интерфейс', group: 'Projector', description: 'Окно и оформление', component: InterfaceSettings }],
+  }),
+});
+app.provide(commandHostKey, { createScope: sdk.createScope, revision: ref(0), reportError: console.error });
+app.mount('#settings');
 window.fixture = {
   ready: true,
   apply: applyAppearance,
+  saved: (id = 'frozen-glass') => appearance.themeSettings[id],
   read: () => {
     const settings = document.querySelector('.interface-settings');
     return settings ? {
@@ -619,6 +642,204 @@ test(
       await browser.close();
       await fixture.close();
     }
+  },
+);
+
+test(
+  "Frozen Glass applies the wallpaper and panel blur through the settings controls",
+  { skip: !chromium, timeout: 45000 },
+  async () => {
+    const fixture = await createBrowserFixture({
+      pages: { "/__appearance_settings": settingsHtml },
+      responses: [
+        {
+          equals: "/__ice.svg",
+          type: "image/svg+xml",
+          body: '<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200"><path fill="#7ddcff" d="M0 0h200v200H0z"/><path fill="#152856" d="M0 0h200L0 200z"/></svg>',
+        },
+      ],
+    });
+    const browser = await createChromium(fixture.directory);
+    try {
+      await browser.viewport(1000);
+      await browser.open(fixture.url("/__appearance_settings"));
+      const scheme = ".interface-settings select:has(option[value='frozen-glass'])";
+      const selectScheme = async (value) => {
+        await expect
+          .poll(() =>
+            browser.evaluate(`document.querySelector(${JSON.stringify(scheme)})?.disabled`),
+          )
+          .toBe(false);
+        await browser.evaluate(`(() => {
+          const select = document.querySelector(${JSON.stringify(scheme)});
+          select.value = ${JSON.stringify(value)};
+          select.dispatchEvent(new Event('change', { bubbles: true }));
+        })()`);
+      };
+      await selectScheme("frozen-glass");
+      const wallpaper = '.interface-settings input[type="url"]';
+      const range = '.interface-settings input[type="range"][max="40"]';
+      const backgroundUrl = fixture.url("/__ice.svg");
+      await expect
+        .poll(() =>
+          browser.evaluate(`document.querySelector(${JSON.stringify(wallpaper)})?.disabled`),
+        )
+        .toBe(false);
+      await browser.evaluate(
+        `document.querySelector(${JSON.stringify(wallpaper)}).scrollIntoView({ block: 'center' })`,
+      );
+      await browser.click(wallpaper);
+      await browser.call("Input.insertText", { text: backgroundUrl });
+      await browser.evaluate(`document.querySelector(${JSON.stringify(range)}).focus()`);
+      await browser.key("End");
+      const button = ".interface-settings div:has(> input[type=url]) ~ .actions button";
+      await browser.evaluate(
+        `document.querySelector(${JSON.stringify(button)}).scrollIntoView({ block: 'center' })`,
+      );
+      await browser.click(button);
+      await expect
+        .poll(() => browser.evaluate("window.fixture.saved()"))
+        .toStrictEqual({
+          backgroundUrl,
+          blur: 40,
+        });
+      await expect
+        .poll(() =>
+          browser.evaluate(
+            `getComputedStyle(document.querySelector('.settings-workbench'), '::before').backdropFilter`,
+          ),
+        )
+        .toBe("blur(40px)");
+      expect(
+        await browser.evaluate("getComputedStyle(document.documentElement).backgroundImage"),
+      ).toContain(backgroundUrl);
+      expect(
+        await browser.evaluate(
+          `getComputedStyle(document.querySelector('.settings-workbench')).position`,
+        ),
+      ).toBe("relative");
+      await browser.evaluate(`document.querySelector(${JSON.stringify(range)}).focus()`);
+      await browser.key("Home");
+      await browser.click(button);
+      await expect
+        .poll(() =>
+          browser.evaluate(
+            `getComputedStyle(document.querySelector('.settings-workbench'), '::before').backdropFilter`,
+          ),
+        )
+        .toBe("none");
+      await selectScheme("dark");
+      await expect
+        .poll(() => browser.evaluate("document.documentElement.dataset.theme"))
+        .toBe("dark");
+      expect(
+        await browser.evaluate("getComputedStyle(document.documentElement).backgroundImage"),
+      ).toBe("none");
+      expect(browser.errors).toEqual([]);
+    } finally {
+      await browser.close();
+      await fixture.close();
+    }
+  },
+);
+
+test(
+  "a trusted theme plugin mounts its own settings widget and saves through the host",
+  { skip: !chromium, timeout: 45000 },
+  async ({ onTestFinished }) => {
+    const id = "widget-example";
+    const theme = {
+      id: `${id}/glass`,
+      packageName: id,
+      title: "Widget example",
+      mode: "dark",
+      tokens: { bg: "#151b27" },
+      settings: [{ id: "softness", kind: "blur", title: "Мягкость", default: 8, min: 0, max: 32 }],
+    };
+    const hash = "a".repeat(64);
+    const plugin = {
+      id,
+      enabled: true,
+      trusted: true,
+      status: "enabled",
+      hash,
+      browser: { entry: "dist/browser.js", key: pluginPackageKey(id), hash },
+      themes: [theme],
+      languages: [],
+      panels: [],
+      tabs: [],
+      diagnostics: [],
+    };
+    const module = `export default { apiVersion: 1, activate(api) {
+      api.themeSettings.register({id: 'glass', mount(root, context) {
+        window.widgetSignal = context.signal;
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.id = 'plugin-theme-demo';
+        button.textContent = String(context.getValues().softness);
+        button.onclick = async () => {
+          const saved = await context.save({softness: 23});
+          button.textContent = String(saved.softness);
+        };
+        root.append(button);
+        return () => { window.widgetDisposed = (window.widgetDisposed ?? 0) + 1; };
+      }});
+    }};`;
+    const fixture = await createBrowserFixture({
+      pages: {
+        "/__plugin_theme": settingsHtml.replace(
+          "themes: [],",
+          `themes: ${JSON.stringify([theme])},`,
+        ),
+      },
+      responses: [
+        { equals: pluginAssetPath(id, hash, "browser.js"), type: "text/javascript", body: module },
+      ],
+    });
+    onTestFinished(() => fixture.close());
+    const browser = await createChromium(fixture.directory);
+    onTestFinished(() => browser.close());
+    await browser.open(fixture.url("/__plugin_theme"));
+    const select = `.interface-settings select:has(option[value='${theme.id}'])`;
+    await expect
+      .poll(() => browser.evaluate(`document.querySelector(${JSON.stringify(select)})?.disabled`), {
+        timeout: 5000,
+      })
+      .toBe(false);
+    await browser.evaluate(`(async () => {
+      const runtime = await import('/packages/client/modules/plugin-runtime/index.ts');
+      window.disableThemeWidget = () => runtime.applyRuntimeCatalog({plugins: []});
+      await runtime.applyRuntimeCatalog({plugins: [${JSON.stringify(plugin)}]});
+      const select = document.querySelector(${JSON.stringify(select)});
+      select.value = ${JSON.stringify(theme.id)};
+      select.dispatchEvent(new Event('change', {bubbles: true}));
+    })()`);
+    await expect
+      .poll(() => browser.evaluate("document.querySelector('#plugin-theme-demo')?.textContent"))
+      .toBe("8");
+    await browser.evaluate(
+      "document.querySelector('#plugin-theme-demo').scrollIntoView({block:'center'})",
+    );
+    await browser.click("#plugin-theme-demo");
+    await expect
+      .poll(() => browser.evaluate("document.querySelector('#plugin-theme-demo')?.textContent"))
+      .toBe("23");
+    expect(await browser.evaluate(`window.fixture.saved(${JSON.stringify(theme.id)})`)).toEqual({
+      softness: 23,
+    });
+    expect(
+      await browser.evaluate("document.documentElement.style.getPropertyValue('--theme-backdrop')"),
+    ).toBe("blur(23px)");
+    await browser.evaluate("window.disableThemeWidget()");
+    await expect
+      .poll(() => browser.evaluate("window.widgetSignal.aborted && window.widgetDisposed === 1"))
+      .toBe(true);
+    expect(await browser.evaluate("document.querySelector('#plugin-theme-demo') === null")).toBe(
+      true,
+    );
+    expect(
+      await browser.evaluate("document.querySelector('input[type=range][max=\"32\"]')?.value"),
+    ).toBe("23");
   },
 );
 

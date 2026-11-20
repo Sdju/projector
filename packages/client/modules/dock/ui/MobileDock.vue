@@ -68,7 +68,7 @@ const handlers = {
     >
       <section
         class="surface"
-        :class="surface.side"
+        :class="[surface.side, { 'theme-panel': surface.side === 'editor' }]"
         v-show="surface.side === 'editor' || terminalOpen"
         :inert="surface.side === 'editor' && terminalOpen"
         :aria-label="surface.side === 'editor' ? 'Редактор' : 'Терминалы'"
@@ -157,13 +157,16 @@ const handlers = {
 .terminal {
   z-index: 2;
 }
+.surface.editor {
+  background: var(--theme-panel-background, var(--bg));
+}
 .tabs {
   display: flex;
   align-items: center;
   min-width: 0;
   flex: none;
   height: 36px;
-  background: var(--bg-sunken);
+  background: var(--theme-panel-background, var(--bg-sunken));
 }
 .tabs :deep(.workspace-tabs) {
   flex: 1;

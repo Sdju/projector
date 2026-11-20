@@ -5,6 +5,7 @@ import {
   pluginPackageKey,
   validatePluginManifest,
   validateThemeTokens,
+  validateThemeSettings,
   type AvailableTheme,
   type PluginBrowserEntry,
   type PluginManifest,
@@ -98,6 +99,7 @@ export async function loadPluginPackage(
       if (!stats.isFile() || stats.isSymbolicLink())
         throw new Error("Файл токенов должен быть обычным файлом");
       const tokens = validateThemeTokens(await readJson(path));
+      const settings = validateThemeSettings(theme.settings);
       themes.push({
         id: externalThemeId(manifest.name, theme.id),
         packageName: manifest.name,
@@ -105,6 +107,7 @@ export async function loadPluginPackage(
         description: theme.description,
         mode: theme.mode,
         tokens,
+        ...(settings ? { settings } : {}),
       });
     } catch (error) {
       diagnostics.push({

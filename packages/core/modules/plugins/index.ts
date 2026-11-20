@@ -15,6 +15,7 @@ import {
   type PluginTabContribution,
 } from "./browser.ts";
 import type { PluginThemeContribution } from "./theme.ts";
+import { validateThemeSettings } from "./theme-settings.ts";
 
 export type {
   PluginAgentContribution,
@@ -40,6 +41,16 @@ export type {
   PluginPanelContribution,
   PluginTabContribution,
 } from "./browser.ts";
+export {
+  mergeThemeValues,
+  resolveThemeValues,
+  themeEffectProperties,
+  themeEffectStyle,
+  validateThemeSettings,
+  type SavedThemeValues,
+  type ThemeSetting,
+  type ThemeValues,
+} from "./theme-settings.ts";
 export { isPluginIconFile, sanitizePluginIconSvg } from "./icon.ts";
 export {
   serializeThemeTokens,
@@ -332,7 +343,11 @@ export function validatePluginManifest(
     const ids = new Set<string>();
     for (const theme of themes) {
       assertRecord(theme, "Тема плагина");
-      assertAllowedKeys(theme, ["id", "title", "description", "mode", "tokens"], "Тема плагина");
+      assertAllowedKeys(
+        theme,
+        ["id", "title", "description", "mode", "tokens", "settings"],
+        "Тема плагина",
+      );
       if (typeof theme.id !== "string" || !themeIdPattern.test(theme.id))
         throw new Error("Некорректный идентификатор темы");
       if (ids.has(theme.id)) throw new Error("Повторяющийся идентификатор темы");
@@ -341,6 +356,7 @@ export function validatePluginManifest(
       if (theme.description !== undefined) assertText(theme.description, "Описание темы", 1000);
       if (theme.mode !== "dark" && theme.mode !== "light")
         throw new Error("Некорректный режим темы");
+      validateThemeSettings(theme.settings);
       assertText(theme.tokens, "Путь к токенам темы", 300);
       if (
         theme.tokens.startsWith("/") ||

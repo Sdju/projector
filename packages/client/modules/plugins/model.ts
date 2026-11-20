@@ -5,7 +5,12 @@ import {
   useCommandScope,
 } from "../../common/utilities/commands.ts";
 import { pickFolder } from "../project/index.ts";
-import { applyAppearance, currentAppearance, setAppearanceThemes } from "../appearance/index.ts";
+import {
+  appearanceThemes,
+  applyAppearance,
+  currentAppearance,
+  setAppearanceThemes,
+} from "../appearance/index.ts";
 import { refreshClientAgents } from "../agents-integration/catalog/index.ts";
 import { applyRuntimeCatalog, runtimeIssues } from "../plugin-runtime/index.ts";
 import { fetchPlugins, pluginAction, saveAppearance, type PluginCatalog } from "./client.ts";
@@ -56,7 +61,13 @@ export function usePluginSettings() {
   function accept(next: PluginCatalog) {
     if (disposed) return;
     catalog.value = next;
-    setAppearanceThemes(next.availableThemes);
+    const pluginThemeIds = new Set(next.availableThemes.map(({ id }) => id));
+    setAppearanceThemes([
+      ...next.availableThemes,
+      ...appearanceThemes().value.filter(
+        (theme) => theme.source === "file" && !pluginThemeIds.has(theme.id),
+      ),
+    ]);
     applyAppearance(currentAppearance());
     // An agent plugin changes the chat catalog too; menus and tabs read it reactively.
     void refreshClientAgents();

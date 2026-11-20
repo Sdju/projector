@@ -794,7 +794,7 @@ onBeforeUnmount(() => release());
 .agent-chat {
   --chat-width: 680px;
   min-width: 0;
-  background: var(--bg);
+  background: var(--theme-panel-background, var(--bg));
   container-type: inline-size;
   position: relative;
 }

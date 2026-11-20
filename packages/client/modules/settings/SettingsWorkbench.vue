@@ -206,7 +206,7 @@ function filter(event: Event) {
 <template>
   <section
     class="settings-workbench"
-    :class="{ embedded }"
+    :class="{ embedded, 'theme-panel': !embedded }"
     :aria-label="title"
     @pointerdown="commands.scope.activate()"
   >
@@ -372,6 +372,9 @@ function filter(event: Event) {
   overflow: hidden;
   font-size: var(--fs-sm);
 }
+[data-theme-effects] .settings-workbench {
+  position: relative;
+}
 .settings-workbench.embedded {
   display: flex;
   flex: 1;
@@ -403,7 +406,7 @@ function filter(event: Event) {
   width: 100%;
 }
 .toolbar {
-  background: var(--bg-2);
+  background: var(--theme-chrome, var(--bg-2));
 }
 h1 {
   display: flex;
@@ -496,7 +499,7 @@ svg {
 }
 .sidebar {
   padding: var(--sp-2);
-  background: var(--bg-2);
+  background: var(--theme-chrome, var(--bg-2));
   border-right: 1px solid var(--line);
 }
 .group + .group {
@@ -660,7 +663,7 @@ svg {
   }
   .mobile-navigation {
     display: block;
-    background: var(--bg-2);
+    background: var(--theme-chrome, var(--bg-2));
     border-bottom: 1px solid var(--line);
   }
   .sidebar {

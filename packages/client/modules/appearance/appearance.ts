@@ -2,8 +2,11 @@ import { shallowRef } from "vue";
 import {
   defaultAppearance,
   defaultAppearanceFonts,
+  builtinAppearance,
   effectiveAppearance,
   isAppearanceChoice,
+  isBuiltinAppearance,
+  normalizeSavedThemeValues,
   normalizeAppearanceFonts,
   resolveScheme,
   schemeMode,
@@ -15,6 +18,10 @@ import {
 } from "@ai-projector/core/modules/appearance/index.ts";
 import {
   themeStyleProperties,
+  themeEffectProperties,
+  themeEffectStyle,
+  type SavedThemeValues,
+  type ThemeValues,
   themeTokenNames,
   type AvailableTheme,
 } from "@ai-projector/core/modules/plugins/index.ts";
@@ -22,6 +29,7 @@ import {
 /** User-global settings from `/api/appearance` (before a project override). */
 const globalChoice = shallowRef<AppearanceChoice>(defaultAppearance);
 const globalFonts = shallowRef<AppearanceFonts>({ ...defaultAppearanceFonts });
+export const themeSettingsValues = shallowRef<SavedThemeValues>({});
 /** Trusted project override while a project page is open; cleared on leave. */
 const projectOverride = shallowRef<ProjectAppearanceOverride | undefined>();
 let activeProjectId: string | null = null;
@@ -53,7 +61,11 @@ export function setAppearanceThemes(value: AvailableTheme[]): AvailableTheme[] {
 }
 
 export function globalAppearanceSettings(): AppearanceSettings {
-  return { choice: globalChoice.value, fonts: { ...globalFonts.value } };
+  return {
+    choice: globalChoice.value,
+    fonts: { ...globalFonts.value },
+    themeSettings: themeSettingsValues.value,
+  };
 }
 
 function clearExternalTokens(root: HTMLElement) {
@@ -94,11 +106,18 @@ export function applyAppearance(value: AppearanceChoice): ThemeId {
   choice.value = value;
   const resolved = resolveScheme(value, media?.matches ?? false);
   const theme = themes.value.find((item) => item.id === resolved && item.tokens);
-  const scheme = !theme && !["dark", "light", "contrast"].includes(resolved) ? "dark" : resolved;
+  const scheme = !theme && !isBuiltinAppearance(resolved) ? "dark" : resolved;
   const root = document.documentElement;
   clearExternalTokens(root);
   root.dataset.appearance = value;
   root.dataset.theme = scheme;
+  const fields = theme?.settings ?? builtinAppearance(scheme)?.settings ?? [];
+  root.toggleAttribute("data-theme-effects", fields.length > 0);
+  for (const name of Object.values(themeEffectProperties)) root.style.removeProperty(name);
+  for (const [name, token] of Object.entries(
+    themeEffectStyle(fields, themeSettingsValues.value[scheme]),
+  ))
+    root.style.setProperty(name, token);
   appearanceScheme.value = scheme;
   if (theme) {
     for (const [name, token] of Object.entries(themeStyleProperties(theme.tokens)))
@@ -121,29 +140,31 @@ export function applyAppearanceFonts(value: AppearanceFonts): AppearanceFonts {
 }
 
 function paintEffective(): AppearanceSettings {
-  const effective = effectiveAppearance(
-    { choice: globalChoice.value, fonts: globalFonts.value },
-    projectOverride.value,
-  );
+  const effective = effectiveAppearance(globalAppearanceSettings(), projectOverride.value);
   applyAppearance(effective.choice);
   applyAppearanceFonts(effective.fonts);
   return effective;
 }
 
-function rememberGlobal(settings: AppearanceSettings) {
-  globalChoice.value = settings.choice;
-  globalFonts.value = { ...settings.fonts };
+export function setGlobalAppearanceSettings(value: {
+  choice?: unknown;
+  fonts?: unknown;
+  themeSettings?: unknown;
+  themes?: AvailableTheme[];
+}) {
+  if (isAppearanceChoice(value.choice)) globalChoice.value = value.choice;
+  if (value.fonts !== undefined) globalFonts.value = normalizeAppearanceFonts(value.fonts);
+  if (value.themeSettings !== undefined)
+    themeSettingsValues.value = normalizeSavedThemeValues(value.themeSettings);
+  if (value.themes) setAppearanceThemes(value.themes.filter((theme) => theme.tokens !== undefined));
+  return paintEffective();
 }
 
 export function loadAppearanceFonts() {
   return (fontsLoading ??= (async () => {
     const response = await fetch("/api/appearance");
     if (!response.ok) throw new Error("Не удалось загрузить оформление");
-    const data = await response.json();
-    const nextChoice = isAppearanceChoice(data.choice) ? data.choice : globalChoice.value;
-    const nextFonts = normalizeAppearanceFonts(data.fonts ?? defaultAppearanceFonts);
-    rememberGlobal({ choice: nextChoice, fonts: nextFonts });
-    return paintEffective().fonts;
+    return setGlobalAppearanceSettings(await response.json()).fonts;
   })().catch((error) => {
     fontsLoading = undefined;
     throw error;
@@ -163,6 +184,21 @@ export function setGlobalAppearanceChoice(value: AppearanceChoice): void {
 export function setGlobalAppearanceFonts(fonts: AppearanceFonts): void {
   globalFonts.value = normalizeAppearanceFonts(fonts);
   paintEffective();
+}
+
+export async function saveThemeSettings(id: string, values: unknown): Promise<ThemeValues> {
+  const response = await fetch("/api/appearance", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ themeSettings: { [id]: values } }),
+  });
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.error || "Не удалось сохранить настройки схемы");
+  const saved = normalizeSavedThemeValues(data.themeSettings)[id];
+  if (!saved) throw new Error("Сервер не вернул настройки схемы");
+  themeSettingsValues.value = { ...themeSettingsValues.value, [id]: saved };
+  applyAppearance(choice.value);
+  return saved;
 }
 
 /** Writes a fonts patch to the global file, then repaints with any project override. */

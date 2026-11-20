@@ -38,6 +38,7 @@ describe("appearance fonts", () => {
     });
     expect(normalizeAppearance({ choice: "light", fonts: { chat: 15 } })).toEqual({
       choice: "light",
+      themeSettings: {},
       fonts: {
         chat: 15,
         editor: defaultAppearanceFonts.editor,

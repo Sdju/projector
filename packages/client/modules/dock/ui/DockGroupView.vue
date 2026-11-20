@@ -137,7 +137,7 @@ const focus = () => {
     as="section"
     sizing="flex"
     class="dock-group"
-    :class="{ focused, maximized, zen: zenActive, embedded }"
+    :class="{ focused, maximized, zen: zenActive, embedded, 'theme-panel': !embedded }"
     :inert="zen && !focused"
     :data-group="group.id"
     @pointerdown.capture="focus"
@@ -228,7 +228,10 @@ const focus = () => {
   overflow: hidden;
   border: 1px solid var(--line);
   border-radius: var(--r-lg);
-  background: var(--bg);
+  background: var(--theme-panel-background, var(--bg));
+}
+[data-theme-effects] .dock-group:not(.embedded, .maximized, .zen) {
+  position: relative;
 }
 /* The right-rail panel already has a frame: the teleported terminal group sits inside it. */
 .dock-group.embedded {
@@ -253,7 +256,7 @@ const focus = () => {
   display: flex;
   flex-shrink: 0;
   min-width: 0;
-  background: var(--bg-sunken);
+  background: var(--theme-panel-background, var(--bg-sunken));
 }
 .dock-header :deep(.workspace-tabs) {
   flex: 1;

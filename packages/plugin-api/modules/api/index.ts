@@ -108,6 +108,32 @@ export interface TabRegistration {
   ): DisposableLike | Promise<DisposableLike>;
 }
 
+export type ThemeSettingsValues = Record<string, string | number>;
+
+export interface ThemeSettingsContext {
+  /** Aborted when the widget is replaced, closed or the plugin is disabled. */
+  signal: AbortSignal;
+  assetUrl(this: void, relative: string): string;
+  /** Current values and defaults for this theme, identified by its declared field IDs. */
+  getValues(): Readonly<ThemeSettingsValues>;
+  /** Saves a partial update for this theme and immediately applies accepted values. */
+  save(values: ThemeSettingsValues): Promise<Readonly<ThemeSettingsValues>>;
+}
+
+export interface ThemeSettingsRegistration {
+  /** Local ID of a theme with settings declared in the plugin manifest. */
+  id: string;
+  mount(
+    this: void,
+    container: HTMLElement,
+    context: ThemeSettingsContext,
+  ): DisposableLike | Promise<DisposableLike>;
+}
+
+export interface ThemeSettingsApi {
+  register(contribution: ThemeSettingsRegistration): Disposable;
+}
+
 export interface CommandRegistration {
   /** Full command id: use `api.commands.prefix + "format"`. */
   id: string;
@@ -212,6 +238,7 @@ export interface PluginApi {
   readonly languages: LanguageApi;
   readonly panels: PanelApi;
   readonly tabs: TabApi;
+  readonly themeSettings: ThemeSettingsApi;
   readonly commands: CommandApi;
   readonly agents: AgentClientApi;
   readonly storage: PluginStorageApi;

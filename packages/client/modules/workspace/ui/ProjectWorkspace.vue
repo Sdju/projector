@@ -832,7 +832,7 @@ onBeforeUnmount(() => {
     overflow: hidden;
     border: 1px solid var(--line);
     border-radius: var(--r-lg);
-    background: var(--bg);
+    background: var(--theme-panel-background, var(--bg));
   }
   .mobile-left-enter-active,
   .mobile-left-leave-active {

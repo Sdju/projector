@@ -120,6 +120,12 @@ test("enable, disable and missing states update the available catalog", async ()
 test("plugins API installs a local fixture, applies its theme and falls back after disable", async () => {
   const base = await apiServer();
   const source = await tempFixture();
+  const manifestPath = join(source, "package.json");
+  const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
+  manifest.projector.contributes.themes[0].settings = [
+    { id: "paperSoftness", title: "Мягкость бумаги", kind: "blur", default: 8, min: 0, max: 30 },
+  ];
+  await writeFile(manifestPath, JSON.stringify(manifest));
   const request = (action, extra = {}) =>
     fetch(`${base}/api/plugins`, {
       method: "POST",
@@ -146,7 +152,7 @@ test("plugins API installs a local fixture, applies its theme and falls back aft
   const applied = await fetch(`${base}/api/appearance`, {
     method: "PUT",
     headers: { "Content-Type": "application/json", Origin: base },
-    body: JSON.stringify({ choice: themeId }),
+    body: JSON.stringify({ choice: themeId, themeSettings: { [themeId]: { paperSoftness: 14 } } }),
   });
   expect(applied.status).toBe(200);
   expect(await readAppearanceChoice()).toBe(themeId);
@@ -157,12 +163,14 @@ test("plugins API installs a local fixture, applies its theme and falls back aft
   expect(bootstrap).toContain(`const choice = ${JSON.stringify(themeId)}`);
   expect(bootstrap).toContain('"--bg":"#f4ecd8"');
   expect(bootstrap).toContain('const mode = "light"');
+  expect(bootstrap).toContain('"--theme-backdrop":"blur(14px)"');
   expect(bootstrap).toContain("root.style.setProperty");
 
   expect((await request("disable", { id: pluginId })).status).toBe(200);
   const fallback = await (await fetch(`${base}/api/appearance/bootstrap.js`)).text();
   expect(fallback).toContain('const choice = "dark"');
   expect(fallback).not.toContain("--bg");
+  expect(fallback).not.toContain("--theme-backdrop");
   expect(await readAppearanceChoice()).toBe(themeId);
   const rejected = await fetch(`${base}/api/appearance`, {
     method: "PUT",

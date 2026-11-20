@@ -1,13 +1,9 @@
 import { afterEach, expect, test } from "vite-plus/test";
 import IconBot from "~icons/lucide/bot";
 import { createApi } from "../modules/plugin-runtime/api.ts";
+import { mountAgentUsage } from "../modules/plugin-runtime/mount.ts";
 import { createScope } from "../modules/plugin-runtime/scope.ts";
-import {
-  findRuntimeAgent,
-  mountAgentUsage,
-  runtimeAgents,
-  runtimeIssues,
-} from "../modules/plugin-runtime/store.ts";
+import { findRuntimeAgent, runtimeAgents, runtimeIssues } from "../modules/plugin-runtime/store.ts";
 import {
   clientAgentByBackend,
   readTodosPlan,

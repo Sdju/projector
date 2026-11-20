@@ -78,3 +78,34 @@ indent/fold и произвольных CodeMirror extensions. `caseInsensitive`
 
 API передаёт host, глобального singleton нет. Browser-код доверенный и выполняется на origin
 страницы/Hub; это не sandbox. Node-возможностей у него нет.
+
+### Виджет настроек цветовой схемы
+
+Тема объявляет поля `settings` в `projector.contributes.themes`. В браузерном `activate(api)` можно
+зарегистрировать собственный виджет для локального ID этой темы.
+
+```ts
+api.themeSettings.register({
+  id: "paper",
+  mount(root, context) {
+    const reset = document.createElement("button");
+    reset.type = "button";
+    reset.textContent = "Установить размытие 0";
+    reset.onclick = async () => {
+      try {
+        const saved = await context.save({ softness: 0 });
+        reset.textContent = `Размытие: ${saved.softness} px`;
+      } catch (error) {
+        reset.textContent = String(error);
+      }
+    };
+    root.append(reset);
+    return () => reset.remove();
+  },
+});
+```
+
+`getValues()` возвращает текущие значения с учётом defaults. `save(patch)` передаёт частичное
+изменение в общий API оформления и возвращает принятые значения. При закрытии виджета, смене схемы
+или отключении плагина хост прерывает `context.signal` и вызывает disposer. Формат полей описан
+в [контракте тем](../../docs/ui-kit.md#настройки-схемы).

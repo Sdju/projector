@@ -2,7 +2,7 @@
 import { inject, onBeforeUnmount, onMounted, ref, useId, watch } from "vue";
 import { commandHostKey } from "../../../common/utilities/commands.ts";
 import { deviceBase } from "../../../common/utilities/device-url.ts";
-import { mountAgentUsage } from "../store.ts";
+import { mountAgentUsage } from "../mount.ts";
 
 const props = defineProps<{
   agentId: string;

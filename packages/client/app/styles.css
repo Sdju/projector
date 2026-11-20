@@ -178,6 +178,81 @@
   --shadow-modal: 0 18px 60px #000000e6;
 }
 
+[data-theme="frozen-glass"] {
+  --bg: #101e2f;
+  --bg-2: #172a3f;
+  --bg-3: #20374e;
+  --bg-4: #2a435b;
+  --bg-sunken: #0b192a;
+  --canvas: #0a1729;
+
+  --line: #a1d8ff38;
+  --line-strong: #b0e3ff70;
+
+  --text: #eef8ff;
+  --text-2: #d8ebf9;
+  --muted: #bfd7e9;
+  --faint: #afc8dc;
+
+  --focus: #b4edff;
+  --accent: #a4e1ff;
+  --run: #98e8ce;
+  --err: #ffc0c9;
+  --warn: #ffe1a9;
+  --info: #aad7ff;
+  --search: #455779;
+
+  --selection: #315675;
+  --overlay: #05101caa;
+  --shadow-popover: 0 12px 32px #02091780;
+  --shadow-modal: 0 18px 60px #020917b8;
+
+  --theme-surface: #10223794;
+  --theme-chrome: #13283e8c;
+  --theme-wallpaper-overlay: linear-gradient(155deg, #09172870, #080f20c2);
+  --theme-wallpaper-fallback:
+    radial-gradient(ellipse at 5% 5%, #527caa, transparent 58%),
+    radial-gradient(ellipse at 93% 24%, #365e82, transparent 57%),
+    radial-gradient(ellipse at 56% 105%, #4b668c, transparent 61%);
+}
+
+/* Theme effects consume a shared set of surface roles and validated settings. */
+[data-theme-effects] {
+  --theme-workspace-canvas: transparent;
+  --theme-panel-background: transparent;
+  --theme-inset-background: color-mix(in srgb, var(--bg-2) 38%, transparent);
+  --popup-surface-tint: var(--theme-chrome, color-mix(in srgb, var(--bg-2) 70%, transparent));
+  --popup-surface-filter: var(--theme-backdrop, none);
+  background:
+    var(
+      --theme-wallpaper-overlay,
+      linear-gradient(color-mix(in srgb, var(--bg) 55%, transparent), var(--bg))
+    ),
+    var(--theme-wallpaper, none) center / cover no-repeat,
+    var(--theme-wallpaper-fallback, none),
+    var(--canvas);
+  background-attachment: fixed;
+}
+
+[data-theme-effects] body {
+  background: transparent;
+}
+
+[data-theme-effects] .theme-panel {
+  isolation: isolate;
+}
+
+[data-theme-effects] .theme-panel::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  background: var(--theme-surface, color-mix(in srgb, var(--bg) 72%, transparent));
+  backdrop-filter: var(--theme-backdrop, none);
+  pointer-events: none;
+}
+
 /* Классическая тема редактора: другой акцент на тех же токенах схемы. */
 .cm-editor.editor-classic {
   --syntax-keyword: var(--info);

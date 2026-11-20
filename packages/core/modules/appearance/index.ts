@@ -1,8 +1,10 @@
-import { isExternalThemeId } from "../plugins/index.ts";
+import { isExternalThemeId, type SavedThemeValues, type ThemeSetting } from "../plugins/index.ts";
+import { frozenGlass } from "./frozen-glass.ts";
+export { frozenGlass };
 
 /** Встроенная схема или namespaced ID темы из включённого плагина. */
 export type ThemeId = ColorScheme | (string & {});
-export type ColorScheme = "dark" | "light" | "contrast";
+export type ColorScheme = Exclude<(typeof appearanceOptions)[number]["id"], "auto">;
 
 /** Режим нативных контролов и scrollbar: у контрастной схемы он тёмный. */
 export type ColorMode = "dark" | "light";
@@ -23,6 +25,7 @@ export type AppearanceFontKey = keyof AppearanceFonts;
 export type AppearanceSettings = {
   choice: AppearanceChoice;
   fonts: AppearanceFonts;
+  themeSettings: SavedThemeValues;
 };
 
 export const appearanceFile = "appearance.json";
@@ -35,29 +38,35 @@ export const appearanceOptions = [
     title: "Тёмная",
     description: "Спокойная тёплая тёмная схема Projector.",
     mode: "dark",
+    themeColor: "#171716",
   },
   {
     id: "light",
     title: "Светлая",
     description: "Тёплая светлая схема для яркого окружения.",
     mode: "light",
+    themeColor: "#efeee8",
   },
   {
     id: "contrast",
     title: "Высокий контраст",
     description: "Чёрный фон и яркие акценты для максимальной читаемости.",
     mode: "dark",
+    themeColor: "#080808",
   },
+  frozenGlass,
   {
     id: "auto",
     title: "Как в системе",
     description: "Следует за светлой или тёмной темой операционной системы.",
   },
 ] as const satisfies readonly {
-  id: AppearanceChoice;
+  id: string;
   title: string;
   description: string;
   mode?: ColorMode;
+  themeColor?: string;
+  settings?: readonly ThemeSetting[];
 }[];
 
 export const defaultAppearance: AppearanceChoice = "dark";
@@ -73,7 +82,11 @@ export const appearanceFontMin = 11;
 export const appearanceFontMax = 20;
 
 export function isAppearanceChoice(value: unknown): value is AppearanceChoice {
-  return appearanceOptions.some((option) => option.id === value) || isExternalThemeId(value);
+  return isBuiltinAppearance(value) || isExternalThemeId(value);
+}
+
+export function isBuiltinAppearance(value: unknown): value is ColorScheme | "auto" {
+  return appearanceOptions.some((option) => option.id === value);
 }
 
 export function resolveScheme(choice: AppearanceChoice, prefersLight: boolean): ThemeId {
@@ -82,9 +95,7 @@ export function resolveScheme(choice: AppearanceChoice, prefersLight: boolean): 
 }
 
 export function schemeMode(scheme: ThemeId, externalMode?: ColorMode): ColorMode {
-  if (scheme === "light") return "light";
-  if (scheme === "dark" || scheme === "contrast") return "dark";
-  return externalMode ?? "dark";
+  return builtinAppearance(scheme)?.mode ?? externalMode ?? "dark";
 }
 
 export function clampAppearanceFont(value: unknown, fallback: number): number {
@@ -115,11 +126,47 @@ export function mergeAppearanceFonts(current: AppearanceFonts, patch: unknown): 
   };
 }
 
+export function builtinAppearance(id: string):
+  | {
+      id: ColorScheme | "auto";
+      mode?: ColorMode;
+      themeColor?: string;
+      settings?: readonly ThemeSetting[];
+    }
+  | undefined {
+  return appearanceOptions.find((option) => option.id === id);
+}
+
+export function normalizeSavedThemeValues(value: unknown): SavedThemeValues {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+  return Object.fromEntries(
+    Object.entries(value).flatMap(([id, fields]) => {
+      if (!fields || typeof fields !== "object" || Array.isArray(fields)) return [];
+      return [
+        [
+          id,
+          Object.fromEntries(
+            Object.entries(fields).filter(
+              (pair): pair is [string, string | number] =>
+                typeof pair[1] === "string" ||
+                (typeof pair[1] === "number" && Number.isFinite(pair[1])),
+            ),
+          ),
+        ],
+      ];
+    }),
+  );
+}
+
 export function normalizeAppearance(value: unknown): AppearanceSettings {
   const raw = value && typeof value === "object" ? (value as Record<string, unknown>) : {};
+  const legacy = appearanceOptions.flatMap((theme) =>
+    "legacySettingsKey" in theme ? [[theme.id, raw[theme.legacySettingsKey]]] : [],
+  );
   return {
     choice: isAppearanceChoice(raw.choice) ? raw.choice : defaultAppearance,
     fonts: normalizeAppearanceFonts(raw.fonts),
+    themeSettings: normalizeSavedThemeValues(raw.themeSettings ?? Object.fromEntries(legacy)),
   };
 }
 
@@ -168,6 +215,7 @@ export function effectiveAppearance(
 ): AppearanceSettings {
   if (!override) return global;
   return {
+    ...global,
     choice: override.choice ?? global.choice,
     fonts: mergeAppearanceFonts(global.fonts, override.fonts ?? {}),
   };

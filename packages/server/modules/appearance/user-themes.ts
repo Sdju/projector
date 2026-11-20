@@ -3,6 +3,7 @@ import { basename, join } from "node:path";
 import { dataDir } from "@ai-projector/core/modules/app-paths/index.ts";
 import {
   validateThemeTokens,
+  validateThemeSettings,
   type AvailableTheme,
   type ThemeTokens,
 } from "@ai-projector/core/modules/plugins/index.ts";
@@ -53,6 +54,7 @@ function jsonTheme(id: string, text: string): AvailableTheme {
   const raw = JSON.parse(text) as Record<string, unknown>;
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) throw new Error("Ожидался объект");
   const tokens = validateThemeTokens(raw.tokens);
+  const settings = validateThemeSettings(raw.settings);
   const mode = raw.mode === "light" || raw.mode === "dark" ? raw.mode : inferMode(tokens);
   const description = descriptionOf(
     typeof raw.description === "string" ? raw.description : undefined,
@@ -60,10 +62,12 @@ function jsonTheme(id: string, text: string): AvailableTheme {
   return {
     id,
     packageName: "user",
+    source: "file",
     title: titleOf(id, typeof raw.title === "string" ? raw.title : undefined),
     ...(description ? { description } : {}),
     mode,
     tokens,
+    ...(settings ? { settings } : {}),
   };
 }
 
@@ -91,6 +95,7 @@ function cssTheme(id: string, text: string): AvailableTheme {
   return {
     id,
     packageName: "user",
+    source: "file",
     title: titleOf(id, title),
     ...(summary ? { description: summary } : {}),
     mode,

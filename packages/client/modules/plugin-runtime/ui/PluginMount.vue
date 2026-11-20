@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { deviceBase } from "../../../common/utilities/device-url.ts";
-import { mountContribution } from "../store.ts";
+import { mountContribution } from "../mount.ts";
 
 const props = defineProps<{
   kind: "panel" | "tab";

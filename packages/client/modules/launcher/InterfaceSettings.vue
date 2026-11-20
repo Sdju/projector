@@ -18,10 +18,11 @@ import {
 import {
   appearanceThemes,
   currentAppearance,
-  setAppearanceThemes,
   setGlobalAppearanceChoice,
   setGlobalAppearanceFonts,
+  setGlobalAppearanceSettings,
   useAppearanceFontSettings,
+  ThemeSettingsHost,
 } from "../appearance/index.ts";
 import { useSectionAction } from "../../common/utilities/use-section-action.ts";
 import { rightPanelPreference, saveRightPanelPreference } from "../workspace/index.ts";
@@ -59,8 +60,7 @@ const {
 appearanceBusy.value = true;
 const availableAppearances = computed(() => [...appearanceOptions, ...appearanceThemes().value]);
 const appearanceDescription = computed(
-  () =>
-    availableAppearances.value.find((option) => option.id === appearance.value)?.description ?? "",
+  () => availableAppearances.value.find(({ id }) => id === appearance.value)?.description ?? "",
 );
 const modes = [
   {
@@ -125,15 +125,9 @@ async function loadAppearance() {
     const response = await fetch("/api/appearance");
     const data = await response.json();
     if (!response.ok) throw new Error(data.error || "Не удалось загрузить схему");
-    // `/api/appearance` also lists the built-in schemes, which have no token map. Only external
-    // themes with tokens are applied through the plugin registry.
-    setAppearanceThemes(
-      (data.themes ?? []).filter((theme: { tokens?: unknown }) => theme.tokens !== undefined),
-    );
     if (isAppearanceChoice(data.choice)) appearance.value = data.choice;
     savedAppearance.value = appearance.value;
-    setGlobalAppearanceChoice(appearance.value);
-    if (data.fonts) setGlobalAppearanceFonts(data.fonts);
+    setGlobalAppearanceSettings(data);
   }, "Не удалось загрузить схему");
 }
 async function saveAppearance() {
@@ -279,6 +273,7 @@ async function open() {
       </option>
     </UiControl>
     <UiHint class="hint">{{ appearanceDescription }} Схема применяется сразу и сохраняется.</UiHint>
+    <ThemeSettingsHost :key="appearance" :theme="appearance" :disabled="appearanceBusy" />
     <UiMessage
       v-if="appearanceError || appearanceStatus"
       role="status"

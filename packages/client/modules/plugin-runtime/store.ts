@@ -9,6 +9,8 @@ import { deviceUrl } from "../../common/utilities/device-url.ts";
 import type {
   AgentClientRegistration,
   AgentPlanReader,
+  ThemeSettingsContext,
+  ThemeSettingsRegistration,
   LanguageRule,
   LanguageToken,
 } from "@ai-projector/plugin-api";
@@ -36,6 +38,14 @@ export interface ActiveTab {
   declaration: PluginTabContribution;
   mount: (container: HTMLElement, context: unknown) => unknown;
   assetUrl(relative: string): string;
+}
+
+export interface ActiveThemeSettings {
+  instance: number;
+  id: string;
+  packageName: string;
+  mount: ThemeSettingsRegistration["mount"];
+  assetUrl: ThemeSettingsContext["assetUrl"];
 }
 
 export interface ActiveCommand {
@@ -68,6 +78,7 @@ export interface PluginRuntimeIssue {
 export const runtimeLanguages = shallowRef<ActiveLanguage[]>([]);
 export const runtimePanels = shallowRef<ActivePanel[]>([]);
 export const runtimeTabs = shallowRef<ActiveTab[]>([]);
+export const runtimeThemeSettings = shallowRef<ActiveThemeSettings[]>([]);
 export const runtimeCommands = shallowRef<ActiveCommand[]>([]);
 export const runtimeAgents = shallowRef<ActiveAgent[]>([]);
 export const runtimeIssues = shallowRef<PluginRuntimeIssue[]>([]);
@@ -132,7 +143,7 @@ export function compileLanguageRules(
   });
 }
 
-function keyOf(packageName: string, id: string): string {
+export function keyOf(packageName: string, id: string): string {
   return `${packageName}\0${id}`;
 }
 
@@ -204,6 +215,25 @@ export function addTab(
   runtimeTabs.value = replace(runtimeTabs.value, (item) => item.key, entry);
   return () => {
     runtimeTabs.value = runtimeTabs.value.filter((item) => item !== entry);
+  };
+}
+
+export function addThemeSettings(
+  id: string,
+  packageName: string,
+  mount: ActiveThemeSettings["mount"],
+  assetUrl: ActiveThemeSettings["assetUrl"],
+): () => void {
+  const entry: ActiveThemeSettings = {
+    instance: ++nextViewInstance,
+    id,
+    packageName,
+    mount,
+    assetUrl,
+  };
+  runtimeThemeSettings.value = replace(runtimeThemeSettings.value, (item) => item.id, entry);
+  return () => {
+    runtimeThemeSettings.value = runtimeThemeSettings.value.filter((item) => item !== entry);
   };
 }
 
@@ -284,88 +314,4 @@ export function findTab(key: string): ActiveTab | undefined {
 
 export function findRuntimeAgent(id: string): ActiveAgent | undefined {
   return runtimeAgents.value.find((item) => item.id === id);
-}
-
-function runMount(
-  packageName: string,
-  mount: (container: HTMLElement, context: unknown) => unknown,
-  container: HTMLElement,
-  context: Record<string, unknown>,
-  onError?: (message: string) => void,
-): () => void {
-  let disposed = false;
-  let cleaned = false;
-  let settled = false;
-  let result: unknown;
-  const cleanResult = () => {
-    if (cleaned || !settled) return;
-    cleaned = true;
-    const value = result as { dispose?: () => void } | (() => void) | undefined;
-    try {
-      if (typeof value === "function") value();
-      else value?.dispose?.();
-    } catch (error) {
-      reportIssue({
-        plugin: packageName,
-        phase: "cleanup",
-        message: error instanceof Error ? error.message : "Ошибка очистки UI плагина",
-      });
-    }
-  };
-  const cleanup = () => {
-    disposed = true;
-    cleanResult();
-  };
-  Promise.resolve(mount(container, context))
-    .then((value) => {
-      result = value;
-      settled = true;
-      if (disposed) cleanResult();
-    })
-    .catch((error) => {
-      if (disposed) return;
-      const message = error instanceof Error ? error.message : "Ошибка отрисовки UI плагина";
-      onError?.(message);
-      reportIssue({ plugin: packageName, phase: "activate", message });
-    });
-  return cleanup;
-}
-
-/** Invokes a panel/tab mount and returns a disposer that also tolerates async cleanup. */
-export function mountContribution(
-  kind: "panel" | "tab",
-  packageName: string,
-  id: string,
-  container: HTMLElement,
-  context: Record<string, unknown>,
-  onError?: (message: string) => void,
-): () => void {
-  const entry =
-    kind === "panel" ? findPanel(keyOf(packageName, id)) : findTab(keyOf(packageName, id));
-  if (!entry) throw new Error("Плагин не зарегистрировал этот вклад");
-  return runMount(
-    packageName,
-    entry.mount,
-    container,
-    { ...context, assetUrl: entry.assetUrl },
-    onError,
-  );
-}
-
-/** Invokes an agent usage mount and returns a disposer that also tolerates async cleanup. */
-export function mountAgentUsage(
-  agentId: string,
-  container: HTMLElement,
-  context: Record<string, unknown>,
-  onError?: (message: string) => void,
-): () => void {
-  const entry = findRuntimeAgent(agentId);
-  if (!entry?.mountUsage) throw new Error("Плагин не зарегистрировал индикатор лимитов");
-  return runMount(
-    entry.packageName,
-    entry.mountUsage as never,
-    container,
-    { ...context, assetUrl: entry.assetUrl },
-    onError,
-  );
 }
