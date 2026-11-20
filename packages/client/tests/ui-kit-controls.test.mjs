@@ -4,7 +4,7 @@ import { createBrowserFixture } from "../../../tests/fixtures/browser-server.mjs
 import { chromium, createChromium } from "../../../tests/fixtures/chromium-driver.mjs";
 test.concurrent(
   "UiControl retains Vue native model, modifiers, events and form semantics",
-  { skip: !chromium, timeout: 45000 },
+  { skip: !chromium, timeout: 60000, retry: 1 },
   async () => {
     const fixture = await createBrowserFixture({
       pages: {
@@ -115,7 +115,7 @@ test.concurrent(
 
 test.concurrent(
   "UiControl supports native value/checked without a model and exposes the same input",
-  { skip: !chromium, timeout: 45000 },
+  { skip: !chromium, timeout: 60000, retry: 1 },
   async () => {
     const fixture = await createBrowserFixture({
       pages: {

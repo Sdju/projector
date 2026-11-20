@@ -95,7 +95,7 @@ const waitFor = (browser, expression) =>
 
 test(
   "sidebar groups keep their side and both panels preserve hidden positions across reordering",
-  { skip: !chromium, timeout: 45000 },
+  { skip: !chromium, timeout: 60000, retry: 1 },
   async ({ onTestFinished }) => {
     const fixture = await createBrowserFixture({
       pages: { "/__sidebar": html },

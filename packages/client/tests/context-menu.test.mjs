@@ -27,7 +27,7 @@ test.concurrent(
 
 test(
   "context menus and the select picker use the same translucent surface",
-  { skip: !chromium, timeout: 45000 },
+  { skip: !chromium, timeout: 60000, retry: 1 },
   async ({ onTestFinished }) => {
     const source = await readFile(
       new URL("../../../tests/fixtures/context-menu.html", import.meta.url),

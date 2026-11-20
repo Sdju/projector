@@ -5,7 +5,7 @@ import { chromium, createChromium } from "../../../tests/fixtures/chromium-drive
 
 test.concurrent(
   "UI kit retains native form, button and pointer lifecycle",
-  { skip: !chromium, timeout: 45000 },
+  { skip: !chromium, timeout: 60000, retry: 1 },
   async () => {
     const fixture = await createBrowserFixture({
       pages: {

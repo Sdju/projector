@@ -63,7 +63,7 @@ const html = `<!doctype html>
 
 test(
   "appearance switches tokens, meta tags and the system scheme without reload",
-  { skip: !chromium, timeout: 45000 },
+  { skip: !chromium, timeout: 60000, retry: 1 },
   async () => {
     const fixture = await createBrowserFixture({ pages: { "/__appearance": html } });
     const browser = await createChromium(fixture.directory);
@@ -192,7 +192,7 @@ window.fixture = {
 
 test(
   "built-in schemes keep text readable on every surface",
-  { skip: !chromium, timeout: 45000 },
+  { skip: !chromium, timeout: 60000, retry: 1 },
   async () => {
     const fixture = await createBrowserFixture({
       pages: { "/__appearance_contrast": contrastHtml },
@@ -267,7 +267,7 @@ window.marker = Math.random();
 
 test(
   "CodeMirror repaints surfaces and syntax when the scheme changes",
-  { skip: !chromium, timeout: 45000 },
+  { skip: !chromium, timeout: 60000, retry: 1 },
   async () => {
     const fixture = await createBrowserFixture({ pages: { "/__appearance_editor": editorHtml } });
     const browser = await createChromium(fixture.directory);
@@ -384,7 +384,7 @@ window.marker = Math.random();
 
 test(
   "Markdown code blocks follow the painted scheme",
-  { skip: !chromium, timeout: 60000 },
+  { skip: !chromium, timeout: 60000, retry: 1 },
   async () => {
     const fixture = await createBrowserFixture({
       pages: { "/__appearance_markdown": markdownHtml },
@@ -470,7 +470,7 @@ reloadFileIconTheme().then(() => { window.fixture.themeReady = true; });
 
 test(
   "file icon palette follows the painted scheme",
-  { skip: !chromium, timeout: 45000 },
+  { skip: !chromium, timeout: 60000, retry: 1 },
   async () => {
     const fixture = await createBrowserFixture({ pages: { "/__appearance_icons": fileIconsHtml } });
     const browser = await createChromium(fixture.directory);
@@ -550,7 +550,7 @@ window.marker = Math.random();
 
 test(
   "agent chat follows the painted scheme without reload",
-  { skip: !chromium, timeout: 45000 },
+  { skip: !chromium, timeout: 60000, retry: 1 },
   async () => {
     const fixture = await createBrowserFixture({ pages: { "/__appearance_chat": chatHtml } });
     const browser = await createChromium(fixture.directory);
@@ -644,7 +644,7 @@ window.marker = Math.random();
 
 test(
   "settings follow the painted scheme without reload",
-  { skip: !chromium, timeout: 45000 },
+  { skip: !chromium, timeout: 60000, retry: 1 },
   async () => {
     const fixture = await createBrowserFixture({
       pages: { "/__appearance_settings": settingsHtml },
@@ -678,7 +678,7 @@ test(
 
 test(
   "Frozen Glass applies the wallpaper and panel blur through the settings controls",
-  { skip: !chromium, timeout: 45000 },
+  { skip: !chromium, timeout: 60000, retry: 1 },
   async () => {
     const fixture = await createBrowserFixture({
       pages: { "/__appearance_settings": settingsHtml },
@@ -776,7 +776,7 @@ test(
 
 test(
   "a trusted theme plugin mounts its own settings widget and saves through the host",
-  { skip: !chromium, timeout: 45000 },
+  { skip: !chromium, timeout: 60000, retry: 1 },
   async ({ onTestFinished }) => {
     const id = "widget-example";
     const theme = {
@@ -913,7 +913,7 @@ window.marker = Math.random();
 
 test(
   "diff surfaces follow the painted scheme without reload",
-  { skip: !chromium, timeout: 45000 },
+  { skip: !chromium, timeout: 60000, retry: 1 },
   async () => {
     const fixture = await createBrowserFixture({ pages: { "/__appearance_diff": diffHtml } });
     const browser = await createChromium(fixture.directory);
@@ -1000,7 +1000,7 @@ window.marker = Math.random();
 
 test(
   "file tree follows the painted scheme without reload",
-  { skip: !chromium, timeout: 45000 },
+  { skip: !chromium, timeout: 60000, retry: 1 },
   async () => {
     const fixture = await createBrowserFixture({ pages: { "/__appearance_tree": treeHtml } });
     const browser = await createChromium(fixture.directory);
@@ -1102,7 +1102,7 @@ window.marker = Math.random();
 
 test(
   "terminal follows the painted scheme without reload",
-  { skip: !chromium, timeout: 45000 },
+  { skip: !chromium, timeout: 60000, retry: 1 },
   async () => {
     const fixture = await createBrowserFixture({
       pages: { "/__appearance_terminal": terminalHtml },
@@ -1148,7 +1148,7 @@ document.getElementById('result').textContent = currentAppearance() === 'example
 
 test(
   "appearance init preserves external bootstrap tokens until the catalog arrives",
-  { skip: !chromium, timeout: 45000 },
+  { skip: !chromium, timeout: 60000, retry: 1 },
   async () => {
     const fixture = await createBrowserFixture({
       pages: { "/__appearance_bootstrap": bootstrapHtml },

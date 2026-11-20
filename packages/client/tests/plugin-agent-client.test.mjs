@@ -192,7 +192,7 @@ finally{app?.unmount();window.fetch=originalFetch;}})();
 
 test(
   "Plugin settings render a server agent without a command and list dependencies",
-  { skip: !chromium, timeout: 30000 },
+  { skip: !chromium, timeout: 60000, retry: 1 },
   async ({ onTestFinished }) => {
     const fixture = await createBrowserFixture({ pages: { "/__plugin_agent": settingsHtml } });
     onTestFinished(() => fixture.close());

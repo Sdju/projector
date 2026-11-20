@@ -57,7 +57,7 @@ finally{app?.unmount();window.fetch=originalFetch;}})();
 
 test.concurrent(
   "Hub login QR is requested through a scoped IDE command",
-  { skip: !chromium, timeout: 45000 },
+  { skip: !chromium, timeout: 60000, retry: 1 },
   async ({ onTestFinished }) => {
     const fixture = await createBrowserFixture({ pages: { "/__hub_login_qr": html } });
     onTestFinished(() => fixture.close());

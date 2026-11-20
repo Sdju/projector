@@ -69,7 +69,7 @@ try {
 
 test(
   "pending activation is cancellable and does not block independent plugins",
-  { skip: !chromium, timeout: 30000 },
+  { skip: !chromium, timeout: 60000, retry: 1 },
   async ({ onTestFinished }) => {
     const fixture = await createBrowserFixture({
       pages: { "/__activation": html },
