@@ -1,11 +1,10 @@
 <script setup lang="ts">
+import ProjectorIcon from "../../../common/icons/ProjectorIcon.vue";
 import UiDisclosureSummary from "../../../common/ui/UiDisclosureSummary.vue";
 import { computed } from "vue";
 import UiButton from "../../../common/ui/UiButton.vue";
 import { turnChanges } from "../../agent-core/index.ts";
 import type { AgentToolChip } from "../../agent-core/index.ts";
-import IconFileDiff from "~icons/lucide/file-diff";
-import IconUndo from "~icons/lucide/undo-2";
 
 const props = defineProps<{ tools: AgentToolChip[]; root: string; canRevert: boolean }>();
 const emit = defineEmits<{ open: [path: string]; revert: [] }>();
@@ -19,7 +18,7 @@ const totals = computed(() => ({
 <template>
   <details v-if="changes.length" class="changes">
     <UiDisclosureSummary>
-      <IconFileDiff aria-hidden="true" />
+      <ProjectorIcon name="file-diff" aria-hidden="true" />
       <span>Изменено файлов: {{ changes.length }}</span>
       <span class="added">+{{ totals.added }}</span>
       <span class="removed">−{{ totals.removed }}</span>
@@ -44,7 +43,7 @@ const totals = computed(() => ({
       title="Вернуть файлы к состоянию до этого запроса"
       @click="emit('revert')"
     >
-      <IconUndo aria-hidden="true" />Вернуть файлы
+      <ProjectorIcon name="undo-2" aria-hidden="true" />Вернуть файлы
     </UiButton>
   </details>
 </template>

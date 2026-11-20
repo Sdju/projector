@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ProjectorIcon from "../../../common/icons/ProjectorIcon.vue";
 import { deviceUrl } from "../../../common/utilities/device-url.ts";
 import UiActionCopy from "../../../common/ui/UiActionCopy.vue";
 import UiBadge from "../../../common/ui/UiBadge.vue";
@@ -21,9 +22,6 @@ import {
 } from "@ai-projector/core/modules/launcher/index.ts";
 import { projectIconUrl, useProjects, type ProjectLocation } from "../../project/index.ts";
 import PathBar from "./PathBar.vue";
-import IconChevron from "~icons/lucide/chevron-down";
-import IconSearch from "~icons/lucide/search";
-import IconTrash from "~icons/lucide/trash-2";
 
 /**
  * Переключатель проекта: кнопка с текущим проектом открывает остров с путём к папке
@@ -104,7 +102,7 @@ const menuItems = computed<ContextMenuItem[]>(() => {
     {
       id: "ide.project.switcher.remove",
       label: "Убрать из Projector",
-      icon: IconTrash,
+      icon: "trash-2",
       danger: true,
       command: "ide.project.switcher.remove",
       disabled: removing.value,
@@ -233,7 +231,7 @@ function keydown(event: KeyboardEvent) {
     >
       <img :src="projectIconUrl(project)" alt="" width="22" height="22" />
       <span class="u-truncate">{{ project.name }}</span>
-      <IconChevron aria-hidden="true" />
+      <ProjectorIcon name="chevron-down" aria-hidden="true" />
     </button>
     <UiPopupSurface
       as="section"
@@ -245,7 +243,7 @@ function keydown(event: KeyboardEvent) {
     >
       <PathBar class="island-path" :path="project.path" :navigate="go" />
       <UiInline as="label" class="search" justify="normal">
-        <IconSearch aria-hidden="true" />
+        <ProjectorIcon name="search" aria-hidden="true" />
         <UiControl
           ref="input"
           v-model="text"

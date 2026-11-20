@@ -1,14 +1,19 @@
 <script setup lang="ts">
-import { computed } from "vue";
-import { icons } from "../../_/index.ts";
+import ProjectorIcon from "../../../../common/icons/ProjectorIcon.vue";
+import { hasIcon } from "../../../../common/icons/registry.ts";
 
 const props = defineProps<{ name: string; label?: string }>();
-const icon = computed(() => icons[props.name]);
 </script>
 
 <template>
-  <span v-if="icon" class="inline-icon" role="img" :aria-label="label" :aria-hidden="!label">
-    <component :is="icon" />
+  <span
+    v-if="hasIcon(name)"
+    class="inline-icon"
+    role="img"
+    :aria-label="label"
+    :aria-hidden="!label"
+  >
+    <ProjectorIcon :name="name" />
   </span>
   <span v-else class="inline-icon missing" :title="`Нет иконки ${name}`" aria-hidden="true">•</span>
 </template>

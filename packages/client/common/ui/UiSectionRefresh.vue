@@ -1,4 +1,5 @@
 <script lang="ts">
+import ProjectorIcon from "../icons/ProjectorIcon.vue";
 import { type ComputedRef, type InjectionKey } from "vue";
 
 /** Host of a sidebar section: the in-flow refresh button calls this instead of an overlay. */
@@ -14,7 +15,6 @@ export const sectionRefreshKey: InjectionKey<SectionRefresh> = Symbol("section-r
 <script setup lang="ts">
 import { computed, inject } from "vue";
 import UiButton from "./UiButton.vue";
-import IconRefresh from "~icons/lucide/rotate-cw";
 
 const host = inject(sectionRefreshKey, null);
 const refreshing = computed(() => host?.refreshing.value ?? false);
@@ -32,6 +32,6 @@ const command = computed(() => host?.command.value ?? "");
     :busy="refreshing"
     @click="host.run()"
   >
-    <IconRefresh aria-hidden="true" />
+    <ProjectorIcon name="rotate-cw" aria-hidden="true" />
   </UiButton>
 </template>

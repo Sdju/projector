@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ProjectorIcon from "../../../common/icons/ProjectorIcon.vue";
 import { computed, nextTick, onBeforeUnmount, onMounted, provide, ref } from "vue";
 import { widgetReplyKey } from "../../widget-runtime/index.ts";
 import { useIdeCommands } from "../../ide/index.ts";
@@ -74,8 +75,6 @@ import { useChatCopy } from "../model/use-chat-copy.ts";
 import { useAgentChatTabTitle } from "../model/chat-titles.ts";
 import { chatUsageByTurn } from "../model/chat-usage.ts";
 import type { AgentRoleSnapshot } from "@ai-projector/core/modules/agent-role/index.ts";
-import IconArrowDown from "~icons/lucide/arrow-down";
-import IconSquarePen from "~icons/lucide/square-pen";
 const props = withDefaults(
   defineProps<{
     projectId: string;
@@ -552,7 +551,7 @@ onBeforeUnmount(() => release());
         :disabled="busy"
         @click="newChat"
       >
-        <IconSquarePen aria-hidden="true" />
+        <ProjectorIcon name="square-pen" aria-hidden="true" />
       </UiButton>
       <AgentChatMenu
         ref="chatMenu"
@@ -676,7 +675,7 @@ onBeforeUnmount(() => release());
         <button type="button" @click="cancelEdit">Отмена</button>
       </p>
       <button v-if="away" type="button" class="latest-button" @click="toBottom">
-        <IconArrowDown aria-hidden="true" />К последнему сообщению
+        <ProjectorIcon name="arrow-down" aria-hidden="true" />К последнему сообщению
       </button>
       <div v-if="jobsState.hasRequests || secretShows.length" class="requests">
         <AgentPermissions :permissions="permissions" @decide="decide" />

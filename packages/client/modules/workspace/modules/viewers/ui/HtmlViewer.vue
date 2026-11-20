@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ProjectorIcon from "../../../../../common/icons/ProjectorIcon.vue";
 import UiControl from "../../../../../common/ui/UiControl.vue";
 import UiInline from "../../../../../common/ui/UiInline.vue";
 import UiPanel from "../../../../../common/ui/UiPanel.vue";
@@ -6,9 +7,6 @@ import UiToolbar from "../../../../../common/ui/UiToolbar.vue";
 import { computed, defineAsyncComponent, ref, watch } from "vue";
 import SplitPanes from "./SplitPanes.vue";
 import UiButton from "../../../../../common/ui/UiButton.vue";
-import IconRefresh from "~icons/lucide/refresh-cw";
-import IconExternal from "~icons/lucide/external-link";
-import IconPanel from "~icons/lucide/app-window";
 const CodeViewer = defineAsyncComponent(() => import("./CodeViewer.vue"));
 const props = defineProps<{
   path: string;
@@ -69,7 +67,7 @@ const frameStyle = computed(() => {
         title="Перезагрузить страницу"
         @click="emit('command', 'ide.editor.html.reload')"
       >
-        <IconRefresh aria-hidden="true" />
+        <ProjectorIcon name="refresh-cw" aria-hidden="true" />
       </UiButton>
       <UiButton
         shape="icon"
@@ -78,7 +76,7 @@ const frameStyle = computed(() => {
         title="Открыть страницу во вкладке браузера Projector"
         @click="emit('command', 'ide.editor.html.openInBrowserTab')"
       >
-        <IconPanel aria-hidden="true" />
+        <ProjectorIcon name="app-window" aria-hidden="true" />
       </UiButton>
       <UiButton
         shape="icon"
@@ -87,7 +85,7 @@ const frameStyle = computed(() => {
         title="Открыть страницу в новой вкладке браузера"
         @click="emit('command', 'ide.editor.html.openInBrowser')"
       >
-        <IconExternal aria-hidden="true" />
+        <ProjectorIcon name="external-link" aria-hidden="true" />
       </UiButton>
     </UiToolbar>
     <SplitPanes top-label="Страница" bottom-label="Код" :reveal="line">

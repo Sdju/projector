@@ -1,9 +1,8 @@
 <script setup lang="ts">
+import ProjectorIcon from "../../../../../common/icons/ProjectorIcon.vue";
 import UiPanel from "../../../../../common/ui/UiPanel.vue";
 import { defineAsyncComponent, ref } from "vue";
 import UiButton from "../../../../../common/ui/UiButton.vue";
-import IconCode from "~icons/lucide/code-xml";
-import IconDocument from "~icons/lucide/file-text";
 import EditorTopbarActions from "./EditorTopbarActions.vue";
 import VisualMarkdownEditor from "./VisualMarkdownEditor.vue";
 import type { FileScope } from "@ai-projector/core/modules/workspace/index.ts";
@@ -54,8 +53,8 @@ function focusOut(event: FocusEvent) {
         :title="mode === 'source' ? 'Режим документа (WYSIWYG)' : 'Режим исходника (Markdown)'"
         @click="emit('command', 'ide.editor.markdown.toggleSource')"
       >
-        <IconDocument v-if="mode === 'source'" aria-hidden="true" />
-        <IconCode v-else aria-hidden="true" />
+        <ProjectorIcon name="file-text" v-if="mode === 'source'" aria-hidden="true" />
+        <ProjectorIcon name="code-xml" v-else aria-hidden="true" />
       </UiButton>
     </EditorTopbarActions>
     <div class="markdown-body">

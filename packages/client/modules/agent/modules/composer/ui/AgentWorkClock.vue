@@ -1,7 +1,7 @@
 <script setup lang="ts">
+import ProjectorIcon from "../../../../../common/icons/ProjectorIcon.vue";
 import { computed } from "vue";
 import { formatElapsed, useElapsedClock } from "../../../../agent-core/index.ts";
-import IconTimer from "~icons/lucide/timer";
 
 /** How long the agent has been on the current answer: a live label beside the input. */
 const props = withDefaults(defineProps<{ startedAt?: number; title?: string }>(), {
@@ -22,7 +22,7 @@ const elapsed = computed(() =>
     :title="`${title}: ${elapsed}`"
     :aria-label="`${title}: ${elapsed}`"
   >
-    <IconTimer aria-hidden="true" />
+    <ProjectorIcon name="timer" aria-hidden="true" />
     <span>{{ elapsed }}</span>
   </span>
 </template>

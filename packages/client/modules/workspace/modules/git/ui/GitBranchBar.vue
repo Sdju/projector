@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ProjectorIcon from "../../../../../common/icons/ProjectorIcon.vue";
 import UiControl from "../../../../../common/ui/UiControl.vue";
 import UiLoader from "../../../../../common/ui/UiLoader.vue";
 import UiMessage from "../../../../../common/ui/UiMessage.vue";
@@ -15,14 +16,6 @@ import { relativeTime } from "../../../../../common/utilities/commit-format.ts";
 import { registerBranchCommands } from "../lib/branch-commands.ts";
 import { registerSyncCommands } from "../lib/sync-commands.ts";
 import type { GitBranchesState } from "../lib/git-branches.ts";
-import IconBranch from "~icons/lucide/git-branch";
-import IconCheck from "~icons/lucide/check";
-import IconPlus from "~icons/lucide/plus";
-import IconChevron from "~icons/lucide/chevron-down";
-import IconArrowDown from "~icons/lucide/arrow-down";
-import IconArrowUp from "~icons/lucide/arrow-up";
-import IconCloudUpload from "~icons/lucide/cloud-upload";
-import IconEllipsis from "~icons/lucide/ellipsis";
 
 const props = defineProps<{
   branches: GitBranchesState;
@@ -113,7 +106,7 @@ const primary = computed(() => {
   if (!branch.upstream || branch.gone)
     return {
       action: "push" as const,
-      icon: IconCloudUpload,
+      icon: "cloud-upload",
       title: branch.gone
         ? "Upstream удалён: опубликовать ветку заново"
         : `Опубликовать ветку ${branch.name}`,
@@ -123,13 +116,13 @@ const primary = computed(() => {
   if (branch.behind > 0)
     return {
       action: "pull" as const,
-      icon: IconArrowDown,
+      icon: "arrow-down",
       title: `Стянуть изменения: ↓${branch.behind}`,
     };
   if (branch.ahead > 0)
     return {
       action: "push" as const,
-      icon: IconArrowUp,
+      icon: "arrow-up",
       title: `Отправить коммиты: ↑${branch.ahead}`,
     };
   return undefined;
@@ -210,12 +203,12 @@ watch(open, (value) => {
         data-command="ide.git.branch.toggle"
         @click="commands.run('ide.git.branch.toggle')"
       >
-        <IconBranch class="icon" aria-hidden="true" />
+        <ProjectorIcon name="git-branch" class="icon" aria-hidden="true" />
         <span class="name u-truncate">{{ label }}</span>
         <span v-if="current && syncText(current)" class="sync" title="Относительно upstream">
           {{ syncText(current) }}
         </span>
-        <IconChevron class="chevron" :class="{ open }" aria-hidden="true" />
+        <ProjectorIcon name="chevron-down" class="chevron" :class="{ open }" aria-hidden="true" />
       </button>
       <div
         v-if="canSync"
@@ -235,7 +228,7 @@ watch(open, (value) => {
           :data-command="`ide.git.sync.${primary.action}`"
           @click="runPrimary"
         >
-          <component :is="primary.icon" aria-hidden="true" />
+          <ProjectorIcon :name="primary.icon" aria-hidden="true" />
         </UiButton>
         <UiButton
           shape="icon"
@@ -246,7 +239,7 @@ watch(open, (value) => {
           aria-label="Действия с удалённым репозиторием"
           @click="openSyncMenu"
         >
-          <IconEllipsis aria-hidden="true" />
+          <ProjectorIcon name="ellipsis" aria-hidden="true" />
         </UiButton>
       </div>
       <UiButton
@@ -258,7 +251,7 @@ watch(open, (value) => {
         data-command="ide.git.branch.create"
         @click="commands.run('ide.git.branch.create')"
       >
-        <IconPlus aria-hidden="true" />
+        <ProjectorIcon name="plus" aria-hidden="true" />
       </UiButton>
       <UiSectionRefresh />
     </div>
@@ -289,7 +282,12 @@ watch(open, (value) => {
               @contextmenu="context($event, branch.name)"
               @keydown.shift.f10.prevent="context($event, branch.name)"
             >
-              <IconCheck v-if="branch.current" class="mark" aria-label="Текущая ветка" />
+              <ProjectorIcon
+                name="check"
+                v-if="branch.current"
+                class="mark"
+                aria-label="Текущая ветка"
+              />
               <span v-else class="mark" />
               <span class="label u-truncate">{{ branch.name }}</span>
               <span v-if="branch.gone" class="gone" title="Upstream удалён">upstream удалён</span>

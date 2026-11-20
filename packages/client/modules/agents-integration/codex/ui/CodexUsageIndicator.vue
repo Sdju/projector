@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ProjectorIcon from "../../../../common/icons/ProjectorIcon.vue";
 import { computed } from "vue";
 import { useIntervalFn, useNow } from "@vueuse/core";
 import UsageIndicator from "../../_/UsageIndicator.vue";
@@ -6,7 +7,6 @@ import { usageWindowView } from "../../_/usage-windows.ts";
 import { publishAgentUsage } from "../../_/usage-summary.ts";
 import { useUsagePolling } from "../../_/use-usage-polling.ts";
 import { USAGE_PERIOD_SECONDS } from "../../_/usage-pace.ts";
-import IconCodex from "~icons/simple-icons/openai";
 import type { CodexUsage } from "@ai-projector/core/modules/agents-integration/codex/index.ts";
 import { resetTimestamp } from "../../../../common/utilities/reset-time.ts";
 
@@ -57,6 +57,6 @@ const tooltip = computed(() => {
     :rows="tooltipRows"
     compact
   >
-    <template #icon><IconCodex /></template>
+    <template #icon><ProjectorIcon name="simple-icons:openai" /></template>
   </UsageIndicator>
 </template>

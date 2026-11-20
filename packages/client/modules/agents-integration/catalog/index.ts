@@ -1,9 +1,6 @@
 import { ref, type Component } from "vue";
 import type { AgentUsageWindowDefinition } from "@ai-projector/core/modules/usage-analytics/index.ts";
-import IconBot from "~icons/lucide/bot";
-import IconCode from "~icons/lucide/code";
-import IconSparkles from "~icons/lucide/sparkles";
-import IconTerminal from "~icons/lucide/terminal";
+import { hasIcon, registerIcon, type IconName } from "../../../common/icons/registry.ts";
 import { findRuntimeAgent, runtimeAgents } from "../../plugin-runtime/index.ts";
 import { PluginCustomUsageIndicator } from "../usage/index.ts";
 import { iconFromSvg, iconNodesFromSvg } from "./icon.ts";
@@ -25,7 +22,8 @@ export interface ClientAgent {
   program: string;
   title: string;
   caption: string;
-  icon: Component;
+  /** Shared icon name; the menus and settings render it without importing a component. */
+  icon: IconName;
   /** The built-in Projector agent: it has a chat but no terminal program. */
   builtin?: boolean;
   /** A local descriptor for a backend a plugin provides; it disappears when the server drops it. */
@@ -50,22 +48,21 @@ const localPlugins = new Map<string, ClientAgent>();
 const revision = ref(0);
 const agents = new Map<string, ClientAgent>();
 
-const fallbackIcon = IconTerminal;
-const icons: Record<string, Component> = {
-  bot: IconBot,
-  code: IconCode,
-  sparkles: IconSparkles,
-  terminal: IconTerminal,
-};
+const fallbackIcon: IconName = "terminal";
 
-function iconOf(name: unknown): Component {
-  return typeof name === "string" && icons[name] ? icons[name] : fallbackIcon;
+/** A manifest names one of the shared icons; an unknown name gets the terminal. */
+function iconOf(name: unknown): IconName {
+  return typeof name === "string" && hasIcon(name) ? name : fallbackIcon;
 }
 
-function iconFromRemote(item: RemoteAgent): Component {
-  return typeof item.iconSvg === "string" && item.iconSvg.includes("<svg")
-    ? iconFromSvg(item.iconSvg)
-    : iconOf(item.icon);
+/** A plugin SVG becomes a registered icon, so the catalog can keep passing names around. */
+function iconFromRemote(item: RemoteAgent, backend: string): IconName {
+  if (typeof item.iconSvg === "string" && item.iconSvg.includes("<svg")) {
+    const name = `agent:${backend}`;
+    registerIcon(name, iconFromSvg(item.iconSvg));
+    return name;
+  }
+  return iconOf(item.icon);
 }
 
 /** Overlays live browser-plugin contributions without replacing a local usage indicator. */
@@ -183,7 +180,7 @@ function usageWindowsOf(value: unknown): AgentUsageWindowDefinition[] | undefine
 function usagePropsOf(
   item: RemoteAgent,
   title: string,
-  icon: Component,
+  icon: IconName,
 ): Record<string, unknown> | undefined {
   if (typeof item.usageUrl !== "string" || !item.usageUrl) return undefined;
   const windows = usageWindowsOf(item.usageWindows);
@@ -201,7 +198,7 @@ function withRemoteUsage(
   agent: ClientAgent,
   item: RemoteAgent,
   title: string,
-  icon: Component,
+  icon: IconName,
 ): ClientAgent {
   if (agent.usage) return agent;
   const usageProps = usagePropsOf(item, title, icon);
@@ -262,7 +259,7 @@ export async function refreshClientAgents(): Promise<void> {
       continue;
     }
     seen.add(item.id);
-    const icon = iconFromRemote(item);
+    const icon = iconFromRemote(item, item.id);
     const plan = planFromRemote(item);
     const usageProps = usagePropsOf(item, label, icon);
     registerClientAgent({

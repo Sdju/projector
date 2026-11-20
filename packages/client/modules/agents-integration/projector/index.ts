@@ -1,4 +1,3 @@
-import IconProjector from "~icons/lucide/bot";
 import type { ClientAgent } from "../catalog/index.ts";
 import { readProjectorPlan } from "./plan.ts";
 
@@ -8,7 +7,7 @@ export const projectorAgent: ClientAgent = {
   program: "projector",
   title: "Projector",
   caption: "Встроенный агент Projector, история разговоров",
-  icon: IconProjector,
+  icon: "bot",
   builtin: true,
   plan: readProjectorPlan,
 };

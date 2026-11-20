@@ -1,9 +1,7 @@
 <script setup lang="ts">
+import ProjectorIcon from "../icons/ProjectorIcon.vue";
 import UiPopupSurface from "./UiPopupSurface.vue";
 import { dismissNotice, dismissToast, notices, toasts, type Notice } from "../utilities/notice.ts";
-import IconCheck from "~icons/lucide/check";
-import IconAlert from "~icons/lucide/circle-alert";
-import IconClose from "~icons/lucide/x";
 
 /** Слой информационных тултипов (см. utilities/notice.ts). */
 const GAP = 8;
@@ -34,14 +32,14 @@ function place(notice: Notice) {
         :style="place(notice)"
         @click="dismissNotice(notice.id)"
       >
-        <IconCheck v-if="notice.kind === 'success'" aria-hidden="true" />
-        <IconAlert v-else aria-hidden="true" />
+        <ProjectorIcon name="check" v-if="notice.kind === 'success'" aria-hidden="true" />
+        <ProjectorIcon name="circle-alert" v-else aria-hidden="true" />
         <span>{{ notice.text }}</span>
       </UiPopupSurface>
     </div>
     <div class="toast-layer" role="region" aria-label="Ошибки">
       <div v-for="toast in toasts" :key="toast.id" class="toast" role="alert">
-        <IconAlert aria-hidden="true" />
+        <ProjectorIcon name="circle-alert" aria-hidden="true" />
         <span class="toast-text">{{ toast.text }}</span>
         <button
           v-if="toast.action"
@@ -61,7 +59,7 @@ function place(notice: Notice) {
           title="Закрыть"
           @click="dismissToast(toast.id)"
         >
-          <IconClose aria-hidden="true" />
+          <ProjectorIcon name="x" aria-hidden="true" />
         </button>
       </div>
     </div>

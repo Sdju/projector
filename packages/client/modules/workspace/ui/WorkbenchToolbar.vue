@@ -1,16 +1,11 @@
 <script setup lang="ts">
+import ProjectorIcon from "../../../common/icons/ProjectorIcon.vue";
 import type { WorkspaceCapabilities } from "../../workspace-api/index.ts";
 import UiButton from "../../../common/ui/UiButton.vue";
 import { AgentInboxBell } from "../../agent/index.ts";
 import LayoutMenu from "./LayoutMenu.vue";
 import NewSessionMenu from "./NewSessionMenu.vue";
 import type { LayoutPreset } from "../lib/workbench-layout.ts";
-import IconAnalytics from "~icons/lucide/chart-no-axes-column";
-import IconMedia from "~icons/lucide/sparkles";
-import IconSettings from "~icons/lucide/settings-2";
-import IconMenu from "~icons/lucide/menu";
-import IconEyeOff from "~icons/lucide/eye-off";
-import IconEye from "~icons/lucide/eye";
 import { computed, ref, useSlots } from "vue";
 import UiIsland from "../../../common/ui/UiIsland.vue";
 import ContextMenu from "../../../common/ui/ContextMenu.vue";
@@ -130,7 +125,7 @@ const contextItems = computed(() => [
   {
     id: "hide",
     label: "Скрыть",
-    icon: IconEyeOff,
+    icon: "eye-off",
     command: "ide.workbench.action.visibility.set",
     args: { action: target.value, visible: false },
     run: async () => {
@@ -217,9 +212,13 @@ function openContext(event: MouseEvent, id: string) {
           )
         "
       >
-        <IconMedia v-if="item.id === 'media'" aria-hidden="true" />
-        <IconAnalytics v-else-if="item.id === 'analytics'" aria-hidden="true" />
-        <IconSettings v-else aria-hidden="true" />
+        <ProjectorIcon name="sparkles" v-if="item.id === 'media'" aria-hidden="true" />
+        <ProjectorIcon
+          name="chart-no-axes-column"
+          v-else-if="item.id === 'analytics'"
+          aria-hidden="true"
+        />
+        <ProjectorIcon name="settings-2" v-else aria-hidden="true" />
       </UiButton>
     </span>
     <span :ref="menu.trigger"
@@ -232,7 +231,7 @@ function openContext(event: MouseEvent, id: string) {
         :aria-expanded="menu.open.value"
         data-command="ide.workbench.actions.hidden.toggle"
         @click="commands.run('ide.workbench.actions.hidden.toggle')"
-        ><IconMenu aria-hidden="true" /></UiButton
+        ><ProjectorIcon name="menu" aria-hidden="true" /></UiButton
     ></span>
     <UiIsland :menu="menu" label="Скрытые действия" :width="300">
       <p v-if="visibility.error.value" role="alert">{{ visibility.error.value }}</p>
@@ -293,7 +292,7 @@ function openContext(event: MouseEvent, id: string) {
           @click="
             commands.run('ide.workbench.action.visibility.set', { action: item.id, visible: true })
           "
-          ><IconEye aria-hidden="true"
+          ><ProjectorIcon name="eye" aria-hidden="true"
         /></UiButton>
       </div>
     </UiIsland>

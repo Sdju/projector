@@ -1,9 +1,9 @@
 <script setup lang="ts">
+import ProjectorIcon from "../../../../../common/icons/ProjectorIcon.vue";
 import UiCard from "../../../../../common/ui/UiCard.vue";
 import UiInline from "../../../../../common/ui/UiInline.vue";
 import UiButton from "../../../../../common/ui/UiButton.vue";
 import type { WorktreeInfo } from "../../../../agent-core/index.ts";
-import IconBranch from "~icons/lucide/git-branch";
 
 defineProps<{
   branch: string;
@@ -18,12 +18,10 @@ const emit = defineEmits<{ merge: []; discard: [] }>();
 <template>
   <UiCard density="compact" class="worktree" aria-label="Изолированная копия проекта">
     <UiInline as="header" align="flex-start" justify="normal">
-      <IconBranch aria-hidden="true" />
+      <ProjectorIcon name="git-branch" aria-hidden="true" />
       <span class="what"
-        >Чат работает в изолированной копии, ветка <code>{{ branch }}</code
-        >. Файлы проекта не затронуты<template v-if="info"
-          >; изменено файлов: {{ info.changed }}</template
-        >.</span
+        >Чат работает в изолированной копии, ветка <code>{{ branch }}</code>. Файлы проекта не
+        затронуты<template v-if="info">; изменено файлов: {{ info.changed }}</template>.</span
       >
     </UiInline>
     <p v-if="note" class="note" role="status">{{ note }}</p>

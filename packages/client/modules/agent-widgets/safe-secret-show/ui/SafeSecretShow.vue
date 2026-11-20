@@ -1,11 +1,11 @@
 <script setup lang="ts">
+import ProjectorIcon from "../../../../common/icons/ProjectorIcon.vue";
 import { inject, ref } from "vue";
 import UiButton from "../../../../common/ui/UiButton.vue";
 import UiCard from "../../../../common/ui/UiCard.vue";
 import UiInline from "../../../../common/ui/UiInline.vue";
 import UiSecretValue from "../../../../common/ui/UiSecretValue.vue";
 import { widgetProjectKey } from "../../../widget-runtime/index.ts";
-import IconKey from "~icons/lucide/key-round";
 
 const props = defineProps<{ script: string; label?: string; comment?: string }>();
 
@@ -53,7 +53,7 @@ async function load(): Promise<void> {
 <template>
   <UiCard as="section" tone="warning" density="notice" class="secret-widget">
     <UiInline as="header" align="center" justify="normal">
-      <IconKey aria-hidden="true" />
+      <ProjectorIcon name="key-round" aria-hidden="true" />
       <span class="title">{{ label || "Секрет" }}</span>
     </UiInline>
     <p v-if="comment" class="comment">{{ comment }}</p>

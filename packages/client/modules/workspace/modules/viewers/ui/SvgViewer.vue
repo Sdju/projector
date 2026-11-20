@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ProjectorIcon from "../../../../../common/icons/ProjectorIcon.vue";
 import UiPanel from "../../../../../common/ui/UiPanel.vue";
 import UiToolbar from "../../../../../common/ui/UiToolbar.vue";
 import { computed, defineAsyncComponent, onBeforeUnmount, ref } from "vue";
@@ -11,9 +12,6 @@ import { useCompactViewport } from "../../../../../common/utilities/compact-view
 import ImageViewport from "../../../../../common/ui/ImageViewport.vue";
 import SplitPanes from "./SplitPanes.vue";
 import SvgParameters from "./SvgParameters.vue";
-import IconSliders from "~icons/lucide/sliders-horizontal";
-import IconExpand from "~icons/lucide/maximize-2";
-import IconShrink from "~icons/lucide/minimize-2";
 import { svgPreview } from "../lib/svg-preview.ts";
 const CodeViewer = defineAsyncComponent(() => import("./CodeViewer.vue"));
 const props = defineProps<{
@@ -191,7 +189,7 @@ commands.scope.registerCommand({
         title="Просмотр SVG на весь экран"
         @click="commands.run('ide.svg.fullscreen.toggle')"
       >
-        <IconExpand aria-hidden="true" />
+        <ProjectorIcon name="maximize-2" aria-hidden="true" />
       </UiButton>
     </UiToolbar>
     <SplitPanes :reveal="line" :initial="compact ? 1 : 0.45" :solo="fullscreen">
@@ -231,7 +229,7 @@ commands.scope.registerCommand({
                     :aria-controls="settings.open.value ? settings.id : undefined"
                     @click="commands.run('ide.svg.parameters.toggle')"
                   >
-                    <IconSliders aria-hidden="true" />
+                    <ProjectorIcon name="sliders-horizontal" aria-hidden="true" />
                   </UiButton>
                 </span>
                 <UiButton
@@ -241,7 +239,10 @@ commands.scope.registerCommand({
                   :title="fullscreen ? 'Выйти из полноэкранного режима (Esc)' : 'На весь экран'"
                   @click="commands.run('ide.svg.fullscreen.toggle')"
                 >
-                  <component :is="fullscreen ? IconShrink : IconExpand" aria-hidden="true" />
+                  <ProjectorIcon
+                    :name="fullscreen ? 'minimize-2' : 'maximize-2'"
+                    aria-hidden="true"
+                  />
                 </UiButton>
               </div>
             </template>

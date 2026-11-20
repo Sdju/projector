@@ -1,8 +1,8 @@
 <script setup lang="ts">
+import ProjectorIcon from "../../../common/icons/ProjectorIcon.vue";
 import UiLoader from "../../../common/ui/UiLoader.vue";
 import UiButton from "../../../common/ui/UiButton.vue";
 import UiResizeHandle from "../../../common/ui/UiResizeHandle.vue";
-import IconMinimize from "~icons/lucide/minimize-2";
 import { computed, nextTick, onBeforeUnmount, ref } from "vue";
 import {
   workspaceProfile,
@@ -686,7 +686,7 @@ onBeforeUnmount(() => {
       data-command="ide.workbench.zen.toggle"
       @click="editorCommands.run('ide.workbench.zen.toggle', { on: false })"
     >
-      <IconMinimize aria-hidden="true" />
+      <ProjectorIcon name="minimize-2" aria-hidden="true" />
     </UiButton>
   </div>
 </template>

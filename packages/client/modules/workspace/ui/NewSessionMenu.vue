@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ProjectorIcon from "../../../common/icons/ProjectorIcon.vue";
 import UiIslandFooter from "../../../common/ui/UiIslandFooter.vue";
 import UiIslandLabel from "../../../common/ui/UiIslandLabel.vue";
 import UiIslandHeader from "../../../common/ui/UiIslandHeader.vue";
@@ -15,11 +16,6 @@ import {
   providerBalanceSummary,
 } from "../../agents-integration/status-bar/index.ts";
 import { useCompactViewport } from "../../../common/utilities/compact-viewport.ts";
-import IconPlus from "~icons/lucide/plus";
-import IconChevron from "~icons/lucide/chevron-down";
-import IconMessage from "~icons/lucide/message-square";
-import IconTerminal from "~icons/lucide/terminal";
-import IconSettings from "~icons/lucide/settings-2";
 import { loadChatRoles } from "../../agent-roles/index.ts";
 import { clientAgentByBackend } from "../../agents-integration/catalog/index.ts";
 import { useSessionLaunchers } from "../lib/session-launchers.ts";
@@ -127,7 +123,7 @@ function hintTone(tone: "spare" | "normal" | "hot" | "over" | null | undefined) 
       :data-command="primary.command"
       @click="launchPrimary"
     >
-      <component :is="primary.icon" class="split-icon" aria-hidden="true" />
+      <ProjectorIcon :name="primary.icon" class="split-icon" aria-hidden="true" />
       <span class="split-label">{{ primary.title }}</span>
     </UiButton>
     <UiButton
@@ -140,7 +136,7 @@ function hintTone(tone: "spare" | "normal" | "hot" | "over" | null | undefined) 
       :aria-controls="open ? menu.id : undefined"
       @click="toggle()"
     >
-      <IconChevron class="split-icon" aria-hidden="true" />
+      <ProjectorIcon name="chevron-down" class="split-icon" aria-hidden="true" />
     </UiButton>
   </span>
   <span v-else :ref="menu.trigger" class="new-session">
@@ -154,7 +150,7 @@ function hintTone(tone: "spare" | "normal" | "hot" | "over" | null | undefined) 
       :aria-controls="open ? menu.id : undefined"
       @click="toggle()"
     >
-      <IconPlus aria-hidden="true" />
+      <ProjectorIcon name="plus" aria-hidden="true" />
     </UiButton>
   </span>
   <UiIsland :menu="menu" label="Новая сессия">
@@ -164,7 +160,7 @@ function hintTone(tone: "spare" | "normal" | "hot" | "over" | null | undefined) 
       aria-label="Закрыть"
       @click="toggle(false)"
     >
-      <IconPlus aria-hidden="true" /><span>Новая сессия</span>
+      <ProjectorIcon name="plus" aria-hidden="true" /><span>Новая сессия</span>
     </UiIslandHeader>
     <template v-if="roleRows.length">
       <UiIslandLabel divided>Роли</UiIslandLabel>
@@ -179,7 +175,7 @@ function hintTone(tone: "spare" | "normal" | "hot" | "over" | null | undefined) 
             @mousemove="active = index"
             @click="pickRole(row.role.id)"
           >
-            <component :is="row.agent.icon" class="row-icon" aria-hidden="true" />
+            <ProjectorIcon :name="row.agent.icon" class="row-icon" aria-hidden="true" />
             <UiActionCopy :title="row.title" :description="row.caption" />
           </UiActionRow>
           <button
@@ -190,7 +186,7 @@ function hintTone(tone: "spare" | "normal" | "hot" | "over" | null | undefined) 
             data-command="ide.agent.role.edit"
             @click="editRole(row.role.id)"
           >
-            <IconSettings aria-hidden="true" />
+            <ProjectorIcon name="settings-2" aria-hidden="true" />
           </button>
         </div>
       </UiStack>
@@ -207,7 +203,7 @@ function hintTone(tone: "spare" | "normal" | "hot" | "over" | null | undefined) 
           @mousemove="active = roleRows.length + index"
           @click="pick(row.program)"
         >
-          <component :is="row.icon" class="row-icon" aria-hidden="true" />
+          <ProjectorIcon :name="row.icon" class="row-icon" aria-hidden="true" />
           <UiActionCopy
             :title="row.title"
             :description="
@@ -233,8 +229,12 @@ function hintTone(tone: "spare" | "normal" | "hot" | "over" | null | undefined) 
           "
           @click="toggleMode(row.program)"
         >
-          <IconMessage v-if="modeOf(row.program) === 'gui'" aria-hidden="true" />
-          <IconTerminal v-else aria-hidden="true" />
+          <ProjectorIcon
+            name="message-square"
+            v-if="modeOf(row.program) === 'gui'"
+            aria-hidden="true"
+          />
+          <ProjectorIcon name="terminal" v-else aria-hidden="true" />
         </button>
       </div>
     </UiStack>
@@ -248,7 +248,7 @@ function hintTone(tone: "spare" | "normal" | "hot" | "over" | null | undefined) 
         @mousemove="active = roleRows.length + rows.length"
         @click="openChat"
       >
-        <component :is="builtin.icon" class="row-icon" aria-hidden="true" />
+        <ProjectorIcon :name="builtin.icon" class="row-icon" aria-hidden="true" />
         <UiActionCopy :title="builtin.title" :description="builtin.caption" />
         <UiBadge
           v-if="providerBalanceSummary.text"

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ProjectorIcon from "../../common/icons/ProjectorIcon.vue";
 import UiAvatar from "../../common/ui/UiAvatar.vue";
 import UiBadge from "../../common/ui/UiBadge.vue";
 import UiCard from "../../common/ui/UiCard.vue";
@@ -6,24 +7,16 @@ import UiHeading from "../../common/ui/UiHeading.vue";
 import UiInline from "../../common/ui/UiInline.vue";
 import type { RepositoryOverviewModel, RepositoryStatIcon } from "./repository-overview.ts";
 import { useTabReadout } from "../../common/utilities/tab-readout.ts";
-import IconBranch from "~icons/lucide/git-branch";
-import IconExternal from "~icons/lucide/external-link";
-import IconEye from "~icons/lucide/eye";
-import IconFork from "~icons/lucide/git-fork";
-import IconGlobe from "~icons/lucide/globe";
-import IconIssue from "~icons/lucide/circle-dot";
-import IconMerge from "~icons/lucide/git-merge";
-import IconScale from "~icons/lucide/scale";
-import IconStar from "~icons/lucide/star";
 
 const props = defineProps<{ repository: RepositoryOverviewModel }>();
-const icons = {
-  star: IconStar,
-  fork: IconFork,
-  eye: IconEye,
-  issue: IconIssue,
-  merge: IconMerge,
-} satisfies Record<RepositoryStatIcon, unknown>;
+/** Semantic keys of the model map to shared icon names in one place. */
+const icons: Record<RepositoryStatIcon, string> = {
+  star: "star",
+  fork: "git-fork",
+  eye: "eye",
+  issue: "circle-dot",
+  merge: "git-merge",
+};
 const number = (value: number) => value.toLocaleString("ru-RU");
 const visibility = () =>
   props.repository.visibility ?? (props.repository.private ? "приватный" : "публичный");
@@ -56,7 +49,8 @@ useTabReadout(() => props.repository.readout);
         target="_blank"
         rel="noopener noreferrer"
       >
-        <IconExternal aria-hidden="true" />Открыть на {{ repository.hostLabel }}
+        <ProjectorIcon name="external-link" aria-hidden="true" />Открыть на
+        {{ repository.hostLabel }}
       </UiInline>
     </UiInline>
 
@@ -75,7 +69,7 @@ useTabReadout(() => props.repository.readout);
         :key="item.key"
         class="stat"
       >
-        <dt><component :is="icons[item.icon]" aria-hidden="true" />{{ item.label }}</dt>
+        <dt><ProjectorIcon :name="icons[item.icon]" aria-hidden="true" />{{ item.label }}</dt>
         <dd>{{ number(item.value) }}</dd>
       </UiCard>
     </dl>
@@ -88,18 +82,18 @@ useTabReadout(() => props.repository.readout);
     </dl>
 
     <p v-if="repository.homepage" class="note-line">
-      <IconGlobe aria-hidden="true" />
+      <ProjectorIcon name="globe" aria-hidden="true" />
       <a :href="repository.homepage" target="_blank" rel="noopener noreferrer">
         {{ repository.homepage }}
       </a>
     </p>
     <p v-if="repository.refNote" class="note-line">
-      <IconBranch aria-hidden="true" />{{ repository.refNote.text }}
+      <ProjectorIcon name="git-branch" aria-hidden="true" />{{ repository.refNote.text }}
       <code v-if="repository.refNote.code">{{ repository.refNote.code }}</code>
       <span v-if="repository.refNote.suffix">{{ repository.refNote.suffix }}</span>
     </p>
     <p v-if="repository.license" class="note-line">
-      <IconScale aria-hidden="true" />Лицензия: {{ repository.license }}
+      <ProjectorIcon name="scale" aria-hidden="true" />Лицензия: {{ repository.license }}
     </p>
   </div>
 </template>

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ProjectorIcon from "../../../common/icons/ProjectorIcon.vue";
 import { computed, ref } from "vue";
 import { useRouter } from "vue-router";
 import UiButton from "../../../common/ui/UiButton.vue";
@@ -21,10 +22,6 @@ import {
   hubItemState,
   sortHubDevices,
 } from "../lib/hub-panel.ts";
-import IconBell from "~icons/lucide/bell";
-import IconBellOff from "~icons/lucide/bell-off";
-import IconExternalLink from "~icons/lucide/external-link";
-import IconMonitor from "~icons/lucide/monitor";
 
 const router = useRouter();
 const { items, hub, error, loading, refresh, href, markRead, isAttention, isUnread } =
@@ -269,7 +266,7 @@ commands.scope.registerCommand({
           data-command="ide.hub.device.open"
           @click="followDevice($event, device)"
         >
-          <span class="device-icon" aria-hidden="true"><IconMonitor /></span>
+          <span class="device-icon" aria-hidden="true"><ProjectorIcon name="monitor" /></span>
           <span class="device-text">
             <span class="device-line">
               <strong class="device-name">{{ device.name }}</strong>
@@ -308,8 +305,8 @@ commands.scope.registerCommand({
               })
             "
           >
-            <IconBell v-if="hubNotifyEnabled(device.id)" aria-hidden="true" />
-            <IconBellOff v-else aria-hidden="true" />
+            <ProjectorIcon name="bell" v-if="hubNotifyEnabled(device.id)" aria-hidden="true" />
+            <ProjectorIcon name="bell-off" v-else aria-hidden="true" />
           </UiButton>
         </div>
 
@@ -361,7 +358,7 @@ commands.scope.registerCommand({
         data-command="ide.hub.open"
         @click="openHub"
       >
-        <IconExternalLink aria-hidden="true" />
+        <ProjectorIcon name="external-link" aria-hidden="true" />
         {{ isHubPage ? "К списку устройств" : "Открыть Hub" }}
       </button>
     </footer>

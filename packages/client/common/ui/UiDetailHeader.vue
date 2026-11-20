@@ -1,7 +1,7 @@
 <script setup lang="ts">
+import ProjectorIcon from "../icons/ProjectorIcon.vue";
 import UiHeading from "./UiHeading.vue";
 import UiInline from "./UiInline.vue";
-import IconExternal from "~icons/lucide/external-link";
 
 /** Shared top of a read-only detail tab: state pill, title, meta line and the host link. */
 withDefaults(
@@ -40,7 +40,7 @@ withDefaults(
       target="_blank"
       rel="noopener noreferrer"
     >
-      <IconExternal aria-hidden="true" />на {{ host }}
+      <ProjectorIcon name="external-link" aria-hidden="true" />на {{ host }}
     </UiInline>
   </UiInline>
 </template>

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ProjectorIcon from "../../../../../common/icons/ProjectorIcon.vue";
 import { computed } from "vue";
 import UiButton from "../../../../../common/ui/UiButton.vue";
 import { useElapsedClock } from "../../../../agent-core/index.ts";
@@ -7,11 +8,6 @@ import { toolLabel } from "../../../../agent-core/index.ts";
 import { useTaskLens } from "../../../../agent-turns/index.ts";
 import type { AgentBackendId, AgentSelection, AgentTask } from "../../../../agent-core/index.ts";
 import { AgentStatusIcon } from "../../../../agent-turns/index.ts";
-import IconBot from "~icons/lucide/bot";
-import IconRefresh from "~icons/lucide/refresh-cw";
-import IconScanEye from "~icons/lucide/scan-eye";
-import IconTerminal from "~icons/lucide/terminal";
-import IconTab from "~icons/lucide/square-arrow-out-up-right";
 
 /** One subagent or background command in the task list: open it to read, or in a tab. */
 const props = defineProps<{
@@ -66,8 +62,8 @@ const { lens, lensNote, toggleLens } = useTaskLens({
       @click="emit('view', task.id)"
     >
       <AgentStatusIcon :status="task.status" />
-      <component
-        :is="task.kind === 'shell' ? IconTerminal : IconBot"
+      <ProjectorIcon
+        :name="task.kind === 'shell' ? 'terminal' : 'bot'"
         class="faint-icon"
         aria-hidden="true"
       />
@@ -93,7 +89,7 @@ const { lens, lensNote, toggleLens } = useTaskLens({
         :aria-label="lens.state.open ? 'Скрыть Lens' : 'Показать Lens'"
         @click="toggleLens"
       >
-        <IconScanEye aria-hidden="true" />
+        <ProjectorIcon name="scan-eye" aria-hidden="true" />
       </UiButton>
       <UiButton
         v-if="lens.state.open"
@@ -104,7 +100,7 @@ const { lens, lensNote, toggleLens } = useTaskLens({
         aria-label="Обновить Lens"
         @click="lens.refresh()"
       >
-        <IconRefresh aria-hidden="true" />
+        <ProjectorIcon name="refresh-cw" aria-hidden="true" />
       </UiButton>
     </template>
     <UiButton
@@ -114,7 +110,7 @@ const { lens, lensNote, toggleLens } = useTaskLens({
       aria-label="Открыть в новой вкладке"
       @click="emit('tab', task.id)"
     >
-      <IconTab aria-hidden="true" />
+      <ProjectorIcon name="square-arrow-out-up-right" aria-hidden="true" />
     </UiButton>
   </li>
 </template>

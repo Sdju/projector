@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ProjectorIcon from "../../common/icons/ProjectorIcon.vue";
 import UiMessage from "../../common/ui/UiMessage.vue";
 import { useRoute, useRouter } from "vue-router";
 import type { GithubRepository } from "@ai-projector/core/modules/github/index.ts";
@@ -9,7 +10,6 @@ import { useCommandScope } from "../../common/utilities/commands.ts";
 import UiButton from "../../common/ui/UiButton.vue";
 import { formatProjectRef, projectRoute } from "../project/index.ts";
 import { GithubClone, GithubConnection } from "../github/index.ts";
-import IconGithub from "~icons/simple-icons/github";
 import { GithubRequestError, readRepository } from "./client.ts";
 import { createGithubConnectionProfile, createGithubWorkspaceProfile } from "./source.ts";
 import GithubRepositoryInfo from "./ui/GithubRepositoryInfo.vue";
@@ -108,7 +108,7 @@ const tabViews: TabViews = {
           )
         "
       >
-        <IconGithub aria-hidden="true" />
+        <ProjectorIcon name="simple-icons:github" aria-hidden="true" />
       </UiButton>
     </template>
     <template #terminal-status

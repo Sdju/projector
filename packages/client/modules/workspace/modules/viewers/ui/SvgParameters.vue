@@ -1,10 +1,10 @@
 <script setup lang="ts">
+import ProjectorIcon from "../../../../../common/icons/ProjectorIcon.vue";
 import UiLabel from "../../../../../common/ui/UiLabel.vue";
 import UiControl from "../../../../../common/ui/UiControl.vue";
 import UiInline from "../../../../../common/ui/UiInline.vue";
 import { useId } from "vue";
 import UiButton from "../../../../../common/ui/UiButton.vue";
-import IconRotateCcw from "~icons/lucide/rotate-ccw";
 
 /** Поля параметров просмотра SVG; `bar` — строка панели на десктопе, `sheet` — вертикальный список острова. */
 defineProps<{ variant: "bar" | "sheet" }>();
@@ -117,7 +117,7 @@ const clamp = () =>
       title="Вернуть исходные currentColor, размер и фон SVG"
       @click="$emit('reset')"
     >
-      <IconRotateCcw aria-hidden="true" />
+      <ProjectorIcon name="rotate-ccw" aria-hidden="true" />
       <template v-if="variant === 'sheet'">Сбросить</template>
     </UiButton>
   </div>

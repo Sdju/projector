@@ -1,8 +1,8 @@
 <script setup lang="ts">
+import ProjectorIcon from "../../../../common/icons/ProjectorIcon.vue";
 import UsageIndicator from "../../_/UsageIndicator.vue";
 import { useAgentUsageIndicator } from "../../_/use-agent-usage-indicator.ts";
 import { USAGE_PERIOD_SECONDS } from "../../_/usage-pace.ts";
-import IconKimi from "~icons/simple-icons/kimi";
 import type { KimiUsage } from "@ai-projector/core/modules/agents-integration/kimi/index.ts";
 
 type WindowName = keyof NonNullable<KimiUsage["windows"]>;
@@ -64,6 +64,6 @@ const { selected, remaining, tone, tooltipRows, tooltip, commands } = useAgentUs
     interactive
     @cycle="commands.run('ide.kimi.usage.window.cycle')"
   >
-    <template #icon><IconKimi /></template>
+    <template #icon><ProjectorIcon name="simple-icons:kimi" /></template>
   </UsageIndicator>
 </template>

@@ -1,4 +1,3 @@
-import IconOpenCode from "~icons/simple-icons/opencode";
 import type { ClientAgent } from "../catalog/index.ts";
 import OpenCodeUsageIndicator from "./ui/OpenCodeUsageIndicator.vue";
 
@@ -9,7 +8,7 @@ export const opencodeAgent: ClientAgent = {
   program: "opencode",
   title: "OpenCode",
   caption: "Запустит агента OpenCode",
-  icon: IconOpenCode,
+  icon: "simple-icons:opencode",
   usage: OpenCodeUsageIndicator,
   usageUrl: "/api/opencode/usage",
 };

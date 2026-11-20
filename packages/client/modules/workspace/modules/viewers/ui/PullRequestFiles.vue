@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ProjectorIcon from "../../../../../common/icons/ProjectorIcon.vue";
 import UiButton from "../../../../../common/ui/UiButton.vue";
 import UiHeading from "../../../../../common/ui/UiHeading.vue";
 import UiHint from "../../../../../common/ui/UiHint.vue";
@@ -11,7 +12,6 @@ import type {
 import { useFileIconTheme } from "../../../../file-icons/index.ts";
 import ChangedFileRow from "./ChangedFileRow.vue";
 import type { ChangedFileItem } from "../lib/changed-files.ts";
-import IconTree from "~icons/lucide/list-tree";
 
 /** Изменённые файлы merge request: список, раскрываемый diff и вход в дерево панели. */
 const props = defineProps<{
@@ -100,7 +100,7 @@ const totalFiles = computed(() =>
         title="Открыть дерево изменений в боковой панели"
         @click="emit('openTree')"
       >
-        <IconTree aria-hidden="true" />
+        <ProjectorIcon name="list-tree" aria-hidden="true" />
         Дерево
       </button>
       <UiButton

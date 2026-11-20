@@ -1,7 +1,7 @@
 <script setup lang="ts">
+import ProjectorIcon from "../../../common/icons/ProjectorIcon.vue";
 import UiBadge from "../../../common/ui/UiBadge.vue";
 import { useSessionLaunchers } from "../lib/session-launchers.ts";
-import IconPlus from "~icons/lucide/plus";
 
 /**
  * Пустая группа терминалов: те же варианты запуска, что и в острове «+», крупными плитками.
@@ -28,7 +28,9 @@ function tone(tone: "spare" | "normal" | "hot" | "over" | null | undefined) {
 <template>
   <div class="tiles-host">
     <div class="tiles" role="group" aria-label="Новая сессия">
-      <p class="lead"><IconPlus aria-hidden="true" /> Новая сессия в папке проекта</p>
+      <p class="lead">
+        <ProjectorIcon name="plus" aria-hidden="true" /> Новая сессия в папке проекта
+      </p>
       <div class="grid">
         <button
           v-for="row in rows"
@@ -39,7 +41,7 @@ function tone(tone: "spare" | "normal" | "hot" | "over" | null | undefined) {
           :data-command="commandOf(row.program)"
           @click="launch(row.program)"
         >
-          <component :is="row.icon" class="tile-icon" aria-hidden="true" />
+          <ProjectorIcon :name="row.icon" class="tile-icon" aria-hidden="true" />
           <span class="tile-copy">
             <span class="tile-title">{{ row.title }}</span>
             <span class="tile-caption">{{
@@ -57,7 +59,7 @@ function tone(tone: "spare" | "normal" | "hot" | "over" | null | undefined) {
           data-command="ide.workbench.agent.open"
           @click="openBuiltin"
         >
-          <component :is="builtin.icon" class="tile-icon" aria-hidden="true" />
+          <ProjectorIcon :name="builtin.icon" class="tile-icon" aria-hidden="true" />
           <span class="tile-copy">
             <span class="tile-title">{{ builtin.title }}</span>
             <span class="tile-caption">{{ builtin.caption }}</span>

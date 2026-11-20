@@ -1,11 +1,8 @@
 <script setup lang="ts">
+import ProjectorIcon from "../../../common/icons/ProjectorIcon.vue";
 import { reactive } from "vue";
 import UiButton from "../../../common/ui/UiButton.vue";
 import type { AgentQuestionRequest } from "../../agent-core/index.ts";
-import IconCheck from "~icons/lucide/check";
-import IconChevronDown from "~icons/lucide/chevron-down";
-import IconPencil from "~icons/lucide/pencil-line";
-import IconSkipForward from "~icons/lucide/skip-forward";
 
 const props = withDefaults(
   defineProps<{
@@ -87,7 +84,7 @@ function submit(request: AgentQuestionRequest) {
         :aria-expanded="!isCollapsed(request.id)"
         @click="toggleCollapsed(request.id)"
       >
-        <span class="fold-icon"><IconChevronDown aria-hidden="true" /></span>
+        <span class="fold-icon"><ProjectorIcon name="chevron-down" aria-hidden="true" /></span>
       </UiButton>
       <fieldset v-for="question in request.questions" :key="question.id" class="ask">
         <legend class="legend">
@@ -121,7 +118,7 @@ function submit(request: AgentQuestionRequest) {
             v-if="(request.custom || question.custom) && ownQuestion(request) !== question"
             class="own"
           >
-            <IconPencil aria-hidden="true" />
+            <ProjectorIcon name="pencil-line" aria-hidden="true" />
             <input
               v-model="written[key(request.id, question.id)]"
               type="text"
@@ -134,7 +131,7 @@ function submit(request: AgentQuestionRequest) {
       </fieldset>
       <div v-if="!isCollapsed(request.id)" class="footer">
         <label v-if="ownQuestion(request)" class="own">
-          <IconPencil aria-hidden="true" />
+          <ProjectorIcon name="pencil-line" aria-hidden="true" />
           <input
             v-model="written[ownKey(request)]"
             type="text"
@@ -152,7 +149,7 @@ function submit(request: AgentQuestionRequest) {
             aria-label="Пропустить вопрос"
             @click="emit('answer', request.id, null)"
           >
-            <IconSkipForward aria-hidden="true" />
+            <ProjectorIcon name="skip-forward" aria-hidden="true" />
           </UiButton>
           <UiButton
             appearance="solid"
@@ -163,7 +160,7 @@ function submit(request: AgentQuestionRequest) {
             :disabled="!complete(request)"
             @click="submit(request)"
           >
-            <IconCheck aria-hidden="true" />
+            <ProjectorIcon name="check" aria-hidden="true" />
           </UiButton>
         </div>
       </div>

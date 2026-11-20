@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ProjectorIcon from "../../../common/icons/ProjectorIcon.vue";
 import UiLoader from "../../../common/ui/UiLoader.vue";
 import UiPanel from "../../../common/ui/UiPanel.vue";
 import { computed } from "vue";
@@ -19,9 +20,6 @@ import NewSessionMenu from "./NewSessionMenu.vue";
 import SessionTiles from "./SessionTiles.vue";
 import PanelHost from "./PanelHost.vue";
 import TabReadoutScope from "../../../common/ui/TabReadoutScope.vue";
-import IconDiff from "~icons/lucide/file-diff";
-import IconRestart from "~icons/lucide/rotate-ccw";
-import IconFailed from "~icons/lucide/circle-slash";
 
 const props = defineProps<{
   projectId: string;
@@ -122,13 +120,15 @@ const asideKey = computed(() => {
       />
     </template>
     <template #icon="{ tab }">
-      <IconDiff
+      <ProjectorIcon
+        name="file-diff"
         v-if="fileOf(tab.id)?.original !== undefined && fileOf(tab.id)"
         class="diff-tab-icon"
         aria-label="Изменения"
       />
       <template v-else-if="terminalPanels.get(tab.id)">
-        <IconFailed
+        <ProjectorIcon
+          name="circle-slash"
           v-if="terminals.failed(terminalPanels.get(tab.id)!)"
           class="session-state failed"
           aria-hidden="true"
@@ -165,7 +165,7 @@ const asideKey = computed(() => {
           aria-label="Перезапустить сессию"
           @click="terminals.restart(terminalPanels.get(activeId)!.id)"
         >
-          <IconRestart aria-hidden="true" />
+          <ProjectorIcon name="rotate-ccw" aria-hidden="true" />
         </UiButton>
       </template>
     </template>

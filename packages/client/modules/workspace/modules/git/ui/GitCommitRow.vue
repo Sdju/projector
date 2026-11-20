@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ProjectorIcon from "../../../../../common/icons/ProjectorIcon.vue";
 import { computed } from "vue";
 import type {
   GitCommit,
@@ -15,9 +16,6 @@ import {
 import type { CommitDetailState } from "../lib/git-history.ts";
 import GitChangesTree from "./GitChangesTree.vue";
 import GitGraphCell from "./GitGraphCell.vue";
-import IconChevronRight from "~icons/lucide/chevron-right";
-import IconOpen from "~icons/lucide/external-link";
-import IconCopy from "~icons/lucide/copy";
 
 const props = defineProps<{
   commit: GitCommit;
@@ -102,7 +100,12 @@ const refs = computed(() =>
             <span v-if="merge" class="flag">merge</span>
           </span>
         </span>
-        <IconChevronRight class="chevron" :class="{ open: expanded }" aria-hidden="true" />
+        <ProjectorIcon
+          name="chevron-right"
+          class="chevron"
+          :class="{ open: expanded }"
+          aria-hidden="true"
+        />
       </button>
       <UiButton
         shape="icon"
@@ -113,7 +116,7 @@ const refs = computed(() =>
         data-command="ide.git.commit.open"
         @click="emit('open')"
       >
-        <IconOpen aria-hidden="true" />
+        <ProjectorIcon name="external-link" aria-hidden="true" />
       </UiButton>
     </div>
     <div v-if="expanded" class="details" :style="{ paddingLeft: gutter.width }">
@@ -136,7 +139,7 @@ const refs = computed(() =>
             data-command="ide.git.commit.copyHash"
             @click="emit('copy')"
           >
-            <IconCopy aria-hidden="true" />
+            <ProjectorIcon name="copy" aria-hidden="true" />
           </UiButton>
         </div>
         <p v-if="!changes.length" class="note">В этой папке коммит ничего не менял.</p>

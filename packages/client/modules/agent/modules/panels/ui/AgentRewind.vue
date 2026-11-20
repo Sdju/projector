@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ProjectorIcon from "../../../../../common/icons/ProjectorIcon.vue";
 import UiControl from "../../../../../common/ui/UiControl.vue";
 import { computed, ref, watch, useId } from "vue";
 import UiCard from "../../../../../common/ui/UiCard.vue";
@@ -7,7 +8,6 @@ import UiLoader from "../../../../../common/ui/UiLoader.vue";
 import UiButton from "../../../../../common/ui/UiButton.vue";
 import type { RewindSummary } from "../../../../agent-core/index.ts";
 import type { RewindScope } from "../../../../agent-core/index.ts";
-import IconUndo from "~icons/lucide/undo-2";
 
 const radioName = useId();
 const props = defineProps<{
@@ -60,7 +60,7 @@ const options = computed(
 <template>
   <UiCard class="rewind" role="dialog" aria-label="Откат к сообщению">
     <UiInline as="header" align="center" justify="normal">
-      <IconUndo aria-hidden="true" />
+      <ProjectorIcon name="undo-2" aria-hidden="true" />
       <span>Откатить к этому сообщению</span>
     </UiInline>
     <template v-if="!result">

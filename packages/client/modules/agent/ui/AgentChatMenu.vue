@@ -1,17 +1,9 @@
 <script setup lang="ts">
+import ProjectorIcon from "../../../common/icons/ProjectorIcon.vue";
 import UiButton from "../../../common/ui/UiButton.vue";
 import UiIsland from "../../../common/ui/UiIsland.vue";
 import UiIslandLabel from "../../../common/ui/UiIslandLabel.vue";
 import { useIslandMenu } from "../../../common/utilities/island-menu.ts";
-import IconBranch from "~icons/lucide/git-branch";
-import IconCheck from "~icons/lucide/check";
-import IconDownload from "~icons/lucide/download";
-import IconEllipsis from "~icons/lucide/ellipsis";
-import IconMessageCircleQuestion from "~icons/lucide/message-circle-question";
-import IconScanEye from "~icons/lucide/scan-eye";
-import IconScale from "~icons/lucide/scale";
-import IconSparkles from "~icons/lucide/sparkles";
-import IconMaximize from "~icons/lucide/maximize-2";
 import { toggleZenMode, zenAvailable, zenMode } from "../../../common/utilities/zen-mode.ts";
 import { useOptionalIdeCommands } from "../../ide/index.ts";
 
@@ -89,12 +81,12 @@ function run(action: "lens" | "side" | "features" | "judge" | "download" | "isol
       :aria-expanded="menu.open.value"
       @click="menu.toggle()"
     >
-      <IconEllipsis aria-hidden="true" />
+      <ProjectorIcon name="ellipsis" aria-hidden="true" />
     </UiButton>
     <UiIsland :menu="menu" label="Действия чата" :width="300">
       <UiIslandLabel>Чат</UiIslandLabel>
       <button type="button" class="item" @click="run('features')">
-        <IconSparkles aria-hidden="true" />
+        <ProjectorIcon name="sparkles" aria-hidden="true" />
         <span class="text">
           <span class="title">Возможности агента</span>
           <span class="hint">Виджеты и команды IDE в этом чате</span>
@@ -102,7 +94,7 @@ function run(action: "lens" | "side" | "features" | "judge" | "download" | "isol
         <span v-if="featuresChanged" class="dot" aria-hidden="true" />
       </button>
       <button type="button" class="item" @click="run('judge')">
-        <IconScale aria-hidden="true" />
+        <ProjectorIcon name="scale" aria-hidden="true" />
         <span class="text">
           <span class="title">Судья</span>
           <span class="hint">Риск действия и автоматическое разрешение</span>
@@ -110,23 +102,23 @@ function run(action: "lens" | "side" | "features" | "judge" | "download" | "isol
         <span v-if="judgeChanged" class="dot" aria-hidden="true" />
       </button>
       <button type="button" class="item" :aria-pressed="lens" @click="run('lens')">
-        <IconScanEye aria-hidden="true" />
+        <ProjectorIcon name="scan-eye" aria-hidden="true" />
         <span class="text">
           <span class="title">Lens</span>
           <span class="hint">Чем агент занят сейчас</span>
         </span>
-        <IconCheck v-if="lens" class="state" aria-hidden="true" />
+        <ProjectorIcon name="check" v-if="lens" class="state" aria-hidden="true" />
       </button>
       <button type="button" class="item" :aria-pressed="side" @click="run('side')">
-        <IconMessageCircleQuestion aria-hidden="true" />
+        <ProjectorIcon name="message-circle-question" aria-hidden="true" />
         <span class="text">
           <span class="title">Вопрос в сторону</span>
           <span class="hint">Не прерывает агента и не попадает в чат</span>
         </span>
-        <IconCheck v-if="side" class="state" aria-hidden="true" />
+        <ProjectorIcon name="check" v-if="side" class="state" aria-hidden="true" />
       </button>
       <button v-if="canDownload" type="button" class="item" @click="run('download')">
-        <IconDownload aria-hidden="true" />
+        <ProjectorIcon name="download" aria-hidden="true" />
         <span class="text">
           <span class="title">Скачать в Markdown</span>
           <span class="hint">Вся переписка одним файлом</span>
@@ -139,12 +131,12 @@ function run(action: "lens" | "side" | "features" | "judge" | "download" | "isol
         :aria-pressed="isolate"
         @click="run('isolate')"
       >
-        <IconBranch aria-hidden="true" />
+        <ProjectorIcon name="git-branch" aria-hidden="true" />
         <span class="text">
           <span class="title">Изолированная копия</span>
           <span class="hint">git worktree: файлы не меняются до слияния</span>
         </span>
-        <IconCheck v-if="isolate" class="state" aria-hidden="true" />
+        <ProjectorIcon name="check" v-if="isolate" class="state" aria-hidden="true" />
       </button>
       <button
         v-if="zenAvailable"
@@ -154,12 +146,12 @@ function run(action: "lens" | "side" | "features" | "judge" | "download" | "isol
         data-command="ide.workbench.zen.toggle"
         @click="toggleZen"
       >
-        <IconMaximize aria-hidden="true" />
+        <ProjectorIcon name="maximize-2" aria-hidden="true" />
         <span class="text">
           <span class="title">Режим Zen</span>
           <span class="hint">Скрыть панели, ввод и детали работы</span>
         </span>
-        <IconCheck v-if="zenMode" class="state" aria-hidden="true" />
+        <ProjectorIcon name="check" v-if="zenMode" class="state" aria-hidden="true" />
       </button>
     </UiIsland>
   </div>

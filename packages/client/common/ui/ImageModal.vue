@@ -1,9 +1,9 @@
 <script setup lang="ts">
+import ProjectorIcon from "../icons/ProjectorIcon.vue";
 import { computed, onMounted, ref } from "vue";
 import UiButton from "./UiButton.vue";
 import UiDialog from "./UiDialog.vue";
 import ImageViewport from "./ImageViewport.vue";
-import IconX from "~icons/lucide/x";
 
 const props = defineProps<{
   src?: string;
@@ -61,7 +61,7 @@ onMounted(() => dialog.value?.open());
           title="Закрыть"
           @click="close()"
         >
-          <IconX aria-hidden="true" />
+          <ProjectorIcon name="x" aria-hidden="true" />
         </UiButton>
       </header>
       <div class="stage">

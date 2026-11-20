@@ -1,9 +1,8 @@
-import type { Component } from "vue";
-
 export interface ContextMenuItem {
   id: string;
   label: string;
-  icon?: Component;
+  /** Shared icon name; the menu renders it through the icon service. */
+  icon?: string;
   shortcut?: string;
   /** Короткая метка справа (например, остаток лимита); `tone` красит её. */
   hint?: { text: string; tone?: "spare" | "normal" | "hot" | "over" | null };

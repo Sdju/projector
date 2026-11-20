@@ -1,13 +1,10 @@
 <script setup lang="ts">
+import ProjectorIcon from "../../../common/icons/ProjectorIcon.vue";
 import { computed } from "vue";
 import UiButton from "../../../common/ui/UiButton.vue";
 import UiSpinner from "../../../common/ui/UiSpinner.vue";
 import { formatElapsed, useElapsedClock } from "../../agent-core/index.ts";
 import type { AgentLens } from "../model/lens.ts";
-import IconRefresh from "~icons/lucide/refresh-cw";
-import IconScanEye from "~icons/lucide/scan-eye";
-import IconTimer from "~icons/lucide/timer";
-import IconX from "~icons/lucide/x";
 
 const props = defineProps<{ lens: AgentLens }>();
 const now = useElapsedClock();
@@ -22,7 +19,7 @@ const stamp = computed(() =>
 <template>
   <section class="lens" aria-label="Lens: чем агент занят сейчас">
     <div class="lens-head">
-      <IconScanEye class="lens-icon" aria-hidden="true" />
+      <ProjectorIcon name="scan-eye" class="lens-icon" aria-hidden="true" />
       <span class="lens-title">Lens</span>
       <UiSpinner v-if="lens.state.busy" />
       <time v-else-if="ago" class="lens-time" :title="stamp">{{ ago }}</time>
@@ -34,7 +31,7 @@ const stamp = computed(() =>
         aria-label="Обновить описание"
         @click="lens.refresh()"
       >
-        <IconRefresh aria-hidden="true" />
+        <ProjectorIcon name="refresh-cw" aria-hidden="true" />
       </UiButton>
       <UiButton
         shape="icon"
@@ -45,7 +42,7 @@ const stamp = computed(() =>
         aria-label="Автообновление Lens"
         @click="lens.setAuto(!lens.state.auto)"
       >
-        <IconTimer aria-hidden="true" />
+        <ProjectorIcon name="timer" aria-hidden="true" />
       </UiButton>
       <UiButton
         shape="icon"
@@ -54,7 +51,7 @@ const stamp = computed(() =>
         aria-label="Скрыть Lens"
         @click="lens.close()"
       >
-        <IconX aria-hidden="true" />
+        <ProjectorIcon name="x" aria-hidden="true" />
       </UiButton>
     </div>
     <p v-if="lens.state.error" class="lens-text error" role="status">{{ lens.state.error }}</p>

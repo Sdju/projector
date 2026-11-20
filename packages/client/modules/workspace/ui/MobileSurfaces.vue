@@ -1,10 +1,6 @@
 <script setup lang="ts">
+import ProjectorIcon from "../../../common/icons/ProjectorIcon.vue";
 import { computed } from "vue";
-import IconFiles from "~icons/lucide/folder-tree";
-import IconEditor from "~icons/lucide/file-code";
-import IconTerminal from "~icons/lucide/terminal";
-import IconMaximize from "~icons/lucide/maximize";
-import IconMinimize from "~icons/lucide/minimize";
 import { fullscreenAvailable, usePwa } from "../../pwa/index.ts";
 
 /** Навигация по поверхностям проекта на узком экране: файлы, редактор, терминалы. */
@@ -13,9 +9,9 @@ defineEmits<{ command: [id: string, args?: unknown] }>();
 const canFullscreen = fullscreenAvailable();
 const { fullscreen } = usePwa();
 const entries = computed(() => [
-  { id: "files", title: "Файлы", icon: IconFiles },
-  { id: "editor", title: "Редактор", icon: IconEditor },
-  ...(props.terminals ? [{ id: "terminal", title: "Терминалы", icon: IconTerminal }] : []),
+  { id: "files", title: "Файлы", icon: "folder-tree" },
+  { id: "editor", title: "Редактор", icon: "file-code" },
+  ...(props.terminals ? [{ id: "terminal", title: "Терминалы", icon: "terminal" }] : []),
 ]);
 </script>
 
@@ -31,7 +27,7 @@ const entries = computed(() => [
       :data-command="'ide.workbench.mobile.surface.show'"
       @click="$emit('command', 'ide.workbench.mobile.surface.show', { surface: entry.id })"
     >
-      <component :is="entry.icon" aria-hidden="true" />
+      <ProjectorIcon :name="entry.icon" aria-hidden="true" />
       <span>{{ entry.title }}</span>
     </button>
     <span v-if="canFullscreen" class="pill-divider" aria-hidden="true"></span>
@@ -45,7 +41,7 @@ const entries = computed(() => [
       data-command="ide.workbench.fullscreen.toggle"
       @click="$emit('command', 'ide.workbench.fullscreen.toggle')"
     >
-      <component :is="fullscreen ? IconMinimize : IconMaximize" aria-hidden="true" />
+      <ProjectorIcon :name="fullscreen ? 'minimize' : 'maximize'" aria-hidden="true" />
     </button>
   </nav>
 </template>

@@ -1,10 +1,9 @@
 <script setup lang="ts">
+import ProjectorIcon from "../../../../../common/icons/ProjectorIcon.vue";
 import { computed } from "vue";
 import type { TrustNotice } from "@ai-projector/core/modules/trust-notices/index.ts";
 import UiButton from "../../../../../common/ui/UiButton.vue";
 import UiStatusDot from "../../../../../common/ui/UiStatusDot.vue";
-import IconCheck from "~icons/lucide/check";
-import IconShieldCheck from "~icons/lucide/shield-check";
 
 const props = defineProps<{
   notice: TrustNotice;
@@ -63,7 +62,7 @@ const when = computed(() =>
         :disabled="busy"
         @click="emit('trust')"
       >
-        <IconShieldCheck aria-hidden="true" />
+        <ProjectorIcon name="shield-check" aria-hidden="true" />
       </UiButton>
       <UiButton
         v-if="unread"
@@ -73,7 +72,7 @@ const when = computed(() =>
         aria-label="Отметить прочитанным"
         @click="emit('read')"
       >
-        <IconCheck aria-hidden="true" />
+        <ProjectorIcon name="check" aria-hidden="true" />
       </UiButton>
     </div>
   </article>

@@ -55,12 +55,12 @@ const html = `<!doctype html>
   };
   const sidebarViews = {
     files: {
-      icon: { render: () => h("svg") },
+      icon: "files",
       component: { render: () => h("input", { id: "file-view" }) },
       props: () => ({}),
     },
     test: {
-      icon: { render: () => h("svg") },
+      icon: "folder-tree",
       component: { render: () => h("div") },
       props: () => ({}),
     },

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ProjectorIcon from "../../../common/icons/ProjectorIcon.vue";
 import UiDisclosureSummary from "../../../common/ui/UiDisclosureSummary.vue";
 import UiIsland from "../../../common/ui/UiIsland.vue";
 import UiIslandHeader from "../../../common/ui/UiIslandHeader.vue";
@@ -13,9 +14,6 @@ import type { AgentWorkItem } from "../../agent-core/index.ts";
 import type { AgentLens } from "../model/lens.ts";
 import AgentLensPanel from "./AgentLens.vue";
 import AgentWorkBody from "./AgentWorkBody.vue";
-import IconAlert from "~icons/lucide/circle-alert";
-import IconCheck from "~icons/lucide/check";
-import IconChevron from "~icons/lucide/chevron-right";
 import UiSpinner from "../../../common/ui/UiSpinner.vue";
 
 const props = defineProps<{
@@ -135,8 +133,13 @@ const elapsed = computed(() => {
   >
     <UiDisclosureSummary variant="fit" class="work-summary" @click="summaryClick">
       <UiSpinner v-if="live" />
-      <IconAlert v-else-if="failed" class="work-icon error" aria-hidden="true" />
-      <IconCheck v-else class="work-icon" aria-hidden="true" />
+      <ProjectorIcon
+        name="circle-alert"
+        v-else-if="failed"
+        class="work-icon error"
+        aria-hidden="true"
+      />
+      <ProjectorIcon name="check" v-else class="work-icon" aria-hidden="true" />
       <span class="work-title">Работа</span>
       <template v-if="!open && lens && lens.state.open && lens.state.text">
         <span class="work-lens-label">Lens</span>
@@ -148,7 +151,7 @@ const elapsed = computed(() => {
         >
         <span v-if="elapsed" class="work-time">{{ elapsed }}</span>
       </template>
-      <IconChevron class="work-chevron" aria-hidden="true" />
+      <ProjectorIcon name="chevron-right" class="work-chevron" aria-hidden="true" />
     </UiDisclosureSummary>
     <div v-if="!compact && open && lens && lens.state.open" class="work-head">
       <AgentLensPanel :lens="lens" />

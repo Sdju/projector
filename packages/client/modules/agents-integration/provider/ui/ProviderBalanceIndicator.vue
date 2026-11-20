@@ -1,9 +1,9 @@
 <script setup lang="ts">
+import ProjectorIcon from "../../../../common/icons/ProjectorIcon.vue";
 import { computed, useId, watch } from "vue";
 import UsageIndicator from "../../_/UsageIndicator.vue";
 import { publishProviderBalance } from "../../_/usage-summary.ts";
 import { useUsagePolling } from "../../_/use-usage-polling.ts";
-import IconWallet from "~icons/lucide/wallet";
 import { useCommandScope } from "../../../../common/utilities/commands.ts";
 import { formatAmount, formatBalances, useProviders } from "../../../provider/index.ts";
 import type { ProviderBalance } from "../../../provider/index.ts";
@@ -75,6 +75,6 @@ commands.scope.registerCommand({
     interactive
     @cycle="commands.run('ide.providers.balance.show')"
   >
-    <template #icon><IconWallet /></template>
+    <template #icon><ProjectorIcon name="wallet" /></template>
   </UsageIndicator>
 </template>

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ProjectorIcon from "../../../../../common/icons/ProjectorIcon.vue";
 import { computed, ref } from "vue";
 import UiSpinner from "../../../../../common/ui/UiSpinner.vue";
 import type { AgentJobView } from "../../../../agent-core/index.ts";
@@ -14,9 +15,6 @@ import AgentJobBar from "./AgentJobBar.vue";
 import AgentPlan from "./AgentPlan.vue";
 import AgentQueue from "./AgentQueue.vue";
 import AgentTaskBar from "./AgentTaskBar.vue";
-import IconAlert from "~icons/lucide/circle-alert";
-import IconChevron from "~icons/lucide/chevron-right";
-import IconListChecks from "~icons/lucide/list-checks";
 
 /** One line for everything running in the background; the lists live behind it. */
 const props = defineProps<{
@@ -91,10 +89,15 @@ const summary = computed(() => {
   <section v-if="has" class="activity" aria-label="Фоновая работа">
     <button type="button" class="summary" :aria-expanded="expanded" @click="expanded = !expanded">
       <UiSpinner v-if="working" />
-      <IconAlert v-else-if="attention" class="alert" aria-hidden="true" />
-      <IconListChecks v-else aria-hidden="true" />
+      <ProjectorIcon name="circle-alert" v-else-if="attention" class="alert" aria-hidden="true" />
+      <ProjectorIcon name="list-checks" v-else aria-hidden="true" />
       <span class="text" :title="summary">{{ summary }}</span>
-      <IconChevron class="chevron" :class="{ expanded }" aria-hidden="true" />
+      <ProjectorIcon
+        name="chevron-right"
+        class="chevron"
+        :class="{ expanded }"
+        aria-hidden="true"
+      />
     </button>
     <div v-if="expanded" class="body">
       <AgentJobBar

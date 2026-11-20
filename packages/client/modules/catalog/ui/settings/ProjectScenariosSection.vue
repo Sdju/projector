@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ProjectorIcon from "../../../../common/icons/ProjectorIcon.vue";
 import { computed } from "vue";
 import UiControl from "../../../../common/ui/UiControl.vue";
 import UiInline from "../../../../common/ui/UiInline.vue";
@@ -11,11 +12,6 @@ import UiDisclosureSummary from "../../../../common/ui/UiDisclosureSummary.vue";
 import { useProjectSettingsForm } from "../../model/project-settings-form.ts";
 import { projectSettingsSection, scenarioSection } from "../../model/project-settings-nav.ts";
 import type { LaunchMode, ProjectCommand } from "../../../project/index.ts";
-import IconPlus from "~icons/lucide/plus";
-import IconTrash from "~icons/lucide/trash-2";
-import IconCopy from "~icons/lucide/copy";
-import IconStar from "~icons/lucide/star";
-import IconChevron from "~icons/lucide/chevron-right";
 
 /** The scenario whose page the navigation opened. Without one, the section shows the overview. */
 const props = defineProps<{ scenarioId?: string }>();
@@ -70,7 +66,7 @@ function remove(command: ProjectCommand) {
         </UiHint>
         <UiInline :gap="2">
           <UiButton size="sm" @click="addScenario"
-            ><IconPlus aria-hidden="true" />Добавить</UiButton
+            ><ProjectorIcon name="plus" aria-hidden="true" />Добавить</UiButton
           >
           <UiButton :disabled="discovering" @click="form.discover">{{
             discovering ? "читаю…" : "из package.json"
@@ -112,8 +108,7 @@ function remove(command: ProjectCommand) {
             justify="normal"
           >
             <UiControl v-model="selected" type="checkbox" :value="command.id" />
-            <span>{{ command.name }}</span
-            ><code>{{ command.cmd }}</code>
+            <span>{{ command.name }}</span><code>{{ command.cmd }}</code>
           </UiInline>
           <UiInline class="picker-actions" :gap="3" justify="between" wrap>
             <UiButton :disabled="!selected.length" @click="form.importCommands"
@@ -151,7 +146,9 @@ function remove(command: ProjectCommand) {
           :title="isDefault(current) ? 'Основной сценарий' : 'Сделать основным'"
           @click="form.setDefaultCommand(current.id)"
         >
-          <IconStar aria-hidden="true" />{{ isDefault(current) ? "Основной" : "Сделать основным" }}
+          <ProjectorIcon name="star" aria-hidden="true" />{{
+            isDefault(current) ? "Основной" : "Сделать основным"
+          }}
         </UiButton>
         <UiButton
           shape="icon"
@@ -159,7 +156,7 @@ function remove(command: ProjectCommand) {
           aria-label="Дублировать сценарий"
           title="Дублировать"
           @click="duplicate(current)"
-          ><IconCopy aria-hidden="true"
+          ><ProjectorIcon name="copy" aria-hidden="true"
         /></UiButton>
         <UiButton
           shape="icon"
@@ -168,7 +165,7 @@ function remove(command: ProjectCommand) {
           aria-label="Удалить сценарий"
           :title="draft.commands.length <= 1 ? 'Нужен хотя бы один сценарий' : 'Удалить сценарий'"
           @click="remove(current)"
-          ><IconTrash aria-hidden="true"
+          ><ProjectorIcon name="trash-2" aria-hidden="true"
         /></UiButton>
       </UiInline>
 
@@ -189,7 +186,11 @@ function remove(command: ProjectCommand) {
 
       <details class="more" :open="hasExtras(current)">
         <UiDisclosureSummary variant="fit"
-          ><IconChevron class="chevron" aria-hidden="true" />Дополнительно</UiDisclosureSummary
+          ><ProjectorIcon
+            name="chevron-right"
+            class="chevron"
+            aria-hidden="true"
+          />Дополнительно</UiDisclosureSummary
         >
         <div class="options">
           <UiField v-slot="{ control }" layout="plain" label="Папка">

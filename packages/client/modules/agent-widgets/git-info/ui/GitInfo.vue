@@ -1,6 +1,6 @@
 <script setup lang="ts">
+import ProjectorIcon from "../../../../common/icons/ProjectorIcon.vue";
 import { computed } from "vue";
-import IconGitBranch from "~icons/lucide/git-branch";
 import UiBadge from "../../../../common/ui/UiBadge.vue";
 import UiMeter from "../../../../common/ui/UiMeter.vue";
 
@@ -79,7 +79,7 @@ const short = (hash: string) => hash.slice(0, 7);
         "
       >
         <span v-if="branch" class="branch">
-          <IconGitBranch aria-hidden="true" />
+          <ProjectorIcon name="git-branch" aria-hidden="true" />
           <strong>{{ branch }}</strong>
         </span>
         <span v-if="upstream" class="upstream">{{ upstream }}</span>

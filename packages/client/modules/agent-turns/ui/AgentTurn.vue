@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ProjectorIcon from "../../../common/icons/ProjectorIcon.vue";
 import UiInline from "../../../common/ui/UiInline.vue";
 import UiButton from "../../../common/ui/UiButton.vue";
 import { computed, inject, ref } from "vue";
@@ -25,15 +26,6 @@ import type { AgentWorkItem } from "../../agent-core/index.ts";
 import AgentWork from "./AgentWork.vue";
 import AgentChanges from "./AgentChanges.vue";
 import AgentUsageInfo from "./AgentUsageInfo.vue";
-import IconCopy from "~icons/lucide/copy";
-import IconCheck from "~icons/lucide/check";
-import IconPencil from "~icons/lucide/pencil";
-import IconUndo from "~icons/lucide/undo-2";
-import IconRefresh from "~icons/lucide/refresh-cw";
-import IconAlert from "~icons/lucide/circle-alert";
-import IconGitFork from "~icons/lucide/git-fork";
-import IconPrev from "~icons/lucide/chevron-left";
-import IconNext from "~icons/lucide/chevron-right";
 
 const projectId = inject(chatProjectKey, "");
 const props = defineProps<{
@@ -272,7 +264,7 @@ const lastWork = computed(
             :disabled="flags.busy || versions.position === 0"
             @click="emit('version', turn.id, versions.position - 1)"
           >
-            <IconPrev aria-hidden="true" />
+            <ProjectorIcon name="chevron-left" aria-hidden="true" />
           </UiButton>
           <span class="version-count">{{ versions.position + 1 }} / {{ versions.count }}</span>
           <UiButton
@@ -283,7 +275,7 @@ const lastWork = computed(
             :disabled="flags.busy || versions.position === versions.count - 1"
             @click="emit('version', turn.id, versions.position + 1)"
           >
-            <IconNext aria-hidden="true" />
+            <ProjectorIcon name="chevron-right" aria-hidden="true" />
           </UiButton>
         </UiInline>
         <UiButton
@@ -295,7 +287,7 @@ const lastWork = computed(
           :disabled="flags.busy"
           @click="editMessage"
         >
-          <IconPencil aria-hidden="true" />
+          <ProjectorIcon name="pencil" aria-hidden="true" />
         </UiButton>
         <UiButton
           shape="icon"
@@ -306,7 +298,7 @@ const lastWork = computed(
           :disabled="flags.busy"
           @click="emit('rewind', turn.id)"
         >
-          <IconUndo aria-hidden="true" />
+          <ProjectorIcon name="undo-2" aria-hidden="true" />
         </UiButton>
         <UiButton
           shape="icon"
@@ -316,7 +308,7 @@ const lastWork = computed(
           aria-label="Ответвить в новый чат"
           @click="emit('fork', turn.id, 'before')"
         >
-          <IconGitFork aria-hidden="true" />
+          <ProjectorIcon name="git-fork" aria-hidden="true" />
         </UiButton>
       </UiInline>
       <div v-if="turn.form" class="user-form">
@@ -427,7 +419,7 @@ const lastWork = computed(
         @revert="emit('revert', turn.id)"
       />
       <div v-if="turn.failure" class="turn-failure" role="alert">
-        <IconAlert aria-hidden="true" />
+        <ProjectorIcon name="circle-alert" aria-hidden="true" />
         <div class="turn-failure-body">
           <p v-if="failureTitleText" class="turn-failure-title">
             {{ failureTitleText
@@ -473,7 +465,7 @@ const lastWork = computed(
           aria-label="Продолжить в новом чате"
           @click="emit('fork', turn.id, 'after')"
         >
-          <IconGitFork aria-hidden="true" />
+          <ProjectorIcon name="git-fork" aria-hidden="true" />
         </UiButton>
         <UiButton
           shape="icon"
@@ -484,7 +476,11 @@ const lastWork = computed(
           :title="flags.copied ? 'Скопировано' : 'Копировать ответ'"
           @click="emit('copy', turn.id, turn.text)"
         >
-          <IconCheck v-if="flags.copied" aria-hidden="true" /><IconCopy v-else aria-hidden="true" />
+          <ProjectorIcon name="check" v-if="flags.copied" aria-hidden="true" /><ProjectorIcon
+            name="copy"
+            v-else
+            aria-hidden="true"
+          />
         </UiButton>
         <UiButton
           v-if="flags.last && !turn.failure"
@@ -496,7 +492,7 @@ const lastWork = computed(
           :disabled="flags.busy"
           @click="emit('retry', turn.id)"
         >
-          <IconRefresh aria-hidden="true" />
+          <ProjectorIcon name="refresh-cw" aria-hidden="true" />
         </UiButton>
         <UiButton
           v-if="flags.last && turn.stopped"

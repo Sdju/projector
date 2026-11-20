@@ -11,7 +11,6 @@ import { latestPlan, shownPlan } from "../modules/agent-core/lib/plan.ts";
 import { chatMarkdown } from "../modules/agent/lib/export.ts";
 import { registerBuiltinClientAgents } from "../app/agents.ts";
 import { readTodosPlan, registerClientAgent } from "../modules/agents-integration/catalog/index.ts";
-import IconBot from "~icons/lucide/bot";
 
 registerBuiltinClientAgents();
 // The plan reader of a plugin agent is declared by the plugin, not by a client module; the test
@@ -21,7 +20,7 @@ registerClientAgent({
   program: "claude",
   title: "Claude Code",
   caption: "Запустит агента Anthropic",
-  icon: IconBot,
+  icon: "bot",
   plan: readTodosPlan(["TodoWrite"]),
 });
 
@@ -164,7 +163,7 @@ test("a plugin's create_plan and update_todos carry the plan too", () => {
     program: "plan-plugin",
     title: "Plan Plugin",
     caption: "Fixture",
-    icon: IconBot,
+    icon: "bot",
     plan: readTodosPlan(["create_plan", "update_todos"]),
   });
   const answer = {

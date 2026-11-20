@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ProjectorIcon from "../../../../../common/icons/ProjectorIcon.vue";
 import UiScrollArea from "../../../../../common/ui/UiScrollArea.vue";
 import { computed, ref } from "vue";
 import ContextMenu from "../../../../../common/ui/ContextMenu.vue";
@@ -16,9 +17,6 @@ import GitBranchBar from "./GitBranchBar.vue";
 import GitSplitter from "./GitSplitter.vue";
 import GitChangesTree from "./GitChangesTree.vue";
 import GitHistory from "./GitHistory.vue";
-import IconPlus from "~icons/lucide/plus";
-import IconMinus from "~icons/lucide/minus";
-import IconChevronRight from "~icons/lucide/chevron-right";
 
 const props = defineProps<{
   projectId: string;
@@ -193,7 +191,8 @@ defineExpose({
               data-command="ide.git.group.toggle"
               @click="gitCommands.run('ide.git.group.toggle', { staged: group.staged })"
             >
-              <IconChevronRight
+              <ProjectorIcon
+                name="chevron-right"
                 class="chevron"
                 :class="{ open: !collapsedGroups.has(group.staged ? 'staged' : 'changed') }"
                 aria-hidden="true"
@@ -221,7 +220,8 @@ defineExpose({
                 })
               "
             >
-              <IconMinus v-if="group.staged" aria-hidden="true" /><IconPlus
+              <ProjectorIcon name="minus" v-if="group.staged" aria-hidden="true" /><ProjectorIcon
+                name="plus"
                 v-else
                 aria-hidden="true"
               />

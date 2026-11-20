@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ProjectorIcon from "../../../../../common/icons/ProjectorIcon.vue";
 import UiButton from "../../../../../common/ui/UiButton.vue";
 import UiStatusDot from "../../../../../common/ui/UiStatusDot.vue";
 import { ref } from "vue";
@@ -11,7 +12,6 @@ import {
   PIPELINE_STATUS_TONE,
 } from "@ai-projector/core/modules/workspace/index.ts";
 import PullRequestPipelineStages from "./PullRequestPipelineStages.vue";
-import IconChevronRight from "~icons/lucide/chevron-right";
 
 /** Pipeline merge request: статус, раскрываемый ход по стадиям и переход в полную вкладку. */
 const props = withDefaults(
@@ -57,7 +57,7 @@ register(
         :title="open ? 'Свернуть стадии' : 'Показать стадии'"
         @click="open = !open"
       >
-        <IconChevronRight class="chevron" :class="{ open }" aria-hidden="true" />
+        <ProjectorIcon name="chevron-right" class="chevron" :class="{ open }" aria-hidden="true" />
         <UiStatusDot :tone="PIPELINE_STATUS_TONE[pipeline.status]" shrink />
         <span class="title">Pipeline #{{ pipeline.id }}</span>
         <span class="state">{{ PIPELINE_STATUS_LABEL[pipeline.status] }}</span>

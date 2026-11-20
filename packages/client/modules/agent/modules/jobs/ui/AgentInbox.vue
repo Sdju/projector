@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ProjectorIcon from "../../../../../common/icons/ProjectorIcon.vue";
 import { computed, inject, ref } from "vue";
 import { useRouter } from "vue-router";
 import UiButton from "../../../../../common/ui/UiButton.vue";
@@ -14,9 +15,6 @@ import { deviceRoute } from "../../../../../common/utilities/device-url.ts";
 import { useAgentInbox, type InboxGroup, type InboxItem } from "../model/inbox.ts";
 import AgentInboxNotice from "./AgentInboxNotice.vue";
 import AgentInboxRow from "./AgentInboxRow.vue";
-import IconCheckCheck from "~icons/lucide/check-check";
-import IconChevron from "~icons/lucide/chevron-right";
-import IconRefresh from "~icons/lucide/rotate-cw";
 
 const props = withDefaults(defineProps<{ scopeId?: string }>(), {
   scopeId: "agent-inbox",
@@ -304,7 +302,7 @@ const groupBadge = (group: InboxGroup) =>
             data-command="ide.inbox.read.all"
             @click="commands.run('ide.inbox.read.all')"
           >
-            <IconCheckCheck aria-hidden="true" />
+            <ProjectorIcon name="check-check" aria-hidden="true" />
           </UiButton>
           <UiSectionRefresh />
           <UiButton
@@ -317,7 +315,7 @@ const groupBadge = (group: InboxGroup) =>
             :busy="pending"
             @click="commands.run('ide.inbox.refresh')"
           >
-            <IconRefresh aria-hidden="true" />
+            <ProjectorIcon name="rotate-cw" aria-hidden="true" />
           </UiButton>
         </UiInline>
       </UiInline>
@@ -399,7 +397,7 @@ const groupBadge = (group: InboxGroup) =>
       />
       <details v-if="completed(group).length" class="done">
         <summary>
-          <IconChevron class="chevron" aria-hidden="true" />
+          <ProjectorIcon name="chevron-right" class="chevron" aria-hidden="true" />
           Прочитанные за сутки
           <span class="count">{{ completed(group).length }}</span>
         </summary>

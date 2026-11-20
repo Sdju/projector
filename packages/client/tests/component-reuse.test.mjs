@@ -16,6 +16,7 @@ import OpenCodeUsageIndicator from '/packages/client/modules/agents-integration/
 import PluginUsageIndicator from '/packages/client/modules/agents-integration/usage/PluginUsageIndicator.vue';
 import {agentUsageSummary} from '/packages/client/modules/agents-integration/_/usage-summary.ts';
 import {iconFromSvg} from '/packages/client/modules/agents-integration/catalog/index.ts';
+import {registerIcon} from '/packages/client/common/icons/registry.ts';
 import {commandHostKey} from '/packages/client/common/utilities/commands.ts';
 const check=(value,label)=>{if(!value)throw new Error(label);};
 const wait=async(condition,label)=>{const until=Date.now()+8000;while(!condition()){if(Date.now()>until)throw new Error(label);await fetch('/__tick');}};
@@ -82,8 +83,8 @@ let trackerApp,dockerApp,usageApp,state;
   return Response.json({status:'ready',windows,weekly:{...quota(30,86400),windowDurationMins:1440}});
  };
  const pluginWindows=[{name:'total',label:'Всего',shortLabel:'вс',periodSeconds:30*86400},{name:'auto',label:'Авто',shortLabel:'авт',periodSeconds:30*86400},{name:'api',label:'API',shortLabel:'API',periodSeconds:30*86400}];
- const pluginIcon=iconFromSvg('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M1 1h22v22H1z"/></svg>');
- const pluginProps={usageUrl:'/api/agent/usage/plugin',title:'Plugin',agentId:'plugin',windows:pluginWindows,icon:pluginIcon};
+ registerIcon('test:plugin',iconFromSvg('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M1 1h22v22H1z"/></svg>'));
+ const pluginProps={usageUrl:'/api/agent/usage/plugin',title:'Plugin',agentId:'plugin',windows:pluginWindows,icon:'test:plugin'};
  const adapters=[['codex',CodexUsageIndicator,1,null,70],['plugin',PluginUsageIndicator,3,'auto',80],['opencode',OpenCodeUsageIndicator,3,'monthly',60]];
  for(const [provider,Component,rowCount,nextWindow,remaining] of adapters){
   const endpoint=provider==='plugin'?'/api/agent/usage/plugin':'/api/'+provider+'/usage';

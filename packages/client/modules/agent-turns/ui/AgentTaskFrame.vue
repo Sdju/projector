@@ -1,8 +1,7 @@
 <script setup lang="ts">
+import ProjectorIcon from "../../../common/icons/ProjectorIcon.vue";
 import UiSpinner from "../../../common/ui/UiSpinner.vue";
 import { zenMode } from "../../../common/utilities/zen-mode.ts";
-import IconBot from "~icons/lucide/bot";
-import IconTerminal from "~icons/lucide/terminal";
 
 /** Read-only task frame: kind icon, title, elapsed meta and actions; the body stays with the owner. */
 withDefaults(
@@ -22,7 +21,11 @@ withDefaults(
   <section class="task-frame" :aria-label="label">
     <header v-show="!zenMode" class="head">
       <slot name="leading" />
-      <component :is="kind === 'shell' ? IconTerminal : IconBot" class="kind" aria-hidden="true" />
+      <ProjectorIcon
+        :name="kind === 'shell' ? 'terminal' : 'bot'"
+        class="kind"
+        aria-hidden="true"
+      />
       <div class="titles">
         <div class="title u-truncate" :title="hint || title">{{ title }}</div>
         <div class="meta"><UiSpinner v-if="running" />{{ meta }}</div>

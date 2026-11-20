@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ProjectorIcon from "../../../../../common/icons/ProjectorIcon.vue";
 import UiButton from "../../../../../common/ui/UiButton.vue";
 import UiHint from "../../../../../common/ui/UiHint.vue";
 import UiInline from "../../../../../common/ui/UiInline.vue";
@@ -35,7 +36,7 @@ const agent = computed(() => clientAgents().find((item) => item.backend === prop
 
     <template v-else>
       <UiInline class="agent-heading" justify="normal" :gap="3">
-        <component :is="agent.icon" class="agent-icon" aria-hidden="true" />
+        <ProjectorIcon :name="agent.icon" class="agent-icon" aria-hidden="true" />
         <div>
           <h3>{{ agent.title }}</h3>
           <p>{{ agent.caption }}</p>

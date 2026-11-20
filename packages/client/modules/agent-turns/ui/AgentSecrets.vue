@@ -1,10 +1,10 @@
 <script setup lang="ts">
+import ProjectorIcon from "../../../common/icons/ProjectorIcon.vue";
 import { reactive } from "vue";
 import UiCard from "../../../common/ui/UiCard.vue";
 import UiInline from "../../../common/ui/UiInline.vue";
 import UiButton from "../../../common/ui/UiButton.vue";
 import type { AgentSecretRequest } from "../../agent-core/index.ts";
-import IconKey from "~icons/lucide/key-round";
 
 defineProps<{ requests: AgentSecretRequest[] }>();
 const emit = defineEmits<{ answer: [id: string, value: string | null] }>();
@@ -36,7 +36,7 @@ function decline(id: string) {
       class="secret"
     >
       <UiInline as="header" align="center" justify="normal">
-        <IconKey aria-hidden="true" />
+        <ProjectorIcon name="key-round" aria-hidden="true" />
         <span class="title">{{ request.label }}</span>
       </UiInline>
       <p v-if="request.reason" class="reason">{{ request.reason }}</p>

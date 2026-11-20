@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ProjectorIcon from "../../../common/icons/ProjectorIcon.vue";
 import UiControl from "../../../common/ui/UiControl.vue";
 import UiSpinner from "../../../common/ui/UiSpinner.vue";
 import { computed, nextTick, ref, useId, watch } from "vue";
@@ -8,9 +9,6 @@ import ContextMenu from "../../../common/ui/ContextMenu.vue";
 import UiIsland from "../../../common/ui/UiIsland.vue";
 import { useIslandMenu } from "../../../common/utilities/island-menu.ts";
 import type { ContextMenuItem } from "../../../common/ui/context-menu.ts";
-import IconClose from "~icons/lucide/x";
-import IconChevron from "~icons/lucide/chevron-down";
-import IconCheck from "~icons/lucide/check";
 import {
   registerTabCommands,
   tabCommandId,
@@ -302,7 +300,8 @@ watch(
         >
           <UiSpinner v-if="tab.saving" />
         </span>
-        <IconClose
+        <ProjectorIcon
+          name="x"
           class="close-icon"
           :class="{ 'has-state': tab.dirty || tab.saving }"
           aria-hidden="true"
@@ -325,7 +324,7 @@ watch(
       @click="commands.run(commandId('picker'))"
     >
       <span class="picker-count">{{ tabs.length }}</span>
-      <IconChevron aria-hidden="true" />
+      <ProjectorIcon name="chevron-down" aria-hidden="true" />
     </button>
   </span>
   <UiIsland v-if="compact" :menu="picker" :label="`Вкладки: ${label}`" :width="280">
@@ -350,7 +349,12 @@ watch(
           tab.saving ? 'Сохраняется' : tab.error ? 'Не удалось сохранить' : 'Не сохранено'
         "
       />
-      <IconCheck v-if="tab.id === activeId" class="pick-check" aria-hidden="true" />
+      <ProjectorIcon
+        name="check"
+        v-if="tab.id === activeId"
+        class="pick-check"
+        aria-hidden="true"
+      />
     </button>
   </UiIsland>
   <ContextMenu ref="menu" :items="menuItems" :label="`Действия: ${label}`" />

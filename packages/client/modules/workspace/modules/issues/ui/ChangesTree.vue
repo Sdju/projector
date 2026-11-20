@@ -8,6 +8,7 @@ export interface ChangesSummary {
 }
 </script>
 <script setup lang="ts">
+import ProjectorIcon from "../../../../../common/icons/ProjectorIcon.vue";
 import UiScrollArea from "../../../../../common/ui/UiScrollArea.vue";
 import UiHint from "../../../../../common/ui/UiHint.vue";
 import UiActionRow from "../../../../../common/ui/UiActionRow.vue";
@@ -22,8 +23,6 @@ import {
   type ChangeTreeRow,
 } from "../lib/change-tree.ts";
 import { FileIcon, useFileIconTheme } from "../../../../file-icons/index.ts";
-import IconChevronRight from "~icons/lucide/chevron-right";
-import IconCollapse from "~icons/lucide/chevrons-down-up";
 
 /** Плоский список изменений, показанный как дерево; общий для сравнения и merge request. */
 const props = withDefaults(
@@ -118,7 +117,7 @@ defineExpose({ reveal });
         :aria-label="expanded.size ? 'Свернуть дерево' : 'Развернуть дерево'"
         @click="expandAll"
       >
-        <IconCollapse aria-hidden="true" />
+        <ProjectorIcon name="chevrons-down-up" aria-hidden="true" />
       </button>
     </div>
     <label class="search">
@@ -155,7 +154,8 @@ defineExpose({ reveal });
             @click="choose(row)"
           >
             <span class="glyph" aria-hidden="true">
-              <IconChevronRight
+              <ProjectorIcon
+                name="chevron-right"
                 class="chevron"
                 :class="{ expanded: expanded.has(row.path) || searching }"
               />

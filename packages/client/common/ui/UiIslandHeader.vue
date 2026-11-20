@@ -1,12 +1,12 @@
 <script setup lang="ts">
-import IconChevron from "~icons/lucide/chevron-down";
+import ProjectorIcon from "../icons/ProjectorIcon.vue";
 defineProps<{ anchor?: "start" | "end"; chevron?: boolean }>();
 </script>
 
 <template>
   <button type="button" class="island-header" :class="anchor ?? 'end'">
     <slot />
-    <IconChevron v-if="chevron" class="island-chevron" aria-hidden="true" />
+    <ProjectorIcon name="chevron-down" v-if="chevron" class="island-chevron" aria-hidden="true" />
   </button>
 </template>
 

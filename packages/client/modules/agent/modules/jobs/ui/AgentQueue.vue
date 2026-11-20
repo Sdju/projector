@@ -1,9 +1,7 @@
 <script setup lang="ts">
+import ProjectorIcon from "../../../../../common/icons/ProjectorIcon.vue";
 import UiButton from "../../../../../common/ui/UiButton.vue";
 import type { QueuedMessage } from "../../../../agent-core/index.ts";
-import IconX from "~icons/lucide/x";
-import IconSend from "~icons/lucide/corner-down-right";
-import IconInject from "~icons/lucide/message-square-plus";
 
 defineProps<{
   items: QueuedMessage[];
@@ -27,7 +25,7 @@ const emit = defineEmits<{ now: [id: string]; inject: [id: string]; remove: [id:
         aria-label="Добавить в ответ"
         @click="emit('inject', item.id)"
       >
-        <IconInject aria-hidden="true" />
+        <ProjectorIcon name="message-square-plus" aria-hidden="true" />
       </UiButton>
       <UiButton
         v-if="busy && !item.delivering"
@@ -37,7 +35,7 @@ const emit = defineEmits<{ now: [id: string]; inject: [id: string]; remove: [id:
         aria-label="Отправить сразу"
         @click="emit('now', item.id)"
       >
-        <IconSend aria-hidden="true" />
+        <ProjectorIcon name="corner-down-right" aria-hidden="true" />
       </UiButton>
       <UiButton
         shape="icon"
@@ -47,7 +45,7 @@ const emit = defineEmits<{ now: [id: string]; inject: [id: string]; remove: [id:
         aria-label="Убрать из очереди"
         @click="emit('remove', item.id)"
       >
-        <IconX aria-hidden="true" />
+        <ProjectorIcon name="x" aria-hidden="true" />
       </UiButton>
     </li>
   </ul>

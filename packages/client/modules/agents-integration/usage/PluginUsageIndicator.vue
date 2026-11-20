@@ -1,6 +1,5 @@
 <script setup lang="ts">
-import type { Component } from "vue";
-import IconTerminal from "~icons/lucide/terminal";
+import ProjectorIcon from "../../../common/icons/ProjectorIcon.vue";
 import {
   USAGE_PERIOD_SECONDS,
   type AgentUsage,
@@ -14,8 +13,8 @@ const props = defineProps<{
   usageUrl?: string;
   title?: string;
   agentId?: string;
-  /** A plugin-provided icon; the shared indicator falls back to a terminal. */
-  icon?: Component;
+  /** A plugin icon name; the shared indicator falls back to a terminal. */
+  icon?: string;
   /** Windows the plugin labels itself; absent uses the generic subscription windows. */
   windows?: readonly AgentUsageWindowDefinition[];
 }>();
@@ -100,6 +99,6 @@ const { selected, remaining, tone, tooltipRows, tooltip, commands } = useAgentUs
     interactive
     @cycle="commands.run(commandId)"
   >
-    <template #icon><component :is="icon ?? IconTerminal" /></template>
+    <template #icon><ProjectorIcon :name="icon ?? 'terminal'" /></template>
   </UsageIndicator>
 </template>

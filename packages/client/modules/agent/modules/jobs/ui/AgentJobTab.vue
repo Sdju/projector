@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ProjectorIcon from "../../../../../common/icons/ProjectorIcon.vue";
 import { computed, watch } from "vue";
 import { useIdeCommands } from "../../../../ide/index.ts";
 import { readoutLines, useTabReadout } from "../../../../../common/utilities/tab-readout.ts";
@@ -21,10 +22,6 @@ import { AgentPermissions } from "../../../../agent-turns/index.ts";
 import { AgentQuestions } from "../../../../agent-turns/index.ts";
 import { AgentTaskFrame } from "../../../../agent-turns/index.ts";
 import { AgentTurn } from "../../../../agent-turns/index.ts";
-import IconSquare from "~icons/lucide/square";
-import IconChat from "~icons/lucide/message-square-share";
-import IconChevron from "~icons/lucide/chevron-right";
-import IconFile from "~icons/lucide/file-diff";
 
 /** A background job followed in its own tab (read-only): its journal, requests, answer and files. */
 const props = defineProps<{ projectId: string; job: string }>();
@@ -140,7 +137,7 @@ useTabReadout(() => ({
         aria-label="Остановить задание"
         @click="stop"
       >
-        <IconSquare aria-hidden="true" /> Остановить
+        <ProjectorIcon name="square" aria-hidden="true" /> Остановить
       </UiButton>
       <UiButton
         v-if="job && canContinueInChat(job)"
@@ -149,14 +146,14 @@ useTabReadout(() => ({
         aria-label="Продолжить в чате"
         @click="proceed"
       >
-        <IconChat aria-hidden="true" /> Продолжить в чате
+        <ProjectorIcon name="message-square-share" aria-hidden="true" /> Продолжить в чате
       </UiButton>
     </template>
     <div class="body" role="log" aria-label="Журнал задания">
       <details v-if="job?.task" class="assignment">
         <UiDisclosureSummary variant="fit" class="assignment-summary">
           <span class="label">Задание</span>
-          <IconChevron class="chevron" aria-hidden="true" />
+          <ProjectorIcon name="chevron-right" class="chevron" aria-hidden="true" />
         </UiDisclosureSummary>
         <p class="task-text">{{ job.task }}</p>
       </details>
@@ -186,7 +183,8 @@ useTabReadout(() => ({
       </template>
       <template v-if="job?.files.length">
         <div class="label">
-          <IconFile aria-hidden="true" /> Изменённые файлы: {{ job.files.length }}
+          <ProjectorIcon name="file-diff" aria-hidden="true" /> Изменённые файлы:
+          {{ job.files.length }}
         </div>
         <ul class="files">
           <li v-for="file in job.files" :key="file">

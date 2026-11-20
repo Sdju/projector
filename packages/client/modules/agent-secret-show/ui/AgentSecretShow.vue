@@ -1,11 +1,10 @@
 <script setup lang="ts">
+import ProjectorIcon from "../../../common/icons/ProjectorIcon.vue";
 import UiButton from "../../../common/ui/UiButton.vue";
 import UiCard from "../../../common/ui/UiCard.vue";
 import UiInline from "../../../common/ui/UiInline.vue";
 import UiSecretValue from "../../../common/ui/UiSecretValue.vue";
 import type { AgentSecretShowItem } from "../model/secret-shows.ts";
-import IconClose from "~icons/lucide/x";
-import IconKey from "~icons/lucide/key-round";
 
 defineProps<{ items: AgentSecretShowItem[] }>();
 const emit = defineEmits<{ dismiss: [id: string] }>();
@@ -29,7 +28,7 @@ const emit = defineEmits<{ dismiss: [id: string] }>();
     >
       <UiInline as="header" align="center" justify="between">
         <UiInline align="center" justify="normal" class="heading">
-          <IconKey aria-hidden="true" />
+          <ProjectorIcon name="key-round" aria-hidden="true" />
           <span class="title">{{ item.label || "Секрет от агента" }}</span>
         </UiInline>
         <UiButton
@@ -39,7 +38,7 @@ const emit = defineEmits<{ dismiss: [id: string] }>();
           title="Закрыть"
           @click="emit('dismiss', item.id)"
         >
-          <IconClose aria-hidden="true" />
+          <ProjectorIcon name="x" aria-hidden="true" />
         </UiButton>
       </UiInline>
       <p v-if="item.comment" class="comment">{{ item.comment }}</p>

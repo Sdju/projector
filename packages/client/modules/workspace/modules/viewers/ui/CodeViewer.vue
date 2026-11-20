@@ -1,9 +1,6 @@
 <script setup lang="ts">
+import ProjectorIcon from "../../../../../common/icons/ProjectorIcon.vue";
 import UiPanel from "../../../../../common/ui/UiPanel.vue";
-import IconRows from "~icons/lucide/rows-2";
-import IconColumns from "~icons/lucide/columns-2";
-import IconFoldVertical from "~icons/lucide/fold-vertical";
-import IconUnfoldVertical from "~icons/lucide/unfold-vertical";
 import { inject, onMounted, onBeforeUnmount, ref, watch } from "vue";
 import {
   EditorView,
@@ -414,8 +411,8 @@ onBeforeUnmount(() => {
         :aria-pressed="sideBySide"
         @click="sideBySide = !sideBySide"
       >
-        <IconRows v-if="sideBySide" />
-        <IconColumns v-else />
+        <ProjectorIcon name="rows-2" v-if="sideBySide" />
+        <ProjectorIcon name="columns-2" v-else />
       </button>
       <button
         type="button"
@@ -428,8 +425,8 @@ onBeforeUnmount(() => {
         :aria-pressed="collapseUnchanged"
         @click="collapseUnchanged = !collapseUnchanged"
       >
-        <IconUnfoldVertical v-if="collapseUnchanged" />
-        <IconFoldVertical v-else />
+        <ProjectorIcon name="unfold-vertical" v-if="collapseUnchanged" />
+        <ProjectorIcon name="fold-vertical" v-else />
       </button>
     </div>
     <div v-if="original !== undefined" class="diff-header">

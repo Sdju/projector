@@ -1,4 +1,3 @@
-import IconKimi from "~icons/simple-icons/kimi";
 import type { ClientAgent } from "../catalog/index.ts";
 import { readKimiPlan } from "./plan.ts";
 import KimiUsageIndicator from "./ui/KimiUsageIndicator.vue";
@@ -10,7 +9,7 @@ export const kimiAgent: ClientAgent = {
   program: "kimi",
   title: "Kimi",
   caption: "Запустит агента Kimi Code",
-  icon: IconKimi,
+  icon: "simple-icons:kimi",
   usage: KimiUsageIndicator,
   usageUrl: "/api/kimi/usage",
   plan: readKimiPlan,

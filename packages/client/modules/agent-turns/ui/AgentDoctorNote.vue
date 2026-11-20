@@ -1,8 +1,8 @@
 <script setup lang="ts">
+import ProjectorIcon from "../../../common/icons/ProjectorIcon.vue";
 import { computed } from "vue";
 import UiTooltip from "../../../common/ui/UiTooltip.vue";
 import type { AgentDoctorProgress, AgentDoctorReport } from "../../agent-core/index.ts";
-import IconStethoscope from "~icons/lucide/stethoscope";
 
 /** The answer mark that shows why and how Answer Doctor touched the visible markup. */
 const props = defineProps<{
@@ -76,7 +76,7 @@ const label = computed(() => {
         :tabindex="canRetry ? undefined : 0"
         @click="canRetry && emit('retry')"
       >
-        <IconStethoscope class="doctor-icon" aria-hidden="true" />
+        <ProjectorIcon name="stethoscope" class="doctor-icon" aria-hidden="true" />
       </component>
     </template>
     <template #content>

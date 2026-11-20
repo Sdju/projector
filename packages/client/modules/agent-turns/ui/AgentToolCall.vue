@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ProjectorIcon from "../../../common/icons/ProjectorIcon.vue";
 import UiDisclosureSummary from "../../../common/ui/UiDisclosureSummary.vue";
 import { computed, inject, nextTick, ref, watch } from "vue";
 import AgentCodeBlock from "./AgentCodeBlock.vue";
@@ -17,15 +18,7 @@ import { lineCount, relativePath, toolVisual } from "../../agent-core/index.ts";
 import { stripReadLineNumbers } from "@ai-projector/core/modules/agent-read/index.ts";
 import { chatImageSource, chatProjectKey } from "../../chat-images/index.ts";
 import type { AgentToolChip, AgentToolView } from "../../agent-core/index.ts";
-import IconChevron from "~icons/lucide/chevron-right";
 import UiSpinner from "../../../common/ui/UiSpinner.vue";
-import IconAlert from "~icons/lucide/circle-alert";
-import IconTerminal from "~icons/lucide/terminal";
-import IconSearch from "~icons/lucide/search";
-import IconFolder from "~icons/lucide/folder";
-import IconFile from "~icons/lucide/file-text";
-import IconGlobe from "~icons/lucide/globe";
-import IconBot from "~icons/lucide/bot";
 
 const props = defineProps<{ tool: AgentToolView; root?: string }>();
 const emit = defineEmits<{ open: [path: string] }>();
@@ -159,19 +152,19 @@ const view = computed(() => {
 const icon = computed(() => {
   switch (visual.value) {
     case "bash":
-      return IconTerminal;
+      return "terminal";
     case "search":
-      return IconSearch;
+      return "search";
     case "web":
-      return IconGlobe;
+      return "globe";
     case "task":
-      return IconBot;
+      return "bot";
     case "read":
     case "write":
     case "edit":
-      return IconFile;
+      return "file-text";
     default:
-      return IconFolder;
+      return "folder";
   }
 });
 
@@ -227,7 +220,7 @@ const timeTitle = computed(() =>
     @toggle="toggle"
   >
     <UiDisclosureSummary variant="padded">
-      <component :is="icon" class="tool-icon" aria-hidden="true" />
+      <ProjectorIcon :name="icon" class="tool-icon" aria-hidden="true" />
       <span class="tool-name u-truncate" :title="view.label">{{ view.label }}</span>
       <span class="tool-hint u-truncate" :title="view.hint">{{ view.hint }}</span>
       <span v-if="view.badge" class="tool-badge" :class="{ failed: view.status === 'error' }">{{
@@ -235,12 +228,13 @@ const timeTitle = computed(() =>
       }}</span>
       <span v-if="time" class="tool-time" :title="timeTitle">{{ time }}</span>
       <UiSpinner v-if="tool.status === 'running'" class="state-icon" label="Выполняется" />
-      <IconAlert
+      <ProjectorIcon
+        name="circle-alert"
         v-else-if="view.status === 'error'"
         class="state-icon error-icon"
         aria-label="Ошибка"
       />
-      <IconChevron class="row-chevron" aria-hidden="true" />
+      <ProjectorIcon name="chevron-right" class="row-chevron" aria-hidden="true" />
     </UiDisclosureSummary>
 
     <div ref="body" class="tool-body">

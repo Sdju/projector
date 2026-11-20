@@ -1,10 +1,10 @@
 <script setup lang="ts">
+import ProjectorIcon from "../../../../../common/icons/ProjectorIcon.vue";
 import { computed, ref } from "vue";
 import UiDisclosureSummary from "../../../../../common/ui/UiDisclosureSummary.vue";
 import type { AgentBackendId, AgentSelection, AgentTask } from "../../../../agent-core/index.ts";
 import { AgentStatusIcon } from "../../../../agent-turns/index.ts";
 import AgentTaskRow from "./AgentTaskRow.vue";
-import IconChevron from "~icons/lucide/chevron-right";
 
 /** Subagents and background commands as a strip above the input: open one to read, or in a tab. */
 const props = defineProps<{
@@ -53,7 +53,7 @@ const showFinished = computed(() => !active.value.length);
         label="Есть ошибки"
       />
       <span>{{ title }}</span>
-      <IconChevron class="chevron" aria-hidden="true" />
+      <ProjectorIcon name="chevron-right" class="chevron" aria-hidden="true" />
     </UiDisclosureSummary>
     <div class="scroll">
       <ul v-if="active.length" class="list">
@@ -72,7 +72,7 @@ const showFinished = computed(() => !active.value.length);
       <details v-if="finished.length" class="finished" :open="showFinished || undefined">
         <UiDisclosureSummary variant="fit" class="finished-summary">
           <span>Завершено: {{ finished.length }}</span>
-          <IconChevron class="chevron" aria-hidden="true" />
+          <ProjectorIcon name="chevron-right" class="chevron" aria-hidden="true" />
         </UiDisclosureSummary>
         <ul class="list">
           <AgentTaskRow

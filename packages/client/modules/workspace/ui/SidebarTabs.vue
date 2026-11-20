@@ -1,20 +1,13 @@
 <script setup lang="ts">
+import ProjectorIcon from "../../../common/icons/ProjectorIcon.vue";
 import UiStatusDot from "../../../common/ui/UiStatusDot.vue";
-import { computed, ref, type Component } from "vue";
+import { computed, ref } from "vue";
 import UiButton from "../../../common/ui/UiButton.vue";
 import UiIsland from "../../../common/ui/UiIsland.vue";
 import ContextMenu from "../../../common/ui/ContextMenu.vue";
 import type { ContextMenuItem } from "../../../common/ui/context-menu.ts";
 import { useCommandScope } from "../../../common/utilities/commands.ts";
 import { useIslandMenu } from "../../../common/utilities/island-menu.ts";
-import IconRefresh from "~icons/lucide/rotate-cw";
-import IconProjectSettings from "~icons/lucide/sliders-horizontal";
-import IconChevron from "~icons/lucide/chevron-down";
-import IconCheck from "~icons/lucide/check";
-import IconX from "~icons/lucide/x";
-import IconMenu from "~icons/lucide/menu";
-import IconEyeOff from "~icons/lucide/eye-off";
-import IconEye from "~icons/lucide/eye";
 import { useHiddenActions } from "../lib/hidden-actions.ts";
 import { useActionDrag } from "../lib/action-drag.ts";
 import type { SidebarLayout, SidebarSide } from "../lib/sidebar-layout.ts";
@@ -23,7 +16,8 @@ import { groupSidebar } from "../../workspace-api/index.ts";
 export interface SidebarItem {
   id: string;
   title: string;
-  icon: Component;
+  /** Shared icon name; the rail renders it through the icon service. */
+  icon: string;
   badge: number;
   command?: string;
   /** Родительский раздел: иконка стоит рядом с ним в общей подложке. */
@@ -93,7 +87,7 @@ const keyFor = (id: string) => `sidebar:${id}`;
 const settingsItem: SidebarItem = {
   id: "project-settings",
   title: "Настройки проекта",
-  icon: IconProjectSettings,
+  icon: "sliders-horizontal",
   badge: 0,
   command: "ide.workbench.project.settings.open",
 };
@@ -177,7 +171,7 @@ const menuItems = computed<ContextMenuItem[]>(() => {
     {
       id: "section.hide",
       label: `Скрыть «${item.title}»`,
-      icon: IconEyeOff,
+      icon: "eye-off",
       command: "ide.workbench.section.visibility.set",
       args: { section: item.id, visible: false },
       run: () =>
@@ -191,7 +185,7 @@ const menuItems = computed<ContextMenuItem[]>(() => {
           {
             id: "section.close",
             label: `Закрыть «${item.title}»`,
-            icon: IconX,
+            icon: "x",
             command: "ide.workbench.section.close",
             args: { section: item.id },
             run: () => emit("command", "ide.workbench.section.close", { section: item.id }),
@@ -225,7 +219,7 @@ function choose(item: SidebarItem) {
         data-command="ide.workbench.section.picker.toggle"
         @click="commands.run('ide.workbench.section.picker.toggle')"
       >
-        <component :is="current?.icon" v-if="current" aria-hidden="true" />
+        <ProjectorIcon v-if="current" :name="current.icon" aria-hidden="true" />
         <span class="name">{{ current?.title ?? "Разделы" }}</span>
         <span v-if="current?.badge" class="count" aria-hidden="true">{{ current.badge }}</span>
         <UiStatusDot
@@ -237,7 +231,7 @@ function choose(item: SidebarItem) {
           tone="success"
           aria-hidden="true"
         />
-        <IconChevron class="chevron" aria-hidden="true" />
+        <ProjectorIcon name="chevron-down" class="chevron" aria-hidden="true" />
       </button>
     </span>
     <div class="side-actions">
@@ -250,7 +244,7 @@ function choose(item: SidebarItem) {
         :busy="refreshing"
         @click="emit('command', refreshCommand ?? 'ide.workbench.sidebar.refresh')"
       >
-        <IconRefresh aria-hidden="true" />
+        <ProjectorIcon name="rotate-cw" aria-hidden="true" />
       </UiButton>
     </div>
   </nav>
@@ -263,10 +257,14 @@ function choose(item: SidebarItem) {
       :aria-current="section === item.id ? 'true' : undefined"
       @click="choose(item)"
     >
-      <component :is="item.icon" :class="{ 'git-logo': item.id === 'git' }" aria-hidden="true" />
+      <ProjectorIcon
+        :name="item.icon"
+        :class="{ 'git-logo': item.id === 'git' }"
+        aria-hidden="true"
+      />
       <span class="label">{{ item.title }}</span>
       <span v-if="item.badge" class="count" aria-hidden="true">{{ item.badge }}</span>
-      <IconCheck v-if="section === item.id" class="check" aria-hidden="true" />
+      <ProjectorIcon name="check" v-if="section === item.id" class="check" aria-hidden="true" />
     </button>
     <button
       v-if="projectSettings"
@@ -277,7 +275,7 @@ function choose(item: SidebarItem) {
         emit('command', 'ide.workbench.project.settings.open');
       "
     >
-      <IconProjectSettings aria-hidden="true" />
+      <ProjectorIcon name="sliders-horizontal" aria-hidden="true" />
       <span class="label">Настройки проекта</span>
     </button>
   </UiIsland>
@@ -310,8 +308,8 @@ function choose(item: SidebarItem) {
             @click="item.command ? emit('command', item.command) : emit('update:section', item.id)"
             @contextmenu="openSectionMenu($event, item)"
           >
-            <component
-              :is="item.icon"
+            <ProjectorIcon
+              :name="item.icon"
               :class="{ 'git-logo': item.id === 'git' }"
               aria-hidden="true"
             />
@@ -338,7 +336,7 @@ function choose(item: SidebarItem) {
         :aria-expanded="overflow.open.value"
         data-command="ide.workbench.section.hidden.toggle"
         @click="commands.run('ide.workbench.section.hidden.toggle')"
-        ><IconMenu aria-hidden="true"
+        ><ProjectorIcon name="menu" aria-hidden="true"
       /></UiButton>
     </span>
     <div
@@ -354,7 +352,7 @@ function choose(item: SidebarItem) {
         @click="emit('command', 'ide.workbench.project.settings.open')"
         @contextmenu="openSectionMenu($event, settingsItem)"
       >
-        <IconProjectSettings aria-hidden="true" />
+        <ProjectorIcon name="sliders-horizontal" aria-hidden="true" />
       </UiButton>
     </div>
   </nav>
@@ -369,7 +367,9 @@ function choose(item: SidebarItem) {
           choose(item);
         "
       >
-        <component :is="item.icon" aria-hidden="true" /><span class="label">{{ item.title }}</span>
+        <ProjectorIcon :name="item.icon" aria-hidden="true" /><span class="label">{{
+          item.title
+        }}</span>
         <span v-if="item.badge" class="count">{{ item.badge }}</span>
       </button>
       <UiButton
@@ -381,7 +381,7 @@ function choose(item: SidebarItem) {
         @click="
           commands.run('ide.workbench.section.visibility.set', { section: item.id, visible: true })
         "
-        ><IconEye aria-hidden="true"
+        ><ProjectorIcon name="eye" aria-hidden="true"
       /></UiButton>
     </div>
   </UiIsland>

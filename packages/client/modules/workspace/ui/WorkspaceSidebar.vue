@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ProjectorIcon from "../../../common/icons/ProjectorIcon.vue";
 import { computed, shallowReactive, ref } from "vue";
 import type { SidebarRegistry, WorkspaceCapabilities } from "../../workspace-api/index.ts";
 import type { GitBranchesState, GitHistoryState, GitOverviewState } from "../modules/git/index.ts";
@@ -11,8 +12,6 @@ import type { SidebarLayout, SidebarSide } from "../lib/sidebar-layout.ts";
 import SidebarTabs from "./SidebarTabs.vue";
 import SidebarSection from "./SidebarSection.vue";
 import UiSpinner from "../../../common/ui/UiSpinner.vue";
-import IconRefresh from "~icons/lucide/rotate-cw";
-import IconX from "~icons/lucide/x";
 
 type SidebarPanel = {
   refresh?: () => unknown;
@@ -229,9 +228,9 @@ defineExpose({
     />
     <div v-show="!rail || !hidden" ref="panelTarget" class="panel" :class="{ 'theme-panel': rail }">
       <div v-if="activeType?.closable" class="panel-head">
-        <component
-          :is="activeView?.icon"
+        <ProjectorIcon
           v-if="activeView"
+          :name="activeView.icon"
           class="panel-head-icon"
           aria-hidden="true"
         />
@@ -249,7 +248,7 @@ defineExpose({
           :data-command="closeCommand ?? 'ide.workbench.section.close'"
           @click="emit('command', closeCommand ?? 'ide.workbench.section.close', { section })"
         >
-          <IconX aria-hidden="true" />
+          <ProjectorIcon name="x" aria-hidden="true" />
         </button>
       </div>
       <button
@@ -260,7 +259,7 @@ defineExpose({
         :data-command="closeCommand ?? 'ide.workbench.section.close'"
         @click="emit('command', closeCommand ?? 'ide.workbench.section.close', { section })"
       >
-        <IconX aria-hidden="true" />
+        <ProjectorIcon name="x" aria-hidden="true" />
       </button>
       <button
         v-if="rail && !activeView?.refreshGutter"
@@ -274,7 +273,7 @@ defineExpose({
         @click="emit('command', refreshCommandId)"
       >
         <UiSpinner v-if="refreshing" />
-        <IconRefresh v-else aria-hidden="true" />
+        <ProjectorIcon name="rotate-cw" v-else aria-hidden="true" />
       </button>
       <Teleport
         v-for="{ type, view } in mountedSections"

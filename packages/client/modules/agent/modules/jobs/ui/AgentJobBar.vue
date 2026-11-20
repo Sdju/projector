@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ProjectorIcon from "../../../../../common/icons/ProjectorIcon.vue";
 import { computed } from "vue";
 import UiDisclosureSummary from "../../../../../common/ui/UiDisclosureSummary.vue";
 import type { AgentJobView } from "../../../../agent-core/index.ts";
@@ -8,7 +9,6 @@ import { useJobTitles } from "../model/job-titles.ts";
 import { useElapsedClock } from "../../../../agent-core/index.ts";
 import { agentLabel } from "../../../../agent-core/index.ts";
 import { AgentStatusIcon } from "../../../../agent-turns/index.ts";
-import IconChevron from "~icons/lucide/chevron-right";
 
 /** Background jobs above the composer: what runs now, and what this chat just finished. */
 const props = defineProps<{ projectId?: string; active: AgentJobView[]; recent: AgentJobView[] }>();
@@ -56,7 +56,7 @@ const outcome = (job: AgentJobView) =>
     <details v-if="recent.length" class="finished">
       <UiDisclosureSummary variant="fit" class="finished-summary">
         <span>Завершено: {{ recent.length }}</span>
-        <IconChevron class="chevron" aria-hidden="true" />
+        <ProjectorIcon name="chevron-right" class="chevron" aria-hidden="true" />
       </UiDisclosureSummary>
       <div class="list">
         <button

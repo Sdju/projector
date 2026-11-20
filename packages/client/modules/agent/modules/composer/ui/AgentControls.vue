@@ -1,23 +1,15 @@
 <script setup lang="ts">
+import ProjectorIcon from "../../../../../common/icons/ProjectorIcon.vue";
 import UiInline from "../../../../../common/ui/UiInline.vue";
 import UiStatusDot from "../../../../../common/ui/UiStatusDot.vue";
 import UiStack from "../../../../../common/ui/UiStack.vue";
 import UiActionRow from "../../../../../common/ui/UiActionRow.vue";
 import UiActionCopy from "../../../../../common/ui/UiActionCopy.vue";
-import { computed, nextTick, ref, watch, type Component } from "vue";
+import { computed, nextTick, ref, watch } from "vue";
 import UiIsland from "../../../../../common/ui/UiIsland.vue";
 import { useIslandMenu } from "../../../../../common/utilities/island-menu.ts";
 import type { McpServer } from "../../../../agent-core/index.ts";
 import type { AgentControl } from "../../../../agent-core/index.ts";
-import IconChevron from "~icons/lucide/chevron-up";
-import IconNext from "~icons/lucide/chevron-right";
-import IconBack from "~icons/lucide/chevron-left";
-import IconCheck from "~icons/lucide/check";
-import IconModel from "~icons/lucide/cpu";
-import IconEffort from "~icons/lucide/brain";
-import IconMode from "~icons/lucide/shield-check";
-import IconFlag from "~icons/lucide/zap";
-import IconOther from "~icons/lucide/sliders-horizontal";
 
 const props = defineProps<{
   controls: AgentControl[];
@@ -36,12 +28,12 @@ const menu = useIslandMenu({
 });
 const { open, toggle, close } = menu;
 
-const icons: Record<AgentControl["category"], Component> = {
-  model: IconModel,
-  effort: IconEffort,
-  mode: IconMode,
-  flag: IconFlag,
-  other: IconOther,
+const icons: Record<AgentControl["category"], string> = {
+  model: "cpu",
+  effort: "brain",
+  mode: "shield-check",
+  flag: "zap",
+  other: "sliders-horizontal",
 };
 function currentName(control: AgentControl): string {
   return control.options.find((item) => item.value === control.current)?.name ?? control.current;
@@ -116,12 +108,13 @@ defineExpose({ toggle: () => menu.toggle() });
         :data-category="item.category"
         :title="`${item.name}: ${item.value}`"
       >
-        <component :is="icons[item.category]" aria-hidden="true" /><span class="value u-truncate">{{
-          item.value
-        }}</span>
+        <ProjectorIcon :name="icons[item.category]" aria-hidden="true" /><span
+          class="value u-truncate"
+          >{{ item.value }}</span
+        >
       </UiInline>
-      <IconOther v-if="!summary.length" aria-hidden="true" />
-      <IconChevron class="arrow" aria-hidden="true" />
+      <ProjectorIcon name="sliders-horizontal" v-if="!summary.length" aria-hidden="true" />
+      <ProjectorIcon name="chevron-up" class="arrow" aria-hidden="true" />
     </button>
   </div>
   <UiIsland :menu="menu" label="Параметры агента" :width="300">
@@ -141,14 +134,14 @@ defineExpose({ toggle: () => menu.toggle() });
         :title="control.description"
         @click="show(control.id)"
       >
-        <component :is="icons[control.category]" class="lead" aria-hidden="true" />
+        <ProjectorIcon :name="icons[control.category]" class="lead" aria-hidden="true" />
         <UiActionCopy
           :title="control.name"
           :description="currentName(control)"
           description-mode="wrap"
           description-tone="secondary"
         />
-        <IconNext class="next" aria-hidden="true" />
+        <ProjectorIcon name="chevron-right" class="next" aria-hidden="true" />
       </UiActionRow>
       <div v-if="mcp?.length" class="mcp" role="group" aria-label="MCP-серверы">
         <span class="mcp-title">MCP-серверы</span>
@@ -182,7 +175,7 @@ defineExpose({ toggle: () => menu.toggle() });
       @keydown.left="back"
     >
       <UiActionRow separator="after" tone="neutral" type="button" class="head" @click="show()">
-        <IconBack aria-hidden="true" />
+        <ProjectorIcon name="chevron-left" aria-hidden="true" />
         <UiActionCopy
           :title="selected.name"
           :description="selected.description"
@@ -208,7 +201,12 @@ defineExpose({ toggle: () => menu.toggle() });
               description-mode="wrap"
               :emphasized="option.value === selected.current"
             />
-            <IconCheck v-if="option.value === selected.current" class="check" aria-hidden="true" />
+            <ProjectorIcon
+              name="check"
+              v-if="option.value === selected.current"
+              class="check"
+              aria-hidden="true"
+            />
           </UiActionRow>
         </template>
       </UiStack>

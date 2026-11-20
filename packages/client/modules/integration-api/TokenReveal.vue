@@ -1,8 +1,7 @@
 <script setup lang="ts">
+import ProjectorIcon from "../../common/icons/ProjectorIcon.vue";
 import UiControl from "../../common/ui/UiControl.vue";
 import { onBeforeUnmount, ref } from "vue";
-import IconEye from "~icons/lucide/eye";
-import IconEyeOff from "~icons/lucide/eye-off";
 import UiButton from "../../common/ui/UiButton.vue";
 import { integrationRequest } from "./client.ts";
 
@@ -45,7 +44,7 @@ defineExpose({ hide });
       :title="revealed ? 'Скрыть токен' : 'Показать токен (скроется через 30 секунд)'"
       @click="toggle"
     >
-      <component :is="revealed ? IconEyeOff : IconEye" />
+      <ProjectorIcon :name="revealed ? 'eye-off' : 'eye'" />
     </UiButton>
   </div>
 </template>

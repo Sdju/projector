@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ProjectorIcon from "../../../common/icons/ProjectorIcon.vue";
 import UiScrollArea from "../../../common/ui/UiScrollArea.vue";
 import UiTable from "../../../common/ui/UiTable.vue";
 import { computed, onScopeDispose, ref, watch } from "vue";
@@ -7,9 +8,6 @@ import UiVirtualList from "../../../common/ui/UiVirtualList.vue";
 import UiButton from "../../../common/ui/UiButton.vue";
 import UiEmpty from "../../../common/ui/UiEmpty.vue";
 import UiKbd from "../../../common/ui/UiKbd.vue";
-import IconEdit from "~icons/lucide/pencil";
-import IconReset from "~icons/lucide/rotate-ccw";
-import IconRemove from "~icons/lucide/x";
 import type { Keybinding } from "@ai-projector/core/modules/ide/index.ts";
 import type { KeybindingRow } from "./keybinding-row.ts";
 defineProps<{
@@ -81,10 +79,7 @@ const rowKey = (row: KeybindingRow) => `${row.command}:${row.index}`;
               :data-command="row.command"
               @dblclick="!busy && emit('action', 'edit', row)"
             >
-              <td>
-                <span>{{ row.title }}</span
-                ><small>{{ row.command }}</small>
-              </td>
+              <td><span>{{ row.title }}</span><small>{{ row.command }}</small></td>
               <td>
                 <button
                   class="binding"
@@ -107,7 +102,7 @@ const rowKey = (row: KeybindingRow) => `${row.command}:${row.index}`;
                   title="Изменить сочетание"
                   @click="emit('action', 'edit', row)"
                 >
-                  <IconEdit />
+                  <ProjectorIcon name="pencil" />
                 </UiButton>
                 <UiButton
                   v-if="row.rule && !row.rule.disabled"
@@ -118,7 +113,7 @@ const rowKey = (row: KeybindingRow) => `${row.command}:${row.index}`;
                   title="Удалить привязку"
                   @click="emit('action', 'remove', row)"
                 >
-                  <IconRemove />
+                  <ProjectorIcon name="x" />
                 </UiButton>
                 <UiButton
                   v-if="row.custom"
@@ -129,7 +124,7 @@ const rowKey = (row: KeybindingRow) => `${row.command}:${row.index}`;
                   title="Восстановить стандартные привязки команды"
                   @click="emit('action', 'reset', row)"
                 >
-                  <IconReset />
+                  <ProjectorIcon name="rotate-ccw" />
                 </UiButton>
               </td>
             </tr>

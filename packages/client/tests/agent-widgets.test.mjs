@@ -413,11 +413,13 @@ test("the permanent guide spends its space on Field, not on old field aliases", 
   expect(widgetCatalog.describe("Field")).toContain("type: string");
 });
 
-test("InlineIcon offers exactly the names its prompt documents", async () => {
+test("every InlineIcon name its prompt documents exists in the shared registry", async () => {
   const { INLINE_ICON_NAMES } =
     await import("../../core/modules/agent-widgets/inline-icon/index.ts");
-  const { icons } = await import("../modules/agent-widgets/_/index.ts");
-  expect(Object.keys(icons).sort()).toEqual([...INLINE_ICON_NAMES].sort());
+  const { hasIcon, resolveIcon } = await import("../common/icons/registry.ts");
+  for (const name of INLINE_ICON_NAMES) expect(hasIcon(name), name).toBe(true);
+  expect(hasIcon("not-a-real-icon")).toBe(false);
+  expect(resolveIcon("not-a-real-icon")).toBeTruthy();
 });
 
 test("the definitions, the client components and both composition lists stay one set", async () => {

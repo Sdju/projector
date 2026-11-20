@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ProjectorIcon from "../../../common/icons/ProjectorIcon.vue";
 import { computed } from "vue";
 import {
   judgeDecisionLabel,
@@ -6,9 +7,6 @@ import {
   type JudgeVerdict,
 } from "@ai-projector/core/modules/agent-judge/index.ts";
 import { permissionRiskClass } from "../lib/permission-risk.ts";
-import IconShieldCheck from "~icons/lucide/shield-check";
-import IconShieldAlert from "~icons/lucide/shield-alert";
-import IconShieldX from "~icons/lucide/shield-x";
 
 const props = defineProps<{
   tool: string;
@@ -28,9 +26,9 @@ const decision = computed(() => judgeDecisionLabel(props.decision));
       :class="risk"
       :title="`Судья: риск ${verdict.score}/5 · ${verdict.label}`"
     >
-      <IconShieldCheck v-if="verdict.score <= 2" aria-hidden="true" />
-      <IconShieldAlert v-else-if="verdict.score === 3" aria-hidden="true" />
-      <IconShieldX v-else aria-hidden="true" />
+      <ProjectorIcon name="shield-check" v-if="verdict.score <= 2" aria-hidden="true" />
+      <ProjectorIcon name="shield-alert" v-else-if="verdict.score === 3" aria-hidden="true" />
+      <ProjectorIcon name="shield-x" v-else aria-hidden="true" />
       <span class="judge-score">{{ verdict.score }}/5</span>
     </span>
     <span class="judge-text">

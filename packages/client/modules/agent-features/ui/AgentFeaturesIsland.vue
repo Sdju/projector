@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ProjectorIcon from "../../../common/icons/ProjectorIcon.vue";
 import { computed, onMounted, ref, useId, type ComponentPublicInstance } from "vue";
 import UiButton from "../../../common/ui/UiButton.vue";
 import UiControl from "../../../common/ui/UiControl.vue";
@@ -8,7 +9,6 @@ import UiMessage from "../../../common/ui/UiMessage.vue";
 import { useIslandMenu } from "../../../common/utilities/island-menu.ts";
 import { commandArgs, useCommandScope } from "../../../common/utilities/commands.ts";
 import { loadAgentFeatures, useAgentFeatureCatalog } from "../model/catalog.ts";
-import IconSparkles from "~icons/lucide/sparkles";
 
 /**
  * The abilities of one chat: every feature the tab's agent can have, with the chat's own choice.
@@ -176,7 +176,7 @@ onMounted(() => void loadAgentFeatures().catch(() => undefined));
       title="Возможности агента"
       @click="open"
     >
-      <IconSparkles aria-hidden="true" />
+      <ProjectorIcon name="sparkles" aria-hidden="true" />
       <span v-if="overridden" class="changed-dot" aria-hidden="true" />
     </button>
   </div>

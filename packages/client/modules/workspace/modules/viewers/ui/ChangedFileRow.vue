@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ProjectorIcon from "../../../../../common/icons/ProjectorIcon.vue";
 import CommitFileDiff from "./CommitFileDiff.vue";
 import { FileIcon } from "../../../../file-icons/index.ts";
 import { setProjectorDrag } from "../../../../path-drop/index.ts";
@@ -7,8 +8,6 @@ import UiHint from "../../../../../common/ui/UiHint.vue";
 import UiLoader from "../../../../../common/ui/UiLoader.vue";
 import type { ChangedFileDiff, ChangedFileItem } from "../lib/changed-files.ts";
 import { computed } from "vue";
-import IconChevronRight from "~icons/lucide/chevron-right";
-import IconOpen from "~icons/lucide/external-link";
 
 /** One changed file with its expandable diff; the list owner keeps expansion and cache state. */
 const props = defineProps<{
@@ -61,7 +60,7 @@ const note = computed(() => {
         @dragend.stop
       >
         <span class="glyph" aria-hidden="true">
-          <IconChevronRight v-if="file.expandable" :class="{ open: expanded }" />
+          <ProjectorIcon name="chevron-right" v-if="file.expandable" :class="{ open: expanded }" />
         </span>
         <b class="status" :class="file.mark">{{ file.mark }}</b>
         <FileIcon :icon="file.icon" />
@@ -90,7 +89,7 @@ const note = computed(() => {
         :data-command="openCommand"
         @click="emit('open')"
       >
-        <IconOpen aria-hidden="true" />
+        <ProjectorIcon name="external-link" aria-hidden="true" />
       </UiButton>
     </div>
     <div v-if="expanded" class="inline">

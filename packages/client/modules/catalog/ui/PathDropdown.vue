@@ -1,8 +1,7 @@
 <script setup lang="ts">
+import ProjectorIcon from "../../../common/icons/ProjectorIcon.vue";
 import UiLoader from "../../../common/ui/UiLoader.vue";
 import UiPopupSurface from "../../../common/ui/UiPopupSurface.vue";
-import IconChevronRight from "~icons/lucide/chevron-right";
-import IconFolder from "~icons/lucide/folder";
 import type { DirectoryEntry } from "@ai-projector/core/modules/directories/index.ts";
 defineProps<{
   /** Id of the listbox; option ids are `${id}-${index}`. */
@@ -53,8 +52,10 @@ defineEmits<{ pick: [path: string] }>();
         @pointerdown.prevent
         @click="$emit('pick', entry.path)"
       >
-        <IconFolder aria-hidden="true" /><span class="u-truncate">{{ entry.name }}</span
-        ><IconChevronRight aria-hidden="true" />
+        <ProjectorIcon name="folder" aria-hidden="true" /><span class="u-truncate">{{
+          entry.name
+        }}</span
+        ><ProjectorIcon name="chevron-right" aria-hidden="true" />
       </button>
     </div>
     <p v-if="truncated" class="notice">

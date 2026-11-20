@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ProjectorIcon from "../../../common/icons/ProjectorIcon.vue";
 import { computed, ref } from "vue";
 import { useRouter } from "vue-router";
 import { useIdeCommands } from "../../ide/index.ts";
@@ -15,8 +16,6 @@ import {
   type ProjectLocation,
 } from "../../project/index.ts";
 import PathBar from "./PathBar.vue";
-import IconChevron from "~icons/lucide/chevron-down";
-import IconClose from "~icons/lucide/x";
 
 const props = defineProps<{ project: ProjectLocation }>();
 const router = useRouter();
@@ -91,7 +90,8 @@ const navigate = (path: string) =>
       @click="commands.run('ide.project.picker.toggle')"
     >
       <img :src="projectIconUrl(project)" alt="" width="22" height="22" />
-      <span class="u-truncate">{{ project.name }}</span><IconChevron aria-hidden="true" />
+      <span class="u-truncate">{{ project.name }}</span
+      ><ProjectorIcon name="chevron-down" aria-hidden="true" />
     </button>
     <button
       v-if="open"
@@ -113,7 +113,7 @@ const navigate = (path: string) =>
           aria-label="Закрыть выбор проекта"
           @click="commands.run('ide.project.picker.toggle')"
         >
-          <IconClose />
+          <ProjectorIcon name="x" />
         </button>
       </div>
       <PathBar :path="project.path" :navigate="navigate" />

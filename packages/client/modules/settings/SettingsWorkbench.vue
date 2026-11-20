@@ -1,13 +1,10 @@
 <script setup lang="ts">
+import ProjectorIcon from "../../common/icons/ProjectorIcon.vue";
 import UiToolbar from "../../common/ui/UiToolbar.vue";
 import UiControl, { type UiControlHandle } from "../../common/ui/UiControl.vue";
 import UiInline from "../../common/ui/UiInline.vue";
 import UiControlScope from "../../common/ui/UiControlScope.vue";
 import { computed, nextTick, ref, watch } from "vue";
-import IconSettings from "~icons/lucide/settings-2";
-import IconSearch from "~icons/lucide/search";
-import IconClose from "~icons/lucide/x";
-import IconChevronDown from "~icons/lucide/chevron-down";
 import UiIsland from "../../common/ui/UiIsland.vue";
 import UiIslandLabel from "../../common/ui/UiIslandLabel.vue";
 import { useIslandMenu } from "../../common/utilities/island-menu.ts";
@@ -211,9 +208,9 @@ function filter(event: Event) {
     @pointerdown="commands.scope.activate()"
   >
     <UiToolbar as="header" class="toolbar" :gap="4" justify="between">
-      <h1><IconSettings aria-hidden="true" />{{ title }}</h1>
+      <h1><ProjectorIcon name="settings-2" aria-hidden="true" />{{ title }}</h1>
       <UiInline class="search" justify="normal">
-        <IconSearch aria-hidden="true" />
+        <ProjectorIcon name="search" aria-hidden="true" />
         <UiControl
           ref="search"
           :value="query"
@@ -230,7 +227,7 @@ function filter(event: Event) {
           aria-label="Очистить поиск"
           title="Очистить поиск"
           @click="commands.run('ide.settings.search', { query: '' })"
-          ><IconClose
+          ><ProjectorIcon name="x"
         /></UiButton>
       </UiInline>
     </UiToolbar>
@@ -247,7 +244,7 @@ function filter(event: Event) {
           ><small>Раздел настроек</small
           ><strong>{{ active?.title ?? "Выбрать раздел" }}</strong></span
         >
-        <IconChevronDown aria-hidden="true" />
+        <ProjectorIcon name="chevron-down" aria-hidden="true" />
       </button>
     </div>
     <UiIsland :menu="menu" label="Разделы настроек" :width="360">
@@ -352,7 +349,7 @@ function filter(event: Event) {
         </template>
         <div v-if="$slots.footer && active" class="footer"><slot name="footer" /></div>
         <div v-if="!active" class="empty">
-          <IconSearch aria-hidden="true" />
+          <ProjectorIcon name="search" aria-hidden="true" />
           <p>Настройки не найдены</p>
           <span>Попробуйте другое название или параметр.</span>
           <UiButton @click="commands.run('ide.settings.search', { query: '' })"

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ProjectorIcon from "../../common/icons/ProjectorIcon.vue";
 import UiMessage from "../../common/ui/UiMessage.vue";
 import UiButton from "../../common/ui/UiButton.vue";
 import { useRoute, useRouter } from "vue-router";
@@ -13,7 +14,6 @@ import { settingsTabViews } from "../app-settings/index.ts";
 import { useRemoteWorkspace } from "../integration-api/index.ts";
 import { useCommandScope } from "../../common/utilities/commands.ts";
 import { formatProjectRef, projectRoute } from "../project/index.ts";
-import IconGitlab from "~icons/simple-icons/gitlab";
 import { GitlabRequestError, readRepository } from "./client.ts";
 import { createGitlabConnectionProfile, createGitlabWorkspaceProfile } from "./source.ts";
 import GitlabClone from "./GitlabClone.vue";
@@ -139,7 +139,7 @@ const tabViews: TabViews = {
           )
         "
       >
-        <IconGitlab aria-hidden="true" />
+        <ProjectorIcon name="simple-icons:gitlab" aria-hidden="true" />
       </UiButton>
     </template>
     <template #terminal-status

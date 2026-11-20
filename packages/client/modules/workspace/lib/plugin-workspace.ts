@@ -12,7 +12,6 @@ import {
   runtimePanels,
   runtimeTabs,
 } from "../../plugin-runtime/index.ts";
-import IconPuzzle from "~icons/lucide/puzzle";
 
 function sectionOf(item: (typeof runtimePanels.value)[number]): SidebarType {
   return {
@@ -42,7 +41,7 @@ export function usePluginWorkspaceViews(baseSidebarViews: SidebarViews | undefin
         return [
           kind,
           {
-            icon: IconPuzzle,
+            icon: "puzzle",
             component: PluginContributionMount,
             props: (host: SidebarHost) => ({
               kind: "panel",

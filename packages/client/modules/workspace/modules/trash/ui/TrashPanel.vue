@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ProjectorIcon from "../../../../../common/icons/ProjectorIcon.vue";
 import { computed, ref, watch } from "vue";
 import type { TrashEntry, TrashMutation } from "@ai-projector/core/modules/workspace/index.ts";
 import UiButton from "../../../../../common/ui/UiButton.vue";
@@ -18,12 +19,6 @@ import { countRu } from "../../../../../common/utilities/plural.ts";
 import { sizeLabel } from "../../../../../common/utilities/release-format.ts";
 import { useTrash } from "../lib/trash.ts";
 import { useTrashPanel } from "../lib/trash-panel.ts";
-import IconArchiveRestore from "~icons/lucide/archive-restore";
-import IconChevronRight from "~icons/lucide/chevron-right";
-import IconEraser from "~icons/lucide/eraser";
-import IconFile from "~icons/lucide/file";
-import IconFolder from "~icons/lucide/folder";
-import IconTrash from "~icons/lucide/trash-2";
 
 /** Sidebar section «Корзина»: a tree of .projector-trash with lazy levels, recursive sizes and restore. */
 const props = defineProps<{ projectId: string; revision: number; active?: boolean }>();
@@ -240,7 +235,7 @@ defineExpose({ refresh: () => list.refresh() });
             data-command="ide.trash.empty"
             @click="empty"
           >
-            <IconEraser aria-hidden="true" />
+            <ProjectorIcon name="eraser" aria-hidden="true" />
           </UiButton>
           <UiSectionRefresh />
         </UiInline>
@@ -277,7 +272,8 @@ defineExpose({ refresh: () => list.refresh() });
             @click="list.toggle(row.key)"
           >
             <UiSpinner v-if="list.childrenLoading.has(row.key)" size="sm" />
-            <IconChevronRight
+            <ProjectorIcon
+              name="chevron-right"
               v-else
               class="chevron-icon"
               :class="{ open: list.expanded.has(row.key) }"
@@ -285,7 +281,11 @@ defineExpose({ refresh: () => list.refresh() });
             />
           </button>
           <span v-else class="chevron" aria-hidden="true" />
-          <component :is="row.directory ? IconFolder : IconFile" class="kind" aria-hidden="true" />
+          <ProjectorIcon
+            :name="row.directory ? 'folder' : 'file'"
+            class="kind"
+            aria-hidden="true"
+          />
           <div class="main">
             <MiddleTruncate :text="row.name" class="name" />
             <div v-if="row.entry" class="meta">
@@ -305,7 +305,7 @@ defineExpose({ refresh: () => list.refresh() });
               data-command="ide.trash.restore"
               @click="restore(row.entry, $event)"
             >
-              <IconArchiveRestore aria-hidden="true" />
+              <ProjectorIcon name="archive-restore" aria-hidden="true" />
             </UiButton>
             <UiButton
               shape="icon"
@@ -317,7 +317,7 @@ defineExpose({ refresh: () => list.refresh() });
               data-command="ide.trash.delete"
               @click="remove(row.entry)"
             >
-              <IconTrash aria-hidden="true" />
+              <ProjectorIcon name="trash-2" aria-hidden="true" />
             </UiButton>
           </div>
           <span v-else class="actions-spacer" aria-hidden="true" />

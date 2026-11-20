@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ProjectorIcon from "../../../../../common/icons/ProjectorIcon.vue";
 import { computed } from "vue";
 import UiButton from "../../../../../common/ui/UiButton.vue";
 import UiStatusDot from "../../../../../common/ui/UiStatusDot.vue";
@@ -7,8 +8,6 @@ import { failureTitle } from "@ai-projector/core/modules/agent-failure/index.ts"
 import type { InboxItem } from "../model/inbox.ts";
 import AgentJobRequests from "./AgentJobRequests.vue";
 import AgentRunRequests from "./AgentRunRequests.vue";
-import IconCheck from "~icons/lucide/check";
-import IconSquare from "~icons/lucide/square";
 
 const props = defineProps<{
   item: InboxItem;
@@ -112,7 +111,7 @@ const requestNote = computed(() => {
         :busy="busy"
         @click="emit('stop')"
       >
-        <IconSquare aria-hidden="true" />
+        <ProjectorIcon name="square" aria-hidden="true" />
       </UiButton>
       <UiButton
         v-if="acknowledgeable"
@@ -122,7 +121,7 @@ const requestNote = computed(() => {
         aria-label="Отметить прочитанным"
         @click="emit('read')"
       >
-        <IconCheck aria-hidden="true" />
+        <ProjectorIcon name="check" aria-hidden="true" />
       </UiButton>
     </div>
     <AgentJobRequests

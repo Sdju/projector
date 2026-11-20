@@ -1,9 +1,8 @@
 <script setup lang="ts">
+import ProjectorIcon from "../../../common/icons/ProjectorIcon.vue";
 import { nextTick, ref, watch } from "vue";
 import UiDisclosureSummary from "../../../common/ui/UiDisclosureSummary.vue";
 import UiSpinner from "../../../common/ui/UiSpinner.vue";
-import IconBrain from "~icons/lucide/brain";
-import IconChevron from "~icons/lucide/chevron-right";
 
 const props = defineProps<{
   text: string;
@@ -26,9 +25,9 @@ watch(
   <details class="thought" :open="streaming || undefined">
     <UiDisclosureSummary variant="fit" class="thought-summary">
       <UiSpinner v-if="streaming" />
-      <IconBrain v-else class="thought-icon" aria-hidden="true" />
+      <ProjectorIcon name="brain" v-else class="thought-icon" aria-hidden="true" />
       <span>{{ streaming ? "Думает…" : "Рассуждения" }}</span>
-      <IconChevron class="thought-chevron" aria-hidden="true" />
+      <ProjectorIcon name="chevron-right" class="thought-chevron" aria-hidden="true" />
     </UiDisclosureSummary>
     <div ref="body" class="thought-text">{{ text }}</div>
   </details>

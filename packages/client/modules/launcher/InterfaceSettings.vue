@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import ProjectorIcon from "../icons/ProjectorIcon.vue";
+import ProjectorIcon from "../../common/icons/ProjectorIcon.vue";
 import UiMessage from "../../common/ui/UiMessage.vue";
 import UiControl from "../../common/ui/UiControl.vue";
 
@@ -208,7 +208,7 @@ function fontProgress(key: "chat" | "terminal") {
           <UiControl v-model="mode" type="radio" name="interface-mode" :value="option.id" />
           <span class="mode-preview" :class="`mode-preview-${option.id}`" aria-hidden="true">
             <span class="preview-top"><i /><i /><i /></span>
-            <span class="preview-body"><component :is="option.icon" /><i /><i /></span>
+            <span class="preview-body"><ProjectorIcon :name="option.icon" /><i /><i /></span>
           </span>
           <span class="mode-copy">
             <strong>{{ option.title }}</strong>

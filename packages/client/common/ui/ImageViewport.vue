@@ -1,12 +1,11 @@
 <script setup lang="ts">
+import ProjectorIcon from "../icons/ProjectorIcon.vue";
 import UiPanel from "./UiPanel.vue";
 import UiControl from "./UiControl.vue";
 import UiInline from "./UiInline.vue";
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { fitImage, zoomImageAt, type ImageTransform } from "../utilities/image-viewport.ts";
 import UiButton from "./UiButton.vue";
-import IconRatio from "~icons/lucide/ratio";
-import IconMaximize from "~icons/lucide/maximize";
 const props = withDefaults(
   defineProps<{
     src?: string;
@@ -266,7 +265,7 @@ defineExpose({ reset });
         title="Масштаб 100% и центрирование изображения"
         @click="reset(false)"
       >
-        <IconRatio aria-hidden="true" />
+        <ProjectorIcon name="ratio" aria-hidden="true" />
       </UiButton>
       <UiButton
         shape="icon"
@@ -275,7 +274,7 @@ defineExpose({ reset });
         title="Вписать изображение в область просмотра"
         @click="reset(true)"
       >
-        <IconMaximize aria-hidden="true" />
+        <ProjectorIcon name="maximize" aria-hidden="true" />
       </UiButton>
       <UiInline
         as="label"

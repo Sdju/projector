@@ -1,11 +1,9 @@
 <script setup lang="ts">
+import ProjectorIcon from "../../../../../common/icons/ProjectorIcon.vue";
 import UiDisclosureSummary from "../../../../../common/ui/UiDisclosureSummary.vue";
 import { computed } from "vue";
 import type { PlanItem } from "../../../../agent-core/index.ts";
-import IconListChecks from "~icons/lucide/list-checks";
-import IconCheck from "~icons/lucide/check";
 import UiSpinner from "../../../../../common/ui/UiSpinner.vue";
-import IconCircle from "~icons/lucide/circle";
 
 const props = defineProps<{ items: PlanItem[]; busy: boolean; embedded?: boolean }>();
 const done = computed(() => props.items.filter((item) => item.status === "completed").length);
@@ -15,7 +13,7 @@ const current = computed(() => props.items.find((item) => item.status === "in_pr
 <template>
   <details v-if="items.length" class="plan" :class="{ embedded }" :open="busy">
     <UiDisclosureSummary :highlight="false">
-      <IconListChecks aria-hidden="true" />
+      <ProjectorIcon name="list-checks" aria-hidden="true" />
       <span class="plan-title">План</span>
       <span class="plan-count">{{ done }} / {{ items.length }}</span>
       <span v-if="current" class="plan-current u-truncate">{{
@@ -27,9 +25,9 @@ const current = computed(() => props.items.find((item) => item.status === "in_pr
     </UiDisclosureSummary>
     <ol>
       <li v-for="(item, index) in items" :key="index" :class="item.status">
-        <IconCheck v-if="item.status === 'completed'" aria-hidden="true" />
+        <ProjectorIcon name="check" v-if="item.status === 'completed'" aria-hidden="true" />
         <UiSpinner v-else-if="item.status === 'in_progress'" />
-        <IconCircle v-else aria-hidden="true" />
+        <ProjectorIcon name="circle" v-else aria-hidden="true" />
         <span>{{ item.content }}</span>
       </li>
     </ol>

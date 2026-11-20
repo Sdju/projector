@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ProjectorIcon from "../../../common/icons/ProjectorIcon.vue";
 import UiActionCopy from "../../../common/ui/UiActionCopy.vue";
 import UiActionRow from "../../../common/ui/UiActionRow.vue";
 import UiIslandHeader from "../../../common/ui/UiIslandHeader.vue";
@@ -8,12 +9,6 @@ import { useIslandMenu } from "../../../common/utilities/island-menu.ts";
 import { computed } from "vue";
 import UiButton from "../../../common/ui/UiButton.vue";
 import { layoutPresets, type LayoutPreset } from "../lib/workbench-layout.ts";
-import IconLayout from "~icons/lucide/layout-template";
-import IconEye from "~icons/lucide/eye";
-import IconEyeOff from "~icons/lucide/eye-off";
-import IconSidebar from "~icons/lucide/panel-left";
-import IconReset from "~icons/lucide/rotate-ccw";
-import IconMaximize from "~icons/lucide/maximize-2";
 import UiKbd from "../../../common/ui/UiKbd.vue";
 import { zenMode } from "../../../common/utilities/zen-mode.ts";
 import { useOptionalIdeCommands } from "../../ide/index.ts";
@@ -70,12 +65,12 @@ function run(id: string, args?: unknown, keepOpen = false) {
       :aria-controls="open ? menu.id : undefined"
       @click="toggle()"
     >
-      <IconLayout aria-hidden="true" />
+      <ProjectorIcon name="layout-template" aria-hidden="true" />
     </UiButton>
   </span>
   <UiIsland :menu="menu" label="Управление раскладкой" gap="var(--sp-2)">
     <UiIslandHeader class="island-head" aria-label="Закрыть" @click="toggle(false)">
-      <span>Раскладка</span><IconLayout aria-hidden="true" />
+      <span>Раскладка</span><ProjectorIcon name="layout-template" aria-hidden="true" />
     </UiIslandHeader>
     <div v-if="presetsAvailable" class="presets" role="group" aria-label="Готовые раскладки">
       <button
@@ -108,7 +103,7 @@ function run(id: string, args?: unknown, keepOpen = false) {
         data-command="ide.workbench.sidebar.toggle"
         @click="run('ide.workbench.sidebar.toggle', undefined, true)"
       >
-        <IconSidebar aria-hidden="true" />
+        <ProjectorIcon name="panel-left" aria-hidden="true" />
         <UiActionCopy
           :grow="false"
           title="Боковая панель"
@@ -126,7 +121,7 @@ function run(id: string, args?: unknown, keepOpen = false) {
         data-command="ide.workbench.layout.group.toggle"
         @click="run('ide.workbench.layout.group.toggle', { group: group.id }, true)"
       >
-        <component :is="group.hidden ? IconEyeOff : IconEye" aria-hidden="true" />
+        <ProjectorIcon :name="group.hidden ? 'eye-off' : 'eye'" aria-hidden="true" />
         <UiActionCopy
           :grow="false"
           :title="roleTitles[group.role!] ?? group.label"
@@ -148,7 +143,7 @@ function run(id: string, args?: unknown, keepOpen = false) {
       data-command="ide.workbench.zen.toggle"
       @click="run('ide.workbench.zen.toggle')"
     >
-      <IconMaximize aria-hidden="true" />
+      <ProjectorIcon name="maximize-2" aria-hidden="true" />
       <UiActionCopy :grow="false" title="Режим Zen" description="Только активный блок" />
       <UiKbd v-if="zenShortcut" class="zen-kbd">{{ zenShortcut }}</UiKbd>
     </UiActionRow>
@@ -160,7 +155,7 @@ function run(id: string, args?: unknown, keepOpen = false) {
       data-command="ide.workbench.layout.reset"
       @click="run('ide.workbench.layout.reset')"
     >
-      <IconReset aria-hidden="true" />Сбросить раскладку
+      <ProjectorIcon name="rotate-ccw" aria-hidden="true" />Сбросить раскладку
     </UiActionRow>
   </UiIsland>
 </template>

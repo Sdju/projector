@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ProjectorIcon from "../../../../../common/icons/ProjectorIcon.vue";
 import UiHeading from "../../../../../common/ui/UiHeading.vue";
 import { computed } from "vue";
 import type { GitCommitDetail } from "@ai-projector/core/modules/workspace/index.ts";
@@ -9,7 +10,6 @@ import {
   relativeTime,
   shortHash,
 } from "../../../../../common/utilities/commit-format.ts";
-import IconCopy from "~icons/lucide/copy";
 
 /** Заголовок обзора коммита: описание, ссылки, хеш, автор, даты и родители. */
 const props = defineProps<{ detail: GitCommitDetail }>();
@@ -43,7 +43,7 @@ async function copy(event: MouseEvent) {
           data-command="ide.git.commit.copyHash"
           @click="copy"
         >
-          <IconCopy aria-hidden="true" />
+          <ProjectorIcon name="copy" aria-hidden="true" />
         </UiButton>
       </dd>
       <dt>Автор</dt>

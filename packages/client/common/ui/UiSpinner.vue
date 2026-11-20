@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import IconLoader from "~icons/lucide/loader-circle";
+import ProjectorIcon from "../icons/ProjectorIcon.vue";
 defineProps<{ label?: string }>();
 </script>
 
 <template>
-  <IconLoader
+  <ProjectorIcon
+    name="loader-circle"
     class="ui-spinner"
     :role="label ? 'img' : undefined"
     :aria-hidden="label ? undefined : true"

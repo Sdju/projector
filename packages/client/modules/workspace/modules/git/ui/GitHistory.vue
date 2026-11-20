@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ProjectorIcon from "../../../../../common/icons/ProjectorIcon.vue";
 import UiControl from "../../../../../common/ui/UiControl.vue";
 import UiInline from "../../../../../common/ui/UiInline.vue";
 import UiLoader from "../../../../../common/ui/UiLoader.vue";
@@ -17,8 +18,6 @@ import {
 } from "../../../../../common/utilities/commands.ts";
 import type { GitHistoryState } from "../lib/git-history.ts";
 import GitCommitRow from "./GitCommitRow.vue";
-import IconChevronRight from "~icons/lucide/chevron-right";
-import IconRefresh from "~icons/lucide/refresh-cw";
 
 const props = defineProps<{
   history: GitHistoryState;
@@ -213,7 +212,7 @@ watch(commits, (list) => {
         data-command="ide.git.history.toggle"
         @click="commands.run('ide.git.history.toggle')"
       >
-        <IconChevronRight class="chevron" :class="{ open }" aria-hidden="true" />
+        <ProjectorIcon name="chevron-right" class="chevron" :class="{ open }" aria-hidden="true" />
         <h3>History</h3>
         <span v-if="log.ahead" class="sync" title="Не отправлено в upstream">↑{{ log.ahead }}</span>
         <span v-if="log.behind" class="sync" title="Есть в upstream, нет локально">
@@ -230,7 +229,7 @@ watch(commits, (list) => {
         data-command="ide.git.history.refresh"
         @click="commands.run('ide.git.history.refresh')"
       >
-        <IconRefresh aria-hidden="true" />
+        <ProjectorIcon name="refresh-cw" aria-hidden="true" />
       </UiButton>
     </div>
     <template v-if="open">

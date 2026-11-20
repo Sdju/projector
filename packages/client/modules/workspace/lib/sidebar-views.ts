@@ -35,18 +35,6 @@ import { TrashPanel, trashCount } from "../modules/trash/index.ts";
 import type { OpenFile, OpenFileOptions } from "../open-file.ts";
 import type { useGitChangeSync } from "./git-change-sync.ts";
 import type { useOpenFiles } from "./open-files.ts";
-import IconFiles from "~icons/lucide/files";
-import IconSearch from "~icons/lucide/search";
-import IconGit from "~icons/devicon/git";
-import IconDocker from "~icons/lucide/container";
-import IconHub from "~icons/lucide/network";
-import IconIssues from "~icons/lucide/circle-dot";
-import IconPulls from "~icons/lucide/git-pull-request";
-import IconMerge from "~icons/lucide/git-merge";
-import IconDiscussions from "~icons/lucide/messages-square";
-import IconPipelines from "~icons/lucide/workflow";
-import IconReleases from "~icons/lucide/tag";
-import IconTrash from "~icons/lucide/trash-2";
 
 /** Sections every workspace has; profiles add their own through `profile.sidebar`. */
 export const baseSidebarTypes: SidebarType[] = [
@@ -107,7 +95,8 @@ export interface SidebarHost {
 
 /** How a section is drawn; the sidebar only mounts it and wires its button. */
 export interface SidebarView {
-  icon: Component;
+  /** Shared icon name of the section button. */
+  icon: string;
   /** Root owns its fill/scroll recipe; the host keeps panels mounted with v-show. */
   component: Component;
   /** Props and listeners of the panel. */
@@ -128,7 +117,7 @@ export type SidebarViews = Record<string, SidebarView>;
 
 export const baseSidebarViews: SidebarViews = {
   hub: {
-    icon: IconHub,
+    icon: "network",
     component: HubPanel,
     props: () => ({}),
     badge: () => inboxRemoteAttention(),
@@ -136,7 +125,7 @@ export const baseSidebarViews: SidebarViews = {
     refresh: (_, panel) => panel?.refresh?.(),
   },
   files: {
-    icon: IconFiles,
+    icon: "files",
     component: FilesSection,
     props: (host) => ({
       projectId: host.projectId,
@@ -158,7 +147,7 @@ export const baseSidebarViews: SidebarViews = {
     }),
   },
   search: {
-    icon: IconSearch,
+    icon: "search",
     component: SearchPanel,
     props: (host) => ({
       projectId: host.projectId,
@@ -169,7 +158,7 @@ export const baseSidebarViews: SidebarViews = {
     refresh: (_, panel) => panel?.refresh?.(),
   },
   "search-scope": {
-    icon: IconSearch,
+    icon: "search",
     component: SearchPanel,
     props: (host, _selected, type) => {
       const scope = type?.params?.scope as FileScope | undefined;
@@ -185,7 +174,7 @@ export const baseSidebarViews: SidebarViews = {
     refresh: (_, panel) => panel?.refresh?.(),
   },
   git: {
-    icon: IconGit,
+    icon: "devicon:git",
     component: GitPanel,
     props: (host) => ({
       projectId: host.projectId,
@@ -211,7 +200,7 @@ export const baseSidebarViews: SidebarViews = {
   },
   // Service section from `workspaceUtility`: it is drawn in the bottom group of the rail.
   trash: {
-    icon: IconTrash,
+    icon: "trash-2",
     component: TrashPanel,
     props: (host, selected) => ({
       projectId: host.projectId,
@@ -224,7 +213,7 @@ export const baseSidebarViews: SidebarViews = {
     refresh: (_, panel) => panel?.refresh?.(),
   },
   tree: {
-    icon: IconFiles,
+    icon: "files",
     component: ScopeTreeSection,
     props: (host, _selected, type) => {
       const scope = type?.params?.scope as FileScope | undefined;
@@ -247,7 +236,7 @@ export const baseSidebarViews: SidebarViews = {
     },
   },
   changes: {
-    icon: IconFiles,
+    icon: "files",
     component: CompareTreeSection,
     props: (host, _selected, type) => {
       const scope = type?.params?.scope as FileScope | undefined;
@@ -271,7 +260,7 @@ export const baseSidebarViews: SidebarViews = {
     refresh: (_, panel) => panel?.refresh?.(),
   },
   issues: {
-    icon: IconIssues,
+    icon: "circle-dot",
     component: IssuesPanel,
     props: (host, selected) => ({
       projectId: host.projectId,
@@ -282,7 +271,7 @@ export const baseSidebarViews: SidebarViews = {
     refresh: (_, panel) => panel?.refresh?.(),
   },
   pulls: {
-    icon: IconPulls,
+    icon: "git-pull-request",
     component: PullsPanel,
     props: (host, selected) => ({
       projectId: host.projectId,
@@ -293,7 +282,7 @@ export const baseSidebarViews: SidebarViews = {
     refresh: (_, panel) => panel?.refresh?.(),
   },
   "merge-requests": {
-    icon: IconMerge,
+    icon: "git-merge",
     component: PullsPanel,
     props: (host, selected) => ({
       projectId: host.projectId,
@@ -310,7 +299,7 @@ export const baseSidebarViews: SidebarViews = {
     refresh: (_, panel) => panel?.refresh?.(),
   },
   "merge-request-files": {
-    icon: IconFiles,
+    icon: "files",
     component: PullRequestFilesSection,
     props: (host, _selected, type) => {
       const number = Number(type?.params?.number);
@@ -327,7 +316,7 @@ export const baseSidebarViews: SidebarViews = {
     refresh: (_, panel) => panel?.refresh?.(),
   },
   pipelines: {
-    icon: IconPipelines,
+    icon: "workflow",
     component: PipelinesPanel,
     props: (host, selected) => ({
       projectId: host.projectId,
@@ -338,7 +327,7 @@ export const baseSidebarViews: SidebarViews = {
     refresh: (_, panel) => panel?.refresh?.(),
   },
   releases: {
-    icon: IconReleases,
+    icon: "tag",
     component: ReleasesPanel,
     props: (host, selected) => ({
       projectId: host.projectId,
@@ -349,7 +338,7 @@ export const baseSidebarViews: SidebarViews = {
     refresh: (_, panel) => panel?.refresh?.(),
   },
   discussions: {
-    icon: IconDiscussions,
+    icon: "messages-square",
     component: DiscussionsPanel,
     props: (host, selected) => ({
       projectId: host.projectId,
@@ -360,7 +349,7 @@ export const baseSidebarViews: SidebarViews = {
     refresh: (_, panel) => panel?.refresh?.(),
   },
   docker: {
-    icon: IconDocker,
+    icon: "container",
     component: DockerSidebar,
     props: () => ({}),
     refreshGutter: true,

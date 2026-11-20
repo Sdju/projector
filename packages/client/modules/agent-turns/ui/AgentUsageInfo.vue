@@ -1,9 +1,9 @@
 <script setup lang="ts">
+import ProjectorIcon from "../../../common/icons/ProjectorIcon.vue";
 import UiButton from "../../../common/ui/UiButton.vue";
 import UiTooltip from "../../../common/ui/UiTooltip.vue";
 import { computed } from "vue";
 import type { AgentTokens, AgentUsage, ChatUsage } from "../../agent-core/index.ts";
-import IconInfo from "~icons/lucide/info";
 
 const props = defineProps<{ usage: AgentUsage; chat?: ChatUsage }>();
 
@@ -38,7 +38,7 @@ const rows = computed(() => [
   <UiTooltip>
     <template #default="{ describedby }">
       <UiButton shape="icon" size="sm" aria-label="Токены и кэш" :aria-describedby="describedby">
-        <IconInfo aria-hidden="true" />
+        <ProjectorIcon name="info" aria-hidden="true" />
       </UiButton>
     </template>
     <template #content>

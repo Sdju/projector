@@ -1,8 +1,8 @@
 <script setup lang="ts">
+import ProjectorIcon from "../../../../../common/icons/ProjectorIcon.vue";
 import UiButton from "../../../../../common/ui/UiButton.vue";
 import { useCommandScope } from "../../../../../common/utilities/commands.ts";
 import { useAgentInbox } from "../model/inbox.ts";
-import IconBell from "~icons/lucide/bell";
 
 /**
  * The one counter of work that waits for the user on every project and connected device.
@@ -48,7 +48,7 @@ const summary = () => {
     data-command="ide.inbox.open"
     @click="commands.run('ide.inbox.open')"
   >
-    <IconBell aria-hidden="true" />
+    <ProjectorIcon name="bell" aria-hidden="true" />
     <span v-if="badgeCount" class="count" :class="{ info: !attention }" aria-hidden="true">{{
       badgeCount
     }}</span>

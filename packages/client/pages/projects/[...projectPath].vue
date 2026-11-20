@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ProjectorIcon from "../../common/icons/ProjectorIcon.vue";
 import UiMessage from "../../common/ui/UiMessage.vue";
 import { computed, h, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
@@ -36,8 +37,6 @@ import {
 import { useCommandScope } from "../../common/utilities/commands.ts";
 import { bindProjectAppearance } from "../../modules/appearance/index.ts";
 import UiButton from "../../common/ui/UiButton.vue";
-import IconGithub from "~icons/simple-icons/github";
-import IconGitlab from "~icons/simple-icons/gitlab";
 import { projectInitPrompt, requestChatTab, useAgent } from "../../modules/agent/index.ts";
 import { settingsTabViews } from "../../modules/app-settings/index.ts";
 
@@ -266,7 +265,7 @@ watch(
           data-command="ide.gitlab.repository.info"
           @click="gitlabCommands.run('ide.gitlab.repository.info')"
         >
-          <IconGitlab aria-hidden="true" />
+          <ProjectorIcon name="simple-icons:gitlab" aria-hidden="true" />
         </UiButton>
         <UiButton
           v-else-if="githubRepository"
@@ -277,7 +276,7 @@ watch(
           data-command="ide.github.repository.info"
           @click="githubCommands.run('ide.github.repository.info')"
         >
-          <IconGithub aria-hidden="true" />
+          <ProjectorIcon name="simple-icons:github" aria-hidden="true" />
         </UiButton>
       </template>
       <template #terminal-status>

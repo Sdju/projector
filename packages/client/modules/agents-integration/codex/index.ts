@@ -1,4 +1,3 @@
-import IconCodex from "~icons/simple-icons/openai";
 import type { ClientAgent } from "../catalog/index.ts";
 import CodexUsageIndicator from "./ui/CodexUsageIndicator.vue";
 
@@ -9,7 +8,7 @@ export const codexAgent: ClientAgent = {
   program: "codex",
   title: "Codex",
   caption: "Запустит агента OpenAI Codex",
-  icon: IconCodex,
+  icon: "simple-icons:openai",
   usage: CodexUsageIndicator,
   usageUrl: "/api/codex/usage",
 };

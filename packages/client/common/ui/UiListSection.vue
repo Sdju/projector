@@ -1,9 +1,9 @@
 <script setup lang="ts" generic="T extends string">
+import ProjectorIcon from "../icons/ProjectorIcon.vue";
 import UiEmpty from "./UiEmpty.vue";
 import UiLoader from "./UiLoader.vue";
 import UiMessage from "./UiMessage.vue";
 import UiScrollArea from "./UiScrollArea.vue";
-import IconChevronRight from "~icons/lucide/chevron-right";
 
 /**
  * Collapsible sidebar list: title with count, status filter, async states and the next-page button.
@@ -38,10 +38,8 @@ const emit = defineEmits<{ toggle: []; filter: [value: T]; more: [] }>();
       :data-command="toggleCommand"
       @click="emit('toggle')"
     >
-      <IconChevronRight class="chevron" :class="{ open }" aria-hidden="true" />
-      <h3>
-        {{ title }} <span v-if="count" class="count">{{ count }}</span>
-      </h3>
+      <ProjectorIcon name="chevron-right" class="chevron" :class="{ open }" aria-hidden="true" />
+      <h3>{{ title }} <span v-if="count" class="count">{{ count }}</span></h3>
     </button>
     <UiScrollArea v-show="open" class="block-body">
       <div

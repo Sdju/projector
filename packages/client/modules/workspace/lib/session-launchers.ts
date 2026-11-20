@@ -1,7 +1,6 @@
-import { computed, inject, provide, ref, type Component, type InjectionKey, type Ref } from "vue";
+import { computed, inject, provide, ref, type InjectionKey, type Ref } from "vue";
 import { agentUsageSummary } from "../../agents-integration/status-bar/index.ts";
 import { builtinAgent, guiAgents, guiCommand, hasGui, useAgentModes } from "../../agent/index.ts";
-import IconTerminal from "~icons/lucide/terminal";
 
 /** What a launcher row remembers as «last»: a terminal program or the built-in agent chat. */
 export const BUILTIN_LAUNCHER = "builtin";
@@ -15,7 +14,8 @@ export interface SessionRow {
   program: string;
   title: string;
   caption: string;
-  icon: Component;
+  /** Shared icon name; the menus render it through the icon service. */
+  icon: string;
   usage?: { remaining: number; tone?: "spare" | "normal" | "hot" | "over" | null };
 }
 
@@ -47,13 +47,13 @@ export function useSessionLaunchers(options: SessionLaunchersOptions) {
         program: "shell",
         title: "Shell",
         caption: "Пустой терминал в папке проекта",
-        icon: IconTerminal as Component,
+        icon: "terminal",
       },
       ...guiAgents().map((agent) => ({
         program: agent.program,
         title: agent.title,
         caption: agent.caption,
-        icon: agent.icon as Component,
+        icon: agent.icon,
       })),
     ]
       .filter((entry) => entry.program === "shell" || isEnabled(entry.program))
@@ -80,7 +80,7 @@ export function useSessionLaunchers(options: SessionLaunchersOptions) {
       return {
         program: BUILTIN_LAUNCHER,
         title: builtin.title,
-        icon: builtin.icon as Component,
+        icon: builtin.icon,
         command: "ide.workbench.agent.open",
       };
     const row = rows.value.find((entry) => entry.program === last.value) ?? rows.value[0]!;

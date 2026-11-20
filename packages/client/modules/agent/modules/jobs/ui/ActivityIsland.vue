@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ProjectorIcon from "../../../../../common/icons/ProjectorIcon.vue";
 import { computed } from "vue";
 import { useRouter } from "vue-router";
 import UiActionRow from "../../../../../common/ui/UiActionRow.vue";
@@ -14,9 +15,6 @@ import { requestChatTab, requestJobTab } from "../../../../agent-core/index.ts";
 import { formatElapsed, useElapsedClock } from "../../../../agent-core/index.ts";
 import { projectRoute, useProjects } from "../../../../project/index.ts";
 import { useRunner } from "../../../../runner/index.ts";
-import IconSquare from "~icons/lucide/square";
-import IconBot from "~icons/lucide/bot";
-import IconAlert from "~icons/lucide/circle-alert";
 
 /**
  * The counter in the header as an island: running projects and agents at work, one click away.
@@ -114,7 +112,7 @@ function openAgent(agent: AgentActivityItem) {
           aria-label="Остановить проект"
           @click="runner.stop(project.id)"
         >
-          <IconSquare aria-hidden="true" />
+          <ProjectorIcon name="square" aria-hidden="true" />
         </UiButton>
       </UiInline>
     </template>
@@ -128,8 +126,13 @@ function openAgent(agent: AgentActivityItem) {
         @click="openAgent(agent)"
       >
         <UiSpinner v-if="agent.busy" />
-        <IconAlert v-else-if="agent.needsUser" class="alert" aria-hidden="true" />
-        <IconBot v-else class="bot" aria-hidden="true" />
+        <ProjectorIcon
+          name="circle-alert"
+          v-else-if="agent.needsUser"
+          class="alert"
+          aria-hidden="true"
+        />
+        <ProjectorIcon name="bot" v-else class="bot" aria-hidden="true" />
         <span class="name u-truncate">{{ agent.agent }} · {{ nameOf(agent.projectId) }}</span>
         <span v-if="agent.needsUser" class="badge">ждёт вас</span>
         <span class="sub u-truncate">{{ agentSub(agent) }}</span>

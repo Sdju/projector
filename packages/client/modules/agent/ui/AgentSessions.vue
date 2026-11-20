@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ProjectorIcon from "../../../common/icons/ProjectorIcon.vue";
 import UiIsland from "../../../common/ui/UiIsland.vue";
 import { useIslandMenu } from "../../../common/utilities/island-menu.ts";
 import UiInline from "../../../common/ui/UiInline.vue";
@@ -7,11 +8,6 @@ import UiControl, { type UiControlHandle } from "../../../common/ui/UiControl.vu
 import { computed, nextTick, ref, watch } from "vue";
 import UiButton from "../../../common/ui/UiButton.vue";
 import type { AgentRecentChat, AgentSessionInfo } from "../../agent-core/index.ts";
-import IconHistory from "~icons/lucide/history";
-import IconBranch from "~icons/lucide/git-branch";
-import IconPin from "~icons/lucide/pin";
-import IconPencil from "~icons/lucide/pencil";
-import IconTrash from "~icons/lucide/trash-2";
 
 const props = defineProps<{
   native: { sessions: AgentSessionInfo[]; loading: boolean; error: string };
@@ -235,7 +231,7 @@ function age(value?: string): string {
       :disabled="disabled"
       @click="menu.toggle()"
     >
-      <IconHistory aria-hidden="true" />
+      <ProjectorIcon name="history" aria-hidden="true" />
     </UiButton>
     <UiIsland :menu="menu" label="История" :width="320">
       <UiControl
@@ -274,8 +270,13 @@ function age(value?: string): string {
           :title="titleOf(row.session)"
           @click="pick(row.session)"
         >
-          <IconBranch v-if="row.session.parent" class="branch-mark" aria-hidden="true" />
-          <IconPin v-if="row.session.pinned" class="pinned" aria-hidden="true" />
+          <ProjectorIcon
+            name="git-branch"
+            v-if="row.session.parent"
+            class="branch-mark"
+            aria-hidden="true"
+          />
+          <ProjectorIcon name="pin" v-if="row.session.pinned" class="pinned" aria-hidden="true" />
           <span class="title u-truncate">{{ row.session.title }}</span>
           <span v-if="row.session.agent" class="branch-agent">{{ row.session.agent }}</span>
           <span class="age">{{ age(row.session.updatedAt) }}</span>
@@ -299,7 +300,7 @@ function age(value?: string): string {
             :aria-label="row.session.pinned ? 'Открепить чат' : 'Закрепить чат'"
             @click="emit('change', row.session.id, { pinned: !row.session.pinned })"
           >
-            <IconPin aria-hidden="true" />
+            <ProjectorIcon name="pin" aria-hidden="true" />
           </button>
           <button
             v-if="editable && row.session.native"
@@ -309,7 +310,7 @@ function age(value?: string): string {
             aria-label="Переименовать чат"
             @click="startRename(row.session, $event)"
           >
-            <IconPencil aria-hidden="true" />
+            <ProjectorIcon name="pencil" aria-hidden="true" />
           </button>
           <button
             v-if="row.session.native ? deletable : true"
@@ -323,7 +324,7 @@ function age(value?: string): string {
             @click="remove(row.session)"
             @blur="confirming = ''"
           >
-            <IconTrash aria-hidden="true" />
+            <ProjectorIcon name="trash-2" aria-hidden="true" />
           </button>
         </UiInline>
       </UiInline>
@@ -342,7 +343,7 @@ function age(value?: string): string {
         "
         @click="showBranches = !showBranches"
       >
-        <IconBranch aria-hidden="true" />
+        <ProjectorIcon name="git-branch" aria-hidden="true" />
         <span v-if="searchActive">Ветки субагентов · {{ branchCount }}</span>
         <span v-else-if="branchesShown">Скрыть ветки субагентов</span>
         <span v-else>Показать ветки субагентов · {{ branchCount }}</span>

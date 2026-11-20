@@ -1,12 +1,11 @@
 <script setup lang="ts">
+import ProjectorIcon from "../../../../../common/icons/ProjectorIcon.vue";
 import UiInline from "../../../../../common/ui/UiInline.vue";
 import EmojiText from "../../../../../common/ui/EmojiText.vue";
 import { usePagedList } from "../lib/paged-list.ts";
 import { useTrackerPanel } from "../lib/tracker-panel.ts";
 import TrackerPanel from "./TrackerPanel.vue";
 import TrackerRow from "./TrackerRow.vue";
-import IconAnswered from "~icons/lucide/circle-check";
-import IconComment from "~icons/lucide/message-square";
 
 /** Сайдбар-блок discussions: состояние, список и подгрузка следующих страниц по курсору. */
 const props = defineProps<{ projectId: string; active: boolean }>();
@@ -64,7 +63,12 @@ defineExpose({ refresh: () => list.load() });
         "
       >
         <template #icon>
-          <IconAnswered v-if="discussion.answered" class="answered" aria-label="Есть ответ" />
+          <ProjectorIcon
+            name="circle-check"
+            v-if="discussion.answered"
+            class="answered"
+            aria-label="Есть ответ"
+          />
         </template>
         <template #meta>
           <span v-if="discussion.category.name" class="category"
@@ -79,7 +83,7 @@ defineExpose({ refresh: () => list.load() });
             class="comments"
             :title="`${discussion.comments} комментариев`"
           >
-            <IconComment aria-hidden="true" />{{ discussion.comments }}
+            <ProjectorIcon name="message-square" aria-hidden="true" />{{ discussion.comments }}
           </UiInline>
         </template>
       </TrackerRow>

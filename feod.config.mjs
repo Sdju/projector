@@ -120,10 +120,6 @@ export default {
             ceiling: 404,
             plan: "Вынести цикл попыток и разбор ошибок модели в projector-attempts.ts",
           },
-          "packages/client/modules/agent/ui/AgentChat.vue": {
-            ceiling: 501,
-            plan: "Вынести панели задач и композер в дочерние компоненты",
-          },
         },
       },
       confine: adapters,

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ProjectorIcon from "../icons/ProjectorIcon.vue";
 import UiPopupSurface from "./UiPopupSurface.vue";
 import UiBadge from "./UiBadge.vue";
 import UiActionRow from "./UiActionRow.vue";
@@ -164,7 +165,9 @@ function hintTone(tone: "spare" | "normal" | "hot" | "over" | null | undefined) 
           @click="activate(item)"
         >
           <span class="item-label"
-            ><component :is="item.icon" v-if="item.icon" aria-hidden="true" />{{ item.label }}</span
+            ><ProjectorIcon v-if="item.icon" :name="item.icon" aria-hidden="true" />{{
+              item.label
+            }}</span
           ><UiBadge v-if="item.hint" class="hint" mono shrink :tone="hintTone(item.hint.tone)">{{
             item.hint.text
           }}</UiBadge>
@@ -204,7 +207,9 @@ function hintTone(tone: "spare" | "normal" | "hot" | "over" | null | undefined) 
           @click="activate(item)"
         >
           <span class="item-label"
-            ><component :is="item.icon" v-if="item.icon" aria-hidden="true" />{{ item.label }}</span
+            ><ProjectorIcon v-if="item.icon" :name="item.icon" aria-hidden="true" />{{
+              item.label
+            }}</span
           ><UiBadge v-if="item.hint" class="hint" mono shrink :tone="hintTone(item.hint.tone)">{{
             item.hint.text
           }}</UiBadge

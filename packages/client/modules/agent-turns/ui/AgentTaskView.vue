@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ProjectorIcon from "../../../common/icons/ProjectorIcon.vue";
 import { computed } from "vue";
 import { zenMode } from "../../../common/utilities/zen-mode.ts";
 import UiButton from "../../../common/ui/UiButton.vue";
@@ -14,9 +15,6 @@ import AgentTaskFrame from "./AgentTaskFrame.vue";
 import AgentTurn from "./AgentTurn.vue";
 import AgentCodeBlock from "./AgentCodeBlock.vue";
 import AgentToolCall from "./AgentToolCall.vue";
-import IconBack from "~icons/lucide/arrow-left";
-import IconScanEye from "~icons/lucide/scan-eye";
-import IconTab from "~icons/lucide/square-arrow-out-up-right";
 
 /** A task as a read-only chat: the assignment, what the subagent did and how it ended. */
 const props = defineProps<{
@@ -96,7 +94,7 @@ const outcome = computed(() => {
         aria-label="Вернуться в чат"
         @click="emit('back')"
       >
-        <IconBack aria-hidden="true" />
+        <ProjectorIcon name="arrow-left" aria-hidden="true" />
       </UiButton>
     </template>
     <template #actions>
@@ -110,7 +108,7 @@ const outcome = computed(() => {
         :aria-label="lens.state.open ? 'Скрыть Lens' : 'Показать Lens'"
         @click="toggleLens"
       >
-        <IconScanEye aria-hidden="true" />
+        <ProjectorIcon name="scan-eye" aria-hidden="true" />
       </UiButton>
       <UiButton
         v-if="embedded"
@@ -120,7 +118,7 @@ const outcome = computed(() => {
         aria-label="Открыть в новой вкладке"
         @click="emit('tab')"
       >
-        <IconTab aria-hidden="true" />
+        <ProjectorIcon name="square-arrow-out-up-right" aria-hidden="true" />
       </UiButton>
     </template>
     <div v-if="lens.state.open && !zenMode" class="task-lens">

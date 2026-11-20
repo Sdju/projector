@@ -1,5 +1,4 @@
 import { afterEach, expect, test } from "vite-plus/test";
-import IconBot from "~icons/lucide/bot";
 import { createApi } from "../modules/plugin-runtime/api.ts";
 import { mountAgentUsage } from "../modules/plugin-runtime/mount.ts";
 import { createScope } from "../modules/plugin-runtime/scope.ts";
@@ -48,7 +47,7 @@ test("api.agents.register contributes plan, tool labels and usage until dispose"
     program: "acme",
     title: "Acme",
     caption: "Плагинный агент",
-    icon: IconBot,
+    icon: "bot",
   });
   const plan = readTodosPlan(["update_todos"]);
   let cleaned = 0;

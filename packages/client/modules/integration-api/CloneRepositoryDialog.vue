@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ProjectorIcon from "../../common/icons/ProjectorIcon.vue";
 import UiButton from "../../common/ui/UiButton.vue";
 import UiControl, { type UiControlHandle } from "../../common/ui/UiControl.vue";
 import UiDialog from "../../common/ui/UiDialog.vue";
@@ -13,7 +14,6 @@ import { computed, nextTick, onBeforeUnmount, ref, useId } from "vue";
 import { commandArgs, useCommandScope } from "../../common/utilities/commands.ts";
 import { pickFolder, useProjects, type Project } from "../project/index.ts";
 import { fetchIntegrations, integrationRequest } from "./client.ts";
-import IconFolder from "~icons/lucide/folder-open";
 
 type CloneSource = "github" | "gitlab";
 const props = defineProps<{
@@ -268,7 +268,7 @@ function cancel(event: Event) {
             aria-label="Выбрать папку"
             :disabled="busy || loading || !!cloned"
             @click="commands.run(`${commandPrefix}.directory`)"
-            ><IconFolder aria-hidden="true"
+            ><ProjectorIcon name="folder-open" aria-hidden="true"
           /></UiButton>
         </UiInline>
         <p v-if="destination" class="destination">{{ destination }}</p>

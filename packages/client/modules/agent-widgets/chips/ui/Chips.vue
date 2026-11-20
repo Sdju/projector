@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from "vue";
-import { icons } from "../../_/index.ts";
+import ProjectorIcon from "../../../../common/icons/ProjectorIcon.vue";
+import { hasIcon } from "../../../../common/icons/registry.ts";
 
 type Tone = "neutral" | "info" | "success" | "warning" | "danger" | "accent";
 
@@ -22,7 +23,7 @@ const chips = computed(() =>
     return {
       ...chip,
       tone: chip.tone ?? palette[index % palette.length],
-      icon: chip.icon ? icons[chip.icon] : undefined,
+      icon: chip.icon && hasIcon(chip.icon) ? chip.icon : undefined,
     };
   }),
 );
@@ -36,7 +37,7 @@ const chips = computed(() =>
       class="chip"
       :class="[chip.tone, { mono }]"
     >
-      <component :is="chip.icon" v-if="chip.icon" class="icon" aria-hidden="true" />
+      <ProjectorIcon v-if="chip.icon" :name="chip.icon" class="icon" aria-hidden="true" />
       <span v-else class="dot" aria-hidden="true" />
       {{ chip.label }}
     </span>

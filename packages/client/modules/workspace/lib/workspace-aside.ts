@@ -1,5 +1,4 @@
 import { computed, provide, shallowRef, watch, type Ref } from "vue";
-import IconTerminal from "~icons/lucide/terminal";
 import { dockGroups, type DockLayout } from "../../dock/index.ts";
 import { asideTargetKey } from "./aside-target.ts";
 import type {
@@ -42,7 +41,7 @@ export function useWorkspaceAsidePanel(ctx: WorkspaceAsidePanelContext) {
   const registry: SidebarRegistry = asideSections(ctx.profile, ctx.capabilities);
   const views = computed<SidebarViews>(() => ({
     terminals: {
-      icon: IconTerminal,
+      icon: "terminal",
       component: TerminalsAside,
       props: () => ({}),
       refreshGutter: true,

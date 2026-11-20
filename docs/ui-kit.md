@@ -4,7 +4,7 @@
 
 ## Компоненты
 
-Компоненты импортируются напрямую из `packages/client/common/ui`; общая папка не имеет barrel index.
+Компоненты импортируются напрямую из `packages/client/common/ui`; общая папка не имеет barrel index. Иконки — `<ProjectorIcon name="chevron-right" />` из `packages/client/common/icons`, без прямых импортов `~icons` (см. [иконки](icons.md)).
 
 | Задача           | Компоненты                                                     | Основные настройки                                                                                                                                                     |
 | ---------------- | -------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -22,6 +22,7 @@
 | Статус           | UiBadge, UiStatusDot, UiAvatar, UiKbd, UiNoticeHost            | оформление без знания доменных статусов; UiAvatar — картинка с буквой-запасом, UiKbd — клавиша, UiNoticeHost — слой тултипов и карточек ошибок `notice.ts`             |
 | Графики          | UiMeter, UiDonut, UiLineChart, useChartLayout                  | прогресс и кольцо с долями; линейный график с общей осью, `niceMax` и прореживанием подписей; `useChartLayout` — ResizeObserver, масштаб и тики для остальных диаграмм |
 | Списки           | UiStringList, UiVirtualList                                    | редактируемый список строк (`items`, `validate`, `unique`); виртуализация — [virtualization](virtualization.md)                                                        |
+| Иконки           | ProjectorIcon                                                  | имя из реестра (`lucide` без префикса, `simple-icons:github`), необязательный `label`; фоллбек и замены — [иконки](icons.md)                                           |
 | Содержимое       | UiCard, UiTable, UiDisclosureSummary                           | рамка, native table, native summary                                                                                                                                    |
 | Resize           | UiResizeHandle, usePointerDrag                                 | capture/cleanup общие; clamp/rollback/keyboard у владельца                                                                                                             |
 

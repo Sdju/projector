@@ -1,8 +1,8 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { expect, onTestFinished, test } from "vite-plus/test";
-import IconBot from "~icons/lucide/bot";
 import { registerBuiltinClientAgents } from "../app/agents.ts";
+import { hasIcon } from "../common/icons/registry.ts";
 import {
   clientAgents,
   iconFromSvg,
@@ -76,7 +76,9 @@ test("a plugin SVG icon and plan tools hydrate into the client catalog", async (
       input: JSON.stringify({ todos: [{ content: "one", status: "completed" }] }),
     }),
   ).toEqual([{ content: "one", status: "completed" }]);
-  expect(agent.icon).not.toBe(IconBot);
+  // Плагинная SVG-иконка живёт в реестре под именем агента, а не как импортированный компонент.
+  expect(agent.icon).toBe("agent:plugin-icon-test");
+  expect(hasIcon(agent.icon)).toBe(true);
   const nodes = iconNodesFromSvg(svg);
   expect(nodes.children).toHaveLength(1);
   expect(nodes.children[0].type).toBe("path");
@@ -111,7 +113,7 @@ test("a plugin agent keeps its local icon, plan and limits when enabled after a 
     program: "plugin-late",
     title: "Late Agent",
     caption: "Появится позже",
-    icon: IconBot,
+    icon: "bot",
     plugin: true,
     plan,
   });
@@ -136,7 +138,7 @@ test("a local descriptor wins over the same backend from the server", async () =
     program: "local-chat",
     title: "Local Agent",
     caption: "Локальный агент",
-    icon: IconBot,
+    icon: "bot",
   });
   serve([
     {
@@ -161,7 +163,7 @@ test("the server fills missing limits and their window labels into a local descr
     program: "local-usage",
     title: "Local Usage",
     caption: "Локальный индикатор",
-    icon: IconBot,
+    icon: "bot",
     plugin: true,
   });
   serve([

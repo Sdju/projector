@@ -1,16 +1,10 @@
 <script setup lang="ts">
+import ProjectorIcon from "../../../common/icons/ProjectorIcon.vue";
 import UiButton from "../../../common/ui/UiButton.vue";
 import { canRememberPermission, permissionRiskClass } from "../lib/permission-risk.ts";
 import { isEditTool } from "../../agent-core/index.ts";
 import AgentCodeBlock from "./AgentCodeBlock.vue";
 import type { AgentPermission } from "../../agent-core/index.ts";
-import IconCheck from "~icons/lucide/check";
-import IconCheckCheck from "~icons/lucide/check-check";
-import IconShield from "~icons/lucide/shield";
-import IconShieldAlert from "~icons/lucide/shield-alert";
-import IconShieldCheck from "~icons/lucide/shield-check";
-import IconShieldX from "~icons/lucide/shield-x";
-import IconX from "~icons/lucide/x";
 
 defineProps<{ permissions: AgentPermission[] }>();
 const emit = defineEmits<{ decide: [id: string, allow: boolean, always?: boolean] }>();
@@ -39,10 +33,18 @@ const emit = defineEmits<{ decide: [id: string, allow: boolean, always?: boolean
               : 'Оценка риска недоступна'
           "
         >
-          <IconShieldCheck v-if="item.judge && item.judge.score <= 2" aria-hidden="true" />
-          <IconShieldAlert v-else-if="item.judge && item.judge.score === 3" aria-hidden="true" />
-          <IconShieldX v-else-if="item.judge" aria-hidden="true" />
-          <IconShield v-else aria-hidden="true" />
+          <ProjectorIcon
+            name="shield-check"
+            v-if="item.judge && item.judge.score <= 2"
+            aria-hidden="true"
+          />
+          <ProjectorIcon
+            name="shield-alert"
+            v-else-if="item.judge && item.judge.score === 3"
+            aria-hidden="true"
+          />
+          <ProjectorIcon name="shield-x" v-else-if="item.judge" aria-hidden="true" />
+          <ProjectorIcon name="shield" v-else aria-hidden="true" />
           <span v-if="item.judge" class="risk-score">{{ item.judge.score }}/5</span>
         </span>
         <span class="title" :title="item.title">{{ item.title }}</span>
@@ -70,7 +72,7 @@ const emit = defineEmits<{ decide: [id: string, allow: boolean, always?: boolean
           aria-label="Отклонить"
           @click="emit('decide', item.id, false)"
         >
-          <IconX aria-hidden="true" />
+          <ProjectorIcon name="x" aria-hidden="true" />
         </UiButton>
         <UiButton
           v-if="canRememberPermission(item)"
@@ -81,7 +83,7 @@ const emit = defineEmits<{ decide: [id: string, allow: boolean, always?: boolean
           aria-label="Разрешить и больше не спрашивать"
           @click="emit('decide', item.id, true, true)"
         >
-          <IconCheckCheck aria-hidden="true" />
+          <ProjectorIcon name="check-check" aria-hidden="true" />
         </UiButton>
         <UiButton
           shape="icon"
@@ -91,7 +93,7 @@ const emit = defineEmits<{ decide: [id: string, allow: boolean, always?: boolean
           aria-label="Разрешить"
           @click="emit('decide', item.id, true)"
         >
-          <IconCheck aria-hidden="true" />
+          <ProjectorIcon name="check" aria-hidden="true" />
         </UiButton>
       </div>
     </section>

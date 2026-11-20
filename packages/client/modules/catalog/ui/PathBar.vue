@@ -1,9 +1,7 @@
 <script setup lang="ts">
+import ProjectorIcon from "../../../common/icons/ProjectorIcon.vue";
 import UiControl, { type UiControlHandle } from "../../../common/ui/UiControl.vue";
 import { computed, nextTick, onBeforeUnmount, ref, useId, watch } from "vue";
-import IconChevronRight from "~icons/lucide/chevron-right";
-import IconDownload from "~icons/lucide/download";
-import IconFolder from "~icons/lucide/folder";
 import { fetchDirectories, parseProjectRef, projectRefSegments } from "../../project/index.ts";
 import { useCommandScope, commandArgs } from "../../../common/utilities/commands.ts";
 import { useIdeCommands } from "../../ide/index.ts";
@@ -226,7 +224,7 @@ onBeforeUnmount(() => {
 </script>
 <template>
   <div ref="root" class="path-bar" :aria-busy="busy" @keydown="keydown" @focusout="focusout">
-    <IconFolder class="path-icon" aria-hidden="true" />
+    <ProjectorIcon name="folder" class="path-icon" aria-hidden="true" />
     <div v-if="!editing" class="segments">
       <span v-for="segment in segments" :key="segment.path" class="segment">
         <button
@@ -246,7 +244,7 @@ onBeforeUnmount(() => {
           :disabled="busy"
           @click="openClone"
         >
-          <IconDownload aria-hidden="true" />
+          <ProjectorIcon name="download" aria-hidden="true" />
         </button>
         <button
           v-else-if="segment.path !== 'gl:/'"
@@ -264,7 +262,7 @@ onBeforeUnmount(() => {
           :disabled="busy"
           @click="commands.run('ide.project.path.suggestions', { path: segment.path })"
         >
-          <IconChevronRight aria-hidden="true" />
+          <ProjectorIcon name="chevron-right" aria-hidden="true" />
         </button>
       </span>
       <button class="edit-space" aria-label="Ввести путь" :disabled="busy" @click="edit()" />
@@ -272,8 +270,7 @@ onBeforeUnmount(() => {
     <div v-else class="input-wrap">
       <div class="completion" aria-hidden="true">
         <span :style="{ transform: `translateX(${-scroll}px)` }"
-          ><span class="typed">{{ value }}</span
-          >{{ completion }}</span
+          ><span class="typed">{{ value }}</span>{{ completion }}</span
         >
       </div>
       <UiControl

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ProjectorIcon from "../../../common/icons/ProjectorIcon.vue";
 import UiStatusDot from "../../../common/ui/UiStatusDot.vue";
 import UiIslandHeader from "../../../common/ui/UiIslandHeader.vue";
 import UiStack from "../../../common/ui/UiStack.vue";
@@ -14,13 +15,6 @@ import { useIdeCommands } from "../../ide/index.ts";
 import { projectSettingsSection } from "../../catalog/index.ts";
 import type { Project } from "../../project/index.ts";
 import { useRunner } from "../model/session.ts";
-import IconPlay from "~icons/lucide/play";
-import IconStop from "~icons/lucide/square";
-import IconChevron from "~icons/lucide/chevron-down";
-import IconWindow from "~icons/lucide/panels-top-left";
-import IconOpen from "~icons/lucide/external-link";
-import IconContainer from "~icons/lucide/container";
-import IconSettings from "~icons/lucide/settings-2";
 
 /**
  * Запуск проекта в духе WebStorm: кнопка выполняет сценарий по умолчанию (или останавливает работающий),
@@ -135,7 +129,7 @@ async function editScenarios() {
       data-command="ide.project.run.start"
       @click="commands.run('ide.project.run.start')"
     >
-      <IconPlay class="play" aria-hidden="true" />{{ label }}
+      <ProjectorIcon name="play" class="play" aria-hidden="true" />{{ label }}
     </UiButton>
     <UiButton
       v-else
@@ -151,7 +145,7 @@ async function editScenarios() {
         :tone="status === 'starting' || status === 'stopping' ? 'warning' : 'success'"
         aria-hidden="true"
       /><span>{{ label }}</span>
-      <IconStop class="stop" aria-hidden="true" />
+      <ProjectorIcon name="square" class="stop" aria-hidden="true" />
     </UiButton>
     <UiButton
       shape="icon"
@@ -165,7 +159,7 @@ async function editScenarios() {
       data-command="ide.project.run.menu.toggle"
       @click="commands.run('ide.project.run.menu.toggle')"
     >
-      <IconChevron aria-hidden="true" />
+      <ProjectorIcon name="chevron-down" aria-hidden="true" />
     </UiButton>
   </div>
   <UiIsland :menu="menu" label="Сценарии запуска" :width="360">
@@ -184,7 +178,7 @@ async function editScenarios() {
       class="env"
       :title="`${project.environment.image} · сеть: ${project.environment.network}`"
     >
-      <IconContainer aria-hidden="true" />Docker · {{ project.environment.image }}
+      <ProjectorIcon name="container" aria-hidden="true" />Docker · {{ project.environment.image }}
     </div>
     <UiStack
       flow="flex"
@@ -199,14 +193,14 @@ async function editScenarios() {
         class="item"
         @click="act(() => commands.run('ide.project.run.open', { mode: 'server' }))"
       >
-        <IconOpen aria-hidden="true" />
+        <ProjectorIcon name="external-link" aria-hidden="true" />
         <UiActionCopy title="Открыть в браузере" :description="project.runtime.url" />
       </UiActionRow>
       <UiActionRow
         class="item"
         @click="act(() => commands.run('ide.project.run.open', { mode: 'window' }))"
       >
-        <IconWindow aria-hidden="true" />
+        <ProjectorIcon name="panels-top-left" aria-hidden="true" />
         <UiActionCopy title="Открыть в окне" />
       </UiActionRow>
       <UiActionRow
@@ -215,7 +209,7 @@ async function editScenarios() {
         :disabled="status === 'stopping'"
         @click="act(() => commands.run('ide.project.run.stop'))"
       >
-        <IconStop aria-hidden="true" />
+        <ProjectorIcon name="square" aria-hidden="true" />
         <UiActionCopy title="Остановить" />
       </UiActionRow>
     </UiStack>
@@ -227,7 +221,7 @@ async function editScenarios() {
           :data-command="'ide.project.run.start'"
           @click="act(() => commands.run('ide.project.run.start', { command: command.id }))"
         >
-          <IconPlay class="play" aria-hidden="true" />
+          <ProjectorIcon name="play" class="play" aria-hidden="true" />
           <UiActionCopy :title="command.name" :description="command.cmd" mono />
           <UiBadge v-if="command.id === project.defaultCommandId">основной</UiBadge>
         </UiActionRow>
@@ -243,7 +237,7 @@ async function editScenarios() {
             )
           "
         >
-          <IconWindow aria-hidden="true" />
+          <ProjectorIcon name="panels-top-left" aria-hidden="true" />
         </UiButton>
       </div>
       <p v-if="!project.commands.length" class="empty">Сценариев пока нет</p>
@@ -255,7 +249,7 @@ async function editScenarios() {
       data-command="ide.project.run.scenarios.edit"
       @click="commands.run('ide.project.run.scenarios.edit')"
     >
-      <IconSettings aria-hidden="true" />Настроить сценарии…
+      <ProjectorIcon name="settings-2" aria-hidden="true" />Настроить сценарии…
     </UiActionRow>
   </UiIsland>
 </template>

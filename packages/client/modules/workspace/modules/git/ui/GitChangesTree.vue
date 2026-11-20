@@ -1,9 +1,7 @@
 <script setup lang="ts">
+import ProjectorIcon from "../../../../../common/icons/ProjectorIcon.vue";
 import UiActionRow from "../../../../../common/ui/UiActionRow.vue";
 import { computed, ref } from "vue";
-import IconPlus from "~icons/lucide/plus";
-import IconMinus from "~icons/lucide/minus";
-import IconChevronRight from "~icons/lucide/chevron-right";
 import { FileIcon, useFileIconTheme } from "../../../../file-icons/index.ts";
 import { setProjectorDrag } from "../../../../path-drop/index.ts";
 import type { GitOverview } from "@ai-projector/core/modules/workspace/index.ts";
@@ -161,7 +159,8 @@ function startDrag(event: DragEvent, path: string) {
           @dragend.stop
         >
           <span class="glyph" aria-hidden="true">
-            <IconChevronRight
+            <ProjectorIcon
+              name="chevron-right"
               v-if="entry.directory"
               :class="{ expanded: !collapsed.has(entry.path) }"
             />
@@ -181,7 +180,11 @@ function startDrag(event: DragEvent, path: string) {
           @focus="emit('target', entry.path)"
           @click.stop="emit('change', entry.path)"
         >
-          <IconMinus v-if="staged" aria-hidden="true" /><IconPlus v-else aria-hidden="true" />
+          <ProjectorIcon name="minus" v-if="staged" aria-hidden="true" /><ProjectorIcon
+            name="plus"
+            v-else
+            aria-hidden="true"
+          />
         </button>
       </div>
       <GitChangesTree

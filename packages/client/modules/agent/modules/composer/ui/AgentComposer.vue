@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ProjectorIcon from "../../../../../common/icons/ProjectorIcon.vue";
 import { computed, nextTick, ref, watch } from "vue";
 import UiInline from "../../../../../common/ui/UiInline.vue";
 import type { MessageChip, MessagePart } from "../../../../agent-core/index.ts";
@@ -7,13 +8,6 @@ import { AgentFormPanel } from "../../../../agent-turns/index.ts";
 import AgentWorkClock from "./AgentWorkClock.vue";
 import AgentQuote from "./AgentQuote.vue";
 import UiButton from "../../../../../common/ui/UiButton.vue";
-import IconArrowUp from "~icons/lucide/arrow-up";
-import IconSquare from "~icons/lucide/square";
-import IconAlert from "~icons/lucide/circle-alert";
-import IconType from "~icons/lucide/type";
-import IconListChecks from "~icons/lucide/list-checks";
-import IconChevronDown from "~icons/lucide/chevron-down";
-import IconX from "~icons/lucide/x";
 
 const draft = defineModel<string>({ required: true });
 const parts = defineModel<MessagePart[]>("parts", { default: () => [] });
@@ -135,7 +129,7 @@ defineExpose({
 <template>
   <div class="composer-area">
     <div v-if="error" class="chat-error" role="alert">
-      <IconAlert aria-hidden="true" />
+      <ProjectorIcon name="circle-alert" aria-hidden="true" />
       <p class="chat-error-text" :class="{ clamped: long && !expanded, open: expanded }">
         {{ error }}
       </p>
@@ -149,7 +143,7 @@ defineExpose({
         aria-label="Скрыть ошибку"
         @click="emit('dismiss')"
       >
-        <IconX aria-hidden="true" />
+        <ProjectorIcon name="x" aria-hidden="true" />
       </button>
     </div>
     <AgentQuote :root="quoteRoot" @quote="quote" />
@@ -171,7 +165,7 @@ defineExpose({
             aria-label="Свернуть форму"
             @click="dismissForm"
           >
-            <IconChevronDown aria-hidden="true" />
+            <ProjectorIcon name="chevron-down" aria-hidden="true" />
           </UiButton>
         </div>
         <div class="composer-form-body">
@@ -209,8 +203,8 @@ defineExpose({
             :aria-pressed="formOpen"
             @click="formOpen ? dismissForm() : restoreForm()"
           >
-            <IconType v-if="formOpen" aria-hidden="true" />
-            <IconListChecks v-else aria-hidden="true" />
+            <ProjectorIcon name="type" v-if="formOpen" aria-hidden="true" />
+            <ProjectorIcon name="list-checks" v-else aria-hidden="true" />
           </UiButton>
           <AgentWorkClock v-if="busy && startedAt" :started-at="startedAt" />
           <slot name="status" />
@@ -222,7 +216,7 @@ defineExpose({
             aria-label="Остановить"
             @click="emit('stop')"
           >
-            <IconSquare aria-hidden="true" />
+            <ProjectorIcon name="square" aria-hidden="true" />
           </button>
           <button
             v-if="!busy || draft.trim()"
@@ -248,7 +242,7 @@ defineExpose({
             "
             :disabled="formOpen ? !formSubmittable : !draft.trim()"
           >
-            <IconArrowUp aria-hidden="true" />
+            <ProjectorIcon name="arrow-up" aria-hidden="true" />
           </button>
         </UiInline>
       </UiInline>

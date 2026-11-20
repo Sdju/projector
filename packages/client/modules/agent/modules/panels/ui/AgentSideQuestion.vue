@@ -1,13 +1,11 @@
 <script setup lang="ts">
+import ProjectorIcon from "../../../../../common/icons/ProjectorIcon.vue";
 import { computed, nextTick, ref, watch } from "vue";
 import UiButton from "../../../../../common/ui/UiButton.vue";
 import UiSpinner from "../../../../../common/ui/UiSpinner.vue";
 import UiLoader from "../../../../../common/ui/UiLoader.vue";
 import { AgentMarkdown } from "../../../../agent-turns/index.ts";
 import type { SideQuestion } from "../model/side-question.ts";
-import IconMessageCircleQuestion from "~icons/lucide/message-circle-question";
-import IconX from "~icons/lucide/x";
-import IconTrash2 from "~icons/lucide/trash-2";
 
 const props = defineProps<{ side: SideQuestion }>();
 const input = ref<HTMLTextAreaElement>();
@@ -62,7 +60,7 @@ watch(
 <template>
   <section class="side" aria-label="Вопрос в сторону">
     <header class="head">
-      <span class="mark" aria-hidden="true"><IconMessageCircleQuestion /></span>
+      <span class="mark" aria-hidden="true"><ProjectorIcon name="message-circle-question" /></span>
       <div class="titles">
         <strong>Вопрос в сторону</strong>
         <span class="source">{{ source }}</span>
@@ -76,7 +74,7 @@ watch(
         aria-label="Очистить историю вопросов"
         @click="clear"
       >
-        <IconTrash2 aria-hidden="true" />
+        <ProjectorIcon name="trash-2" aria-hidden="true" />
       </UiButton>
       <UiButton
         shape="icon"
@@ -85,7 +83,7 @@ watch(
         aria-label="Закрыть вопрос в сторону"
         @click="close"
       >
-        <IconX aria-hidden="true" />
+        <ProjectorIcon name="x" aria-hidden="true" />
       </UiButton>
     </header>
     <div ref="thread" class="thread" aria-live="polite">

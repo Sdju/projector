@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ProjectorIcon from "../../../common/icons/ProjectorIcon.vue";
 import UiDisclosureSummary from "../../../common/ui/UiDisclosureSummary.vue";
 import { computed } from "vue";
 import { formatElapsed, useElapsedClock } from "../../agent-core/index.ts";
@@ -8,7 +9,6 @@ import type { AgentToolView } from "../../agent-core/index.ts";
 import AgentCodeBlock from "./AgentCodeBlock.vue";
 import AgentStatusIcon from "./AgentStatusIcon.vue";
 import AgentToolCall from "./AgentToolCall.vue";
-import IconChevron from "~icons/lucide/chevron-right";
 
 const props = defineProps<{ tools: AgentToolView[]; root?: string }>();
 const emit = defineEmits<{ open: [path: string] }>();
@@ -63,7 +63,7 @@ const title = computed(() => {
         currentTime
       }}</span>
       <span v-if="current || title === 'Действия'" class="count">{{ tools.length }}</span>
-      <IconChevron class="group-chevron" aria-hidden="true" />
+      <ProjectorIcon name="chevron-right" class="group-chevron" aria-hidden="true" />
     </UiDisclosureSummary>
     <AgentCodeBlock v-if="tail" :text="tail" />
     <div class="activity-list">

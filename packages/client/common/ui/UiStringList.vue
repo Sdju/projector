@@ -1,7 +1,7 @@
 <script setup lang="ts">
+import ProjectorIcon from "../icons/ProjectorIcon.vue";
 import UiControl from "./UiControl.vue";
 import { ref, useId } from "vue";
-import IconRemove from "~icons/lucide/x";
 import UiButton from "./UiButton.vue";
 
 const props = withDefaults(
@@ -73,7 +73,7 @@ function remove(value: string) {
           :aria-label="`Удалить ${item}`"
           title="Удалить"
           @click="remove(item)"
-          ><IconRemove
+          ><ProjectorIcon name="x"
         /></UiButton>
       </li>
       <li v-if="!items.length" class="empty">{{ emptyText }}</li>

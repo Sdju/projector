@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ProjectorIcon from "../../../common/icons/ProjectorIcon.vue";
 import UiScrollArea from "../../../common/ui/UiScrollArea.vue";
 import UiControl from "../../../common/ui/UiControl.vue";
 import UiInline from "../../../common/ui/UiInline.vue";
@@ -14,14 +15,6 @@ import UiButton from "../../../common/ui/UiButton.vue";
 import UiSectionRefresh from "../../../common/ui/UiSectionRefresh.vue";
 import { findWorkspacePaths, searchWorkspace } from "../../workspace-api/index.ts";
 import { FileIcon, useFileIconTheme } from "../../file-icons/index.ts";
-import IconCaseSensitive from "~icons/lucide/case-sensitive";
-import IconWholeWord from "~icons/lucide/whole-word";
-import IconRegex from "~icons/lucide/regex";
-import IconFileText from "~icons/lucide/file-text";
-import IconFiles from "~icons/lucide/files";
-import IconChevronRight from "~icons/lucide/chevron-right";
-import IconChevronDown from "~icons/lucide/chevron-down";
-import IconFile from "~icons/lucide/file";
 
 const FILE_LIMIT = 100;
 type SearchKind = "content" | "files";
@@ -238,7 +231,7 @@ defineExpose({ search, refresh, refreshing: searching });
               aria-label="По содержимому"
               @click="kind = 'content'"
             >
-              <IconFileText aria-hidden="true" />
+              <ProjectorIcon name="file-text" aria-hidden="true" />
             </UiButton>
             <UiButton
               shape="icon"
@@ -249,7 +242,7 @@ defineExpose({ search, refresh, refreshing: searching });
               aria-label="По именам файлов"
               @click="kind = 'files'"
             >
-              <IconFiles aria-hidden="true" />
+              <ProjectorIcon name="files" aria-hidden="true" />
             </UiButton>
           </UiInline>
           <UiInline
@@ -270,7 +263,7 @@ defineExpose({ search, refresh, refreshing: searching });
               aria-label="Учитывать регистр"
               @click="searchCase = !searchCase"
             >
-              <IconCaseSensitive aria-hidden="true" />
+              <ProjectorIcon name="case-sensitive" aria-hidden="true" />
             </UiButton>
             <UiButton
               shape="icon"
@@ -281,7 +274,7 @@ defineExpose({ search, refresh, refreshing: searching });
               aria-label="Только слово целиком"
               @click="searchWord = !searchWord"
             >
-              <IconWholeWord aria-hidden="true" />
+              <ProjectorIcon name="whole-word" aria-hidden="true" />
             </UiButton>
             <UiButton
               shape="icon"
@@ -292,7 +285,7 @@ defineExpose({ search, refresh, refreshing: searching });
               aria-label="Использовать регулярное выражение"
               @click="searchRegex = !searchRegex"
             >
-              <IconRegex aria-hidden="true" />
+              <ProjectorIcon name="regex" aria-hidden="true" />
             </UiButton>
           </UiInline>
         </UiInline>
@@ -334,9 +327,13 @@ defineExpose({ search, refresh, refreshing: searching });
           :title="group.path"
           @click="toggleGroup(group.path)"
         >
-          <IconChevronDown v-if="!collapsedGroups.has(group.path)" aria-hidden="true" />
-          <IconChevronRight v-else aria-hidden="true" />
-          <IconFile class="result-file-icon" aria-hidden="true" />
+          <ProjectorIcon
+            name="chevron-down"
+            v-if="!collapsedGroups.has(group.path)"
+            aria-hidden="true"
+          />
+          <ProjectorIcon name="chevron-right" v-else aria-hidden="true" />
+          <ProjectorIcon name="file" class="result-file-icon" aria-hidden="true" />
           <span class="result-file u-truncate">{{ group.name }}</span>
           <span v-if="group.directory" class="result-dir u-truncate">{{ group.directory }}</span>
           <span class="result-count">{{ group.hits.length }}</span>

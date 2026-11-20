@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ProjectorIcon from "../../../common/icons/ProjectorIcon.vue";
 import UiPanel from "../../../common/ui/UiPanel.vue";
 import { computed, inject, ref, watch } from "vue";
 import { useElementSize, useEventListener, useMediaQuery } from "@vueuse/core";
@@ -6,8 +7,6 @@ import DockTabs from "./DockTabs.vue";
 import DockSlot from "./DockSlot.ts";
 import UiButton from "../../../common/ui/UiButton.vue";
 import { tabDrag } from "../../../common/utilities/tab-drag.ts";
-import IconMaximize from "~icons/lucide/maximize-2";
-import IconMinimize from "~icons/lucide/minimize-2";
 import {
   focusGroup,
   movePanel,
@@ -188,7 +187,8 @@ const focus = () => {
           :aria-pressed="maximized"
           @click="dock.update(toggleMaximized(dock.layout(), group.id))"
         >
-          <IconMinimize v-if="maximized" aria-hidden="true" /><IconMaximize
+          <ProjectorIcon name="minimize-2" v-if="maximized" aria-hidden="true" /><ProjectorIcon
+            name="maximize-2"
             v-else
             aria-hidden="true"
           />

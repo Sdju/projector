@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ProjectorIcon from "../../common/icons/ProjectorIcon.vue";
 import UiControl from "../../common/ui/UiControl.vue";
 import UiPanel from "../../common/ui/UiPanel.vue";
 import UiToolbar from "../../common/ui/UiToolbar.vue";
@@ -15,11 +16,6 @@ import {
 } from "@ai-projector/core/modules/browser/index.ts";
 import { browserProxyKey } from "./proxy-key.ts";
 import { useProjects } from "../project/index.ts";
-import IconBack from "~icons/lucide/arrow-left";
-import IconForward from "~icons/lucide/arrow-right";
-import IconRefresh from "~icons/lucide/refresh-cw";
-import IconExternal from "~icons/lucide/external-link";
-import IconServer from "~icons/lucide/server";
 
 const props = defineProps<{ projectId: string; url?: string }>();
 const emit = defineEmits<{ navigate: [url: string, title: string] }>();
@@ -166,7 +162,7 @@ const hostname = computed(() => {
         :disabled="index <= 0"
         @click="step(-1)"
       >
-        <IconBack aria-hidden="true" />
+        <ProjectorIcon name="arrow-left" aria-hidden="true" />
       </UiButton>
       <UiButton
         shape="icon"
@@ -177,7 +173,7 @@ const hostname = computed(() => {
         :disabled="index >= history.length - 1"
         @click="step(1)"
       >
-        <IconForward aria-hidden="true" />
+        <ProjectorIcon name="arrow-right" aria-hidden="true" />
       </UiButton>
       <UiButton
         shape="icon"
@@ -188,7 +184,7 @@ const hostname = computed(() => {
         :disabled="!current"
         @click="loads++"
       >
-        <IconRefresh aria-hidden="true" />
+        <ProjectorIcon name="refresh-cw" aria-hidden="true" />
       </UiButton>
       <UiControl
         v-model="address"
@@ -207,7 +203,7 @@ const hostname = computed(() => {
         title="Открыть dev-сервер проекта"
         @click="go(devUrl)"
       >
-        <IconServer aria-hidden="true" /> Dev-сервер
+        <ProjectorIcon name="server" aria-hidden="true" /> Dev-сервер
       </UiButton>
       <UiControl
         as="select"
@@ -228,7 +224,7 @@ const hostname = computed(() => {
         :disabled="!current"
         @click="openOutside"
       >
-        <IconExternal aria-hidden="true" />
+        <ProjectorIcon name="external-link" aria-hidden="true" />
       </UiButton>
     </UiToolbar>
     <p v-if="problem" class="note error" role="alert">{{ problem }}</p>
@@ -254,7 +250,7 @@ const hostname = computed(() => {
       <div v-else class="start">
         <p>Введите адрес сайта или dev-сервера проекта.</p>
         <UiButton v-if="devUrl" size="sm" @click="go(devUrl)">
-          <IconServer aria-hidden="true" /> {{ devUrl }}
+          <ProjectorIcon name="server" aria-hidden="true" /> {{ devUrl }}
         </UiButton>
       </div>
     </div>

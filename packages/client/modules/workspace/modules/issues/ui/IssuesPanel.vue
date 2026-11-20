@@ -1,6 +1,6 @@
 <script setup lang="ts">
+import ProjectorIcon from "../../../../../common/icons/ProjectorIcon.vue";
 import UiInline from "../../../../../common/ui/UiInline.vue";
-import IconComment from "~icons/lucide/message-square";
 import { useIssues } from "../lib/issues.ts";
 import { useTrackerPanel } from "../lib/tracker-panel.ts";
 import TrackerPanel from "./TrackerPanel.vue";
@@ -69,7 +69,7 @@ defineExpose({ refresh: () => list.load() });
             class="comments"
             :title="`${issue.comments} комментариев`"
           >
-            <IconComment aria-hidden="true" />{{ issue.comments }}
+            <ProjectorIcon name="message-square" aria-hidden="true" />{{ issue.comments }}
           </UiInline>
         </template>
       </TrackerRow>

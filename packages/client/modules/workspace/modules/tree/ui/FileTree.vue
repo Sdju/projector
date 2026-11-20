@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ProjectorIcon from "../../../../../common/icons/ProjectorIcon.vue";
 import { toastErrors } from "../../../../../common/utilities/notice.ts";
 import UiLoader from "../../../../../common/ui/UiLoader.vue";
 import UiSkeleton from "../../../../../common/ui/UiSkeleton.vue";
@@ -30,7 +31,6 @@ import { useTreeImport } from "../lib/tree-import.ts";
 import ContextMenu from "../../../../../common/ui/ContextMenu.vue";
 import EntryDialog from "../../../../../common/ui/EntryDialog.vue";
 import ImportConflictDialog from "./ImportConflictDialog.vue";
-import IconChevronRight from "~icons/lucide/chevron-right";
 import { FileIcon } from "../../../../file-icons/index.ts";
 import { useFileIconTheme } from "../../../../file-icons/index.ts";
 import { workspaceCapabilities } from "../../../../workspace-api/index.ts";
@@ -314,7 +314,8 @@ defineExpose({ reveal });
         @drop.stop="drop($event, entry)"
       >
         <span class="glyph" aria-hidden="true">
-          <IconChevronRight
+          <ProjectorIcon
+            name="chevron-right"
             v-if="entry.directory"
             :class="{ expanded: expanded.has(entry.path) }"
           />

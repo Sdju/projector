@@ -1,8 +1,8 @@
 <script setup lang="ts">
+import ProjectorIcon from "../../../../common/icons/ProjectorIcon.vue";
 import UsageIndicator from "../../_/UsageIndicator.vue";
 import { useAgentUsageIndicator } from "../../_/use-agent-usage-indicator.ts";
 import { USAGE_PERIOD_SECONDS } from "../../_/usage-pace.ts";
-import IconOpenCode from "~icons/simple-icons/opencode";
 import type { OpenCodeUsage } from "@ai-projector/core/modules/agents-integration/opencode/index.ts";
 
 type WindowName = keyof NonNullable<OpenCodeUsage["windows"]>;
@@ -64,6 +64,6 @@ const { selected, remaining, tone, tooltipRows, tooltip, commands } = useAgentUs
     interactive
     @cycle="commands.run('ide.opencode.usage.window.cycle')"
   >
-    <template #icon><IconOpenCode /></template>
+    <template #icon><ProjectorIcon name="simple-icons:opencode" /></template>
   </UsageIndicator>
 </template>

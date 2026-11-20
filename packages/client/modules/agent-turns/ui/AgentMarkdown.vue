@@ -11,9 +11,6 @@ import "./agent-markdown.css";
 import type { ContextMenuItem } from "../../../common/ui/context-menu.ts";
 import ImageModal from "../../../common/ui/ImageModal.vue";
 import { MermaidModal, createMermaidBlock, type MermaidBlock } from "../../markdown/index.ts";
-import IconCopy from "~icons/lucide/copy";
-import IconExternal from "~icons/lucide/external-link";
-import IconFile from "~icons/lucide/file-text";
 
 /**
  * A markdown text that grows: closed blocks stay as they were, only the last one is redone. While
@@ -131,13 +128,13 @@ function menuItems(link: ReturnType<typeof parseChatLink>, source: Element): Con
       {
         id: "link.open",
         label: "Открыть в новой вкладке",
-        icon: IconExternal,
+        icon: "external-link",
         run: () => openExternalLink(link.href),
       },
       {
         id: "link.copyAddress",
         label: "Копировать адрес ссылки",
-        icon: IconCopy,
+        icon: "copy",
         run: () => void linkActions?.copyAddress(link.href, source),
       },
     ];
@@ -146,13 +143,13 @@ function menuItems(link: ReturnType<typeof parseChatLink>, source: Element): Con
     {
       id: "link.openFile",
       label: "Открыть файл",
-      icon: IconFile,
+      icon: "file-text",
       run: () => void linkActions?.openFile(link, source),
     },
     {
       id: "link.copyAbsolute",
       label: "Копировать абсолютный путь",
-      icon: IconCopy,
+      icon: "copy",
       separator: true,
       run: () => void linkActions?.copyAbsolute(link, source),
     },
@@ -161,7 +158,7 @@ function menuItems(link: ReturnType<typeof parseChatLink>, source: Element): Con
     items.push({
       id: "link.copyRelative",
       label: "Копировать относительный путь",
-      icon: IconCopy,
+      icon: "copy",
       run: () => void linkActions?.copyRelative(link, source),
     });
   return items;
