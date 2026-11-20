@@ -289,7 +289,7 @@ select {
   padding: 6px 8px;
   border: 1px solid var(--line-strong);
   border-radius: var(--r-sm);
-  background: var(--bg-3);
+  background: var(--theme-raised-background, var(--bg-3));
   color: var(--text);
   font: inherit;
 }
@@ -355,7 +355,7 @@ input[type="checkbox"] {
   padding: 5px 9px;
   border: 1px solid var(--line-strong);
   border-radius: var(--r-sm);
-  background: var(--bg-3);
+  background: var(--theme-raised-background, var(--bg-3));
   color: var(--text-2);
   font: inherit;
   cursor: pointer;

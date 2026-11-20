@@ -565,7 +565,7 @@ const lastWork = computed(
   margin: 0;
   padding: var(--sp-2) var(--sp-3);
   border-radius: var(--r-lg);
-  background: var(--bg-3);
+  background: var(--theme-raised-background, var(--bg-3));
   color: var(--text);
   font-size: var(--chat-fs);
   line-height: 1.6;
@@ -577,10 +577,10 @@ const lastWork = computed(
   min-width: 0;
   padding: var(--sp-2) var(--sp-3);
   border-radius: var(--r-lg);
-  background: var(--bg-3);
+  background: var(--theme-raised-background, var(--bg-3));
 }
 .user-form :deep(.ui-card) {
-  background: var(--bg-3);
+  background: transparent;
 }
 .note {
   margin: 0 0 var(--sp-3) auto;
@@ -608,7 +608,7 @@ const lastWork = computed(
   overflow: auto;
   border: 1px solid var(--line);
   border-radius: var(--r-md);
-  background: var(--bg-2);
+  background: var(--theme-inset-background, var(--bg-2));
   color: var(--muted);
   font-family: var(--mono);
   font-size: var(--fs-2xs);
@@ -624,7 +624,7 @@ const lastWork = computed(
   padding: 0 6px;
   border: 1px solid var(--line-strong);
   border-radius: var(--r-md);
-  background: var(--bg-2);
+  background: var(--theme-inset-background, var(--bg-2));
   font-size: var(--fs-xs);
   line-height: 1.5;
   vertical-align: baseline;
@@ -654,7 +654,7 @@ const lastWork = computed(
   padding: var(--sp-2) var(--sp-3);
   border: 1px solid color-mix(in srgb, var(--err) 40%, var(--bg-2));
   border-radius: var(--r-lg);
-  background: color-mix(in srgb, var(--err) 10%, var(--bg-2));
+  background: color-mix(in srgb, var(--err) 10%, var(--theme-inset-background, var(--bg-2)));
   color: var(--err);
   font-size: var(--fs-sm);
   line-height: 1.6;

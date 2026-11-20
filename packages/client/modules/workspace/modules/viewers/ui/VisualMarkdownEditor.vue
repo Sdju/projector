@@ -667,7 +667,7 @@ onBeforeUnmount(() => {
   /* Без overflow: hidden — иначе список языка (.language-picker) режется границей блока. */
   border: 1px solid var(--line);
   border-radius: var(--r-md);
-  background: var(--bg-sunken);
+  background: var(--theme-inset-background, var(--bg-sunken));
   transition: border-color var(--t-fast);
 }
 .visual-markdown :deep(.milkdown-code-block:has(.mermaid-diagram) .codemirror-host),
@@ -689,7 +689,7 @@ onBeforeUnmount(() => {
   padding: 0 var(--sp-2) 0 var(--sp-1);
   border-bottom: 1px solid var(--line);
   border-radius: var(--r-md) var(--r-md) 0 0;
-  background: var(--bg-2);
+  background: var(--theme-inset-background, var(--bg-2));
 }
 .visual-markdown :deep(.milkdown-code-block .cm-editor) {
   border-radius: 0 0 var(--r-md) var(--r-md);
@@ -775,7 +775,7 @@ onBeforeUnmount(() => {
   padding: 1px 6px;
   border: 1px solid var(--line);
   border-radius: var(--r-sm);
-  background: var(--bg-2);
+  background: var(--theme-raised-background, var(--bg-2));
   color: var(--text);
   font: 0.9em var(--mono);
 }

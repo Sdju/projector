@@ -383,7 +383,7 @@ defineExpose({
   border: 1px solid color-mix(in srgb, var(--err) 40%, var(--bg-2));
   border-radius: var(--r-lg);
   padding: 10px 12px;
-  background: color-mix(in srgb, var(--err) 12%, var(--bg-2));
+  background: color-mix(in srgb, var(--err) 12%, var(--theme-inset-background, var(--bg-2)));
   color: var(--err);
   font-size: var(--fs-2xs);
   line-height: 1.6;

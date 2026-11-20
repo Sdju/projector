@@ -274,7 +274,7 @@ svg {
     z-index: 1;
     margin: calc(-1 * var(--sp-1)) calc(-1 * var(--sp-1)) 0;
     padding: var(--sp-1);
-    background: var(--bg-2);
+    background: var(--theme-inset-background, var(--bg-2));
     border-bottom: 1px solid var(--line);
   }
   .work-head-lens {

@@ -99,7 +99,7 @@ function place(notice: Notice) {
   align-items: flex-start;
   padding: var(--sp-2) var(--sp-3);
   border-color: var(--err);
-  background: var(--bg-2);
+  background: color-mix(in srgb, var(--err) 10%, var(--popup-surface-tint, var(--bg-2)));
   color: var(--err);
 }
 .notice.error svg {
@@ -144,7 +144,8 @@ function place(notice: Notice) {
   padding: var(--sp-2) var(--sp-2) var(--sp-2) var(--sp-3);
   border: 1px solid var(--err);
   border-radius: var(--r-md);
-  background: var(--bg-2);
+  background: var(--popup-surface-tint, var(--bg-2));
+  backdrop-filter: var(--popup-surface-filter, none);
   box-shadow: var(--shadow-popover);
   color: var(--text);
   font-size: var(--fs-xs);

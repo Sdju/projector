@@ -57,7 +57,7 @@ provide(tabsKey, {
   gap: 2px;
   padding: 2px;
   border-radius: var(--r-md);
-  background: var(--bg-3);
+  background: var(--theme-raised-background, var(--bg-3));
 }
 button {
   padding: 4px 12px;
@@ -70,7 +70,7 @@ button {
   cursor: pointer;
 }
 .on {
-  background: var(--bg-2);
+  background: var(--theme-inset-background, var(--bg-2));
   color: var(--text);
 }
 </style>

@@ -427,7 +427,7 @@ test(
         .toBe(true);
       const glass = await browser.evaluate("window.fixture.read()");
       expect(glass.documentBg).toBe("rgba(0, 0, 0, 0)");
-      expect(glass.bg).toBe("rgb(11, 25, 42)");
+      expect(glass.bg).toMatch(/0\.38/);
       expect(await browser.evaluate("window.marker")).toBe(marker);
     } finally {
       await browser.close();

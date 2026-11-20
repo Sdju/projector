@@ -31,7 +31,7 @@ defineProps<{
   padding: var(--sp-3);
   border: 1px solid var(--line-strong);
   border-radius: var(--r-lg);
-  background: var(--bg-2);
+  background: var(--theme-inset-background, var(--bg-2));
   font-size: var(--fs-2xs);
 }
 .neutral {
@@ -45,10 +45,10 @@ defineProps<{
 }
 .warning {
   border-color: color-mix(in srgb, var(--warn) 40%, var(--bg-2));
-  background: color-mix(in srgb, var(--warn) 8%, var(--bg-2));
+  background: color-mix(in srgb, var(--warn) 8%, var(--theme-inset-background, var(--bg-2)));
 }
 .danger {
   border-color: color-mix(in srgb, var(--err) 48%, var(--bg-2));
-  background: color-mix(in srgb, var(--err) 8%, var(--bg-2));
+  background: color-mix(in srgb, var(--err) 8%, var(--theme-inset-background, var(--bg-2)));
 }
 </style>

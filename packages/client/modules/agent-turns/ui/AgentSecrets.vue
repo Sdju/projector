@@ -133,7 +133,7 @@ code {
   padding: var(--sp-2) var(--sp-3);
   border: 1px solid var(--line-strong);
   border-radius: var(--r-md);
-  background: var(--bg-sunken);
+  background: var(--theme-inset-background, var(--bg-sunken));
   color: var(--text);
   font-family: var(--mono);
   font-size: var(--fs-sm);

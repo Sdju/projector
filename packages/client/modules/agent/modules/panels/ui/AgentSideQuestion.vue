@@ -137,7 +137,7 @@ watch(
   margin: 0 0 var(--sp-2);
   border: 1px solid var(--line);
   border-radius: var(--r-lg);
-  background: var(--bg-2);
+  background: var(--theme-inset-background, var(--bg-2));
   overflow: hidden;
 }
 .head {
@@ -273,7 +273,7 @@ textarea {
   padding: var(--sp-2);
   border: 1px solid var(--line);
   border-radius: var(--r-md);
-  background: var(--bg);
+  background: var(--theme-inset-background, var(--bg));
   color: var(--text);
   font: var(--fs-xs) / 1.6 var(--sans);
 }

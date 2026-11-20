@@ -102,7 +102,8 @@ function previewRequest(event: Event, index: number, text: string) {
   padding: 8px 10px;
   border: 1px solid var(--line);
   border-radius: var(--r-sm);
-  background: var(--bg-2);
+  background: var(--popup-surface-tint, var(--bg-2));
+  backdrop-filter: var(--popup-surface-filter, none);
   color: var(--text);
   font-size: var(--fs-2xs);
   pointer-events: none;

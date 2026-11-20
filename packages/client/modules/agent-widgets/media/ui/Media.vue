@@ -197,14 +197,14 @@ img {
   width: 100%;
   border: 1px solid var(--line);
   border-radius: var(--r-md);
-  background: var(--bg-2);
+  background: var(--theme-inset-background, var(--bg-2));
 }
 audio,
 video {
   width: 100%;
   max-width: 100%;
   border-radius: var(--r-md);
-  background: var(--bg-2);
+  background: var(--theme-inset-background, var(--bg-2));
 }
 pre {
   margin: 0;
@@ -214,7 +214,7 @@ pre {
   overflow-wrap: anywhere;
   border: 1px solid var(--line);
   border-radius: var(--r-md);
-  background: var(--bg-2);
+  background: var(--theme-inset-background, var(--bg-2));
   font: inherit;
 }
 .status {

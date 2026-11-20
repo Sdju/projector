@@ -115,7 +115,7 @@ function tone(tone: "spare" | "normal" | "hot" | "over" | null | undefined) {
   padding: var(--sp-3);
   border: 1px solid var(--line);
   border-radius: var(--r-md);
-  background: var(--bg-2);
+  background: var(--theme-inset-background, var(--bg-2));
   color: var(--text);
   text-align: left;
   transition:
@@ -126,6 +126,13 @@ function tone(tone: "spare" | "normal" | "hot" | "over" | null | undefined) {
 .tile:focus-visible {
   border-color: var(--line-strong);
   background: var(--hover);
+}
+[data-theme-effects] .tile {
+  background: var(--theme-inset-background);
+}
+[data-theme-effects] .tile:hover:not(:disabled),
+[data-theme-effects] .tile:focus-visible {
+  background: color-mix(in srgb, var(--text) 8%, var(--theme-inset-background));
 }
 .tile:disabled {
   opacity: 0.55;

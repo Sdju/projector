@@ -128,7 +128,7 @@ export default defineComponent({
   border-radius: var(--r-sm);
 }
 .ui-control-filled {
-  background: var(--bg-2);
+  background: var(--theme-inset-background, var(--bg-2));
   border: 1px solid var(--line);
   color: var(--text);
   border-radius: var(--r-sm);

@@ -439,7 +439,7 @@ svg {
   padding: var(--sp-1);
   border: 1px solid var(--line);
   border-radius: var(--r-md);
-  background: var(--bg-2);
+  background: var(--theme-inset-background, var(--bg-2));
   object-fit: contain;
   box-sizing: border-box;
 }

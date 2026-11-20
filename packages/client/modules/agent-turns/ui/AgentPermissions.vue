@@ -111,26 +111,26 @@ const emit = defineEmits<{ decide: [id: string, allow: boolean, always?: boolean
   padding: 10px 12px 8px;
   border: 1px solid var(--line);
   border-radius: var(--r-lg);
-  background: var(--bg-2);
+  background: var(--theme-inset-background, var(--bg-2));
   color: var(--text-2);
   font-size: var(--fs-xs);
   line-height: 1.5;
 }
 .permission.risk-1 {
-  background: color-mix(in srgb, var(--run) 7%, var(--bg-2));
+  background: color-mix(in srgb, var(--run) 7%, var(--theme-inset-background, var(--bg-2)));
   border-color: color-mix(in srgb, var(--run) 32%, var(--line));
 }
 .permission.risk-2 {
-  background: color-mix(in srgb, var(--info) 7%, var(--bg-2));
+  background: color-mix(in srgb, var(--info) 7%, var(--theme-inset-background, var(--bg-2)));
   border-color: color-mix(in srgb, var(--info) 32%, var(--line));
 }
 .permission.risk-3 {
-  background: color-mix(in srgb, var(--warn) 8%, var(--bg-2));
+  background: color-mix(in srgb, var(--warn) 8%, var(--theme-inset-background, var(--bg-2)));
   border-color: color-mix(in srgb, var(--warn) 40%, var(--line));
 }
 .permission.risk-4,
 .permission.risk-5 {
-  background: color-mix(in srgb, var(--err) 8%, var(--bg-2));
+  background: color-mix(in srgb, var(--err) 8%, var(--theme-inset-background, var(--bg-2)));
   border-color: color-mix(in srgb, var(--err) 48%, var(--line));
 }
 .head {
@@ -203,7 +203,7 @@ const emit = defineEmits<{ decide: [id: string, allow: boolean, always?: boolean
 .permission :deep(.code) {
   max-height: 180px;
   margin: 0;
-  background: var(--bg-sunken);
+  background: var(--theme-inset-background, var(--bg-sunken));
 }
 .actions {
   display: flex;

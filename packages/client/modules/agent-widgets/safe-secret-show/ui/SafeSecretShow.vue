@@ -126,7 +126,7 @@ header svg {
   padding: var(--sp-2);
   border: 1px solid var(--line);
   border-radius: var(--r-sm);
-  background: var(--bg-sunken);
+  background: var(--theme-inset-background, var(--bg-sunken));
   color: var(--text-2);
   overflow-x: auto;
   white-space: pre-wrap;

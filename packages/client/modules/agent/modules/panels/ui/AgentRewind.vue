@@ -159,7 +159,7 @@ small {
   margin: 0;
   padding: var(--sp-2);
   border-radius: var(--r-md);
-  background: var(--bg-3);
+  background: var(--theme-raised-background, var(--bg-3));
   line-height: 1.5;
 }
 ul {

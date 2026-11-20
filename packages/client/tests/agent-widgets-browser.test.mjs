@@ -1262,3 +1262,82 @@ test.concurrent(
     ).toBe("0");
   },
 );
+
+test.concurrent(
+  "chat cards and session tiles take the glass fill when theme effects are on",
+  { skip: !chromium, timeout: 30000, retry: 1 },
+  async ({ onTestFinished }) => {
+    const html = `<!doctype html>
+<html lang="ru" data-appearance="dark" data-theme="dark">
+<head><meta name="color-scheme" content="dark"><link rel="icon" href="data:,"></head>
+<body>
+<div id="fixture"></div>
+<script type="module">
+import '/packages/client/app/styles.css';
+import '/packages/client/modules/agent-turns/ui/agent-markdown.css';
+import { createApp, h } from 'vue';
+import UiCard from '/packages/client/common/ui/UiCard.vue';
+import SessionTiles from '/packages/client/modules/workspace/ui/SessionTiles.vue';
+const originalFetch = window.fetch;
+window.fetch = async (input, options = {}) => {
+  const url = String(input);
+  if (url.startsWith('/api/agent/integrations')) return Response.json({ modes: {}, disabled: [] });
+  return originalFetch(input, options);
+};
+createApp({
+  setup: () => () => h('div', { style: 'padding:24px;display:grid;gap:16px' }, [
+    h(UiCard, { class: 'probe-card' }, () => 'карточка'),
+    h(SessionTiles, { busy: false, agent: true }),
+    h('div', { class: 'md' }, [
+      h('pre', { class: 'probe-pre' }, 'блоки кода'),
+      h('p', {}, [h('code', { class: 'probe-code' }, 'inline')]),
+    ]),
+  ]),
+}).mount('#fixture');
+window.fixture = {
+  ready: true,
+  read: () => {
+    const color = (selector) => {
+      const node = document.querySelector(selector);
+      return node ? getComputedStyle(node).backgroundColor : null;
+    };
+    return {
+      card: color('.probe-card'),
+      tile: color('.tile'),
+      pre: color('.probe-pre'),
+      code: color('.probe-code'),
+    };
+  },
+};
+</script>
+</body></html>`;
+    const fixture = await createBrowserFixture({ pages: { "/glass-panels": html } });
+    onTestFinished(() => fixture.close());
+    const browser = await createChromium(fixture.directory);
+    onTestFinished(() => browser.close());
+    await browser.open(fixture.url("/glass-panels"));
+    const wait = async (expression, ms = 8000) => {
+      for (let waited = 0; waited < ms; waited += 50) {
+        if (await browser.evaluate(expression)) return;
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      }
+      expect(await browser.evaluate(expression)).toBeTruthy();
+    };
+    await wait("window.fixture?.ready && document.querySelector('.tile')");
+    const dark = await browser.evaluate("window.fixture.read()");
+    expect(dark.card).toBe("rgb(23, 23, 22)");
+    expect(dark.tile).toBe("rgb(23, 23, 22)");
+    expect(dark.pre).toBe("rgb(23, 23, 22)");
+    expect(dark.code).toBe("rgb(32, 32, 28)");
+    await browser.evaluate("document.documentElement.dataset.themeEffects = ''");
+    await expect
+      .poll(async () => browser.evaluate("window.fixture.read()"))
+      .toMatchObject({
+        card: expect.stringMatching(/0\.38/),
+        tile: expect.stringMatching(/0\.38/),
+        pre: expect.stringMatching(/0\.38/),
+        code: expect.stringMatching(/0\.5/),
+      });
+    expect(browser.errors).toEqual([]);
+  },
+);

@@ -180,7 +180,7 @@ function submit(request: AgentQuestionRequest) {
   padding: 10px 12px 8px;
   border: 1px solid var(--line);
   border-radius: var(--r-lg);
-  background: var(--bg-2);
+  background: var(--theme-inset-background, var(--bg-2));
   color: var(--text-2);
   font-size: var(--fs-xs);
   line-height: 1.5;
@@ -255,7 +255,7 @@ function submit(request: AgentQuestionRequest) {
   color: var(--text);
 }
 .option.picked {
-  background: var(--bg-3);
+  background: var(--theme-raised-background, var(--bg-3));
   color: var(--text);
 }
 .question.compact .option {
@@ -307,7 +307,7 @@ function submit(request: AgentQuestionRequest) {
   padding: 3px 6px;
 }
 .own:focus-within {
-  background: var(--bg-3);
+  background: var(--theme-raised-background, var(--bg-3));
 }
 .question.compact .own:focus-within {
   background: var(--bg-4);

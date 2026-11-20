@@ -63,7 +63,7 @@ const lines = computed(() =>
   margin: var(--sp-1) 0 var(--sp-2);
   padding: var(--sp-2) 0;
   border-radius: var(--r-md);
-  background: var(--bg-2);
+  background: var(--theme-inset-background, var(--bg-2));
   max-height: 240px;
   overflow: auto;
 }

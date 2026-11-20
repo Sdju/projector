@@ -83,7 +83,7 @@ img {
   width: 100%;
   border: 1px solid var(--line);
   border-radius: var(--r-md);
-  background: var(--bg-2);
+  background: var(--theme-inset-background, var(--bg-2));
 }
 .image-text {
   color: var(--muted);

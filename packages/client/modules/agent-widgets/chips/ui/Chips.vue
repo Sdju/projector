@@ -59,7 +59,7 @@ const chips = computed(() =>
   padding: 2px 9px 2px 7px;
   border: 1px solid color-mix(in srgb, var(--chip-color) 42%, var(--line));
   border-radius: 999px;
-  background: color-mix(in srgb, var(--chip-color) 12%, var(--bg-2));
+  background: color-mix(in srgb, var(--chip-color) 12%, var(--theme-inset-background, var(--bg-2)));
   color: color-mix(in srgb, var(--chip-color) 58%, var(--text));
   font-size: var(--fs-2xs);
   line-height: 1.5;

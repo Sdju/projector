@@ -36,7 +36,8 @@ const { text, position, add } = useChatQuote({
   padding: 0 12px;
   border: 1px solid var(--line-strong);
   border-radius: var(--r-full);
-  background: var(--bg-3);
+  background: var(--popup-surface-tint, var(--bg-3));
+  backdrop-filter: var(--popup-surface-filter, none);
   box-shadow: var(--shadow-popover);
   color: var(--text);
   font: var(--fs-xs) var(--sans);

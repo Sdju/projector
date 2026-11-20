@@ -510,7 +510,7 @@ i {
 .tool {
   border: 1px solid var(--line);
   border-radius: 4px;
-  background: var(--bg-3);
+  background: var(--theme-raised-background, var(--bg-3));
   padding: 2px 6px;
   font-size: 12px;
   line-height: 1;
@@ -526,7 +526,8 @@ i {
   z-index: 3;
   border: 1px solid var(--line);
   border-radius: 6px;
-  background: var(--bg-3);
+  background: var(--popup-surface-tint, var(--bg-3));
+  backdrop-filter: var(--popup-surface-filter, none);
   padding: 4px 8px;
   box-shadow: var(--shadow-popover);
   font-size: 11px;

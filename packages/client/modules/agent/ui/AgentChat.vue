@@ -866,7 +866,7 @@ onBeforeUnmount(() => release());
   padding: 6px var(--sp-3);
   border-radius: var(--r-full);
   border: 1px solid var(--line);
-  background: var(--bg-2);
+  background: var(--theme-inset-background, var(--bg-2));
   color: var(--text-2);
   font-size: var(--fs-2xs);
   white-space: nowrap;

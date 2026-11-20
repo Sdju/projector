@@ -221,6 +221,7 @@
   --theme-workspace-canvas: transparent;
   --theme-panel-background: transparent;
   --theme-inset-background: color-mix(in srgb, var(--bg-2) 38%, transparent);
+  --theme-raised-background: color-mix(in srgb, var(--bg-3) 50%, transparent);
   --popup-surface-tint: var(--theme-chrome, color-mix(in srgb, var(--bg-2) 70%, transparent));
   --popup-surface-filter: var(--theme-backdrop, none);
   background:
@@ -294,6 +295,7 @@ a {
 }
 
 button {
+  appearance: none;
   background: none;
   border: 0;
   padding: 0;

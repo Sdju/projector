@@ -27,7 +27,7 @@
   margin: 14px 0;
   border: 1px solid var(--line);
   border-radius: var(--r-md);
-  background: var(--bg);
+  background: var(--theme-inset-background, var(--bg));
   overflow: hidden;
 }
 .mermaid-toolbar {
