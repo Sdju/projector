@@ -13,8 +13,13 @@ const vitePlusRequire = createRequire(import.meta.resolve("vite-plus/package.jso
 // The `.bin` shim is a shell script. Windows `spawn` reports ENOENT for it, so run the JS entry.
 const oxlintBin = join(dirname(vitePlusRequire.resolve("oxlint/package.json")), "bin", "oxlint");
 const plugin = fileURLToPath(import.meta.resolve("@o-feod/oxlint-structure-plugin"));
+/** Project rules of the same runner; the plugin is also loaded by `vp lint` and `vp check`. */
+const projectPlugin = fileURLToPath(new URL("./lint/projector-plugin.mjs", import.meta.url));
+const projectRules = { "projector/no-direct-icon-import": "error" };
+/** Diagnostics this runner owns: FEOD structure and the project rules beside it. */
+const ownedPrefixes = ["feod-structure(", "projector("];
 
-/** Run only the FEOD rules over the configured roots; policy lives in feod.config.mjs. */
+/** Run the FEOD rules and the project rules over the configured roots. */
 export function checkFeod({ rootDir = projectRoot, config = feodConfig } = {}) {
   const run = prepare(rootDir, config);
   if (!run) return [];
@@ -88,8 +93,11 @@ function prepare(rootDir, config) {
     file,
     JSON.stringify({
       categories: { correctness: "off" },
-      jsPlugins: [{ name: "feod-structure", specifier: plugin }],
-      rules: feod.rules,
+      jsPlugins: [
+        { name: "feod-structure", specifier: plugin },
+        { name: "projector", specifier: projectPlugin },
+      ],
+      rules: { ...feod.rules, ...projectRules },
     }),
   );
   return { directory, args: ["--threads=1", "-c", file, "-f", "json", ...roots] };
@@ -103,10 +111,10 @@ function diagnosticsOf(status, stdout, stderr, signal) {
     throw new Error(`oxlint failed (${signal ?? status}): ${stderr || stdout}`);
   }
   return diagnostics
-    .filter((item) => item.code?.startsWith("feod-structure("))
+    .filter((item) => ownedPrefixes.some((prefix) => item.code?.startsWith(prefix)))
     .map((item) => ({
       file: item.filename,
-      rule: item.code.slice(15, -1),
+      rule: /^[a-z-]+\((.+)\)$/.exec(item.code)?.[1] ?? item.code,
       message: item.message,
     }));
 }
@@ -116,5 +124,5 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
   if (errors.length) {
     console.error(errors.map((item) => `${item.file}: ${item.message} [${item.rule}]`).join("\n"));
     process.exitCode = 1;
-  } else console.log("FEOD: boundaries, entries, cycles and size limits checked.");
+  } else console.log("FEOD: boundaries, entries, cycles, size limits and project rules checked.");
 }

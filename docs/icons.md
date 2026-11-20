@@ -41,4 +41,6 @@
 
 Иконки файлового дерева — отдельный механизм с CSS-маской и темой в `public/file-icons`: см. [иконки файлов](file-icons.md).
 
-`vp test run packages/client/tests/icons.test.mjs` проверяет наборы, фоллбек, предупреждение и замену.
+## Проверка
+
+Правило Oxlint `projector/no-direct-icon-import` из `scripts/lint/projector-plugin.mjs` запрещает импорт, реэкспорт и ленивый `import()` из `~icons/...` везде, кроме `packages/client/common/icons/sets.ts`. Оно включено в `vite.config.ts` (для `vp check`, `vp lint` и редактора) и в общий прогон `scripts/check-feod.mjs`, поэтому `vp run build`, `vp run test`, `vp run check` и dev-сервер видят нарушение вместе с FEOD. Тест правила — `tests/lint-rules.test.mjs`; тест реестра — `vp test run packages/client/tests/icons.test.mjs` (наборы, фоллбек, предупреждение, замена).

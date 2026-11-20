@@ -139,10 +139,12 @@ export default defineConfig({
   lint: {
     jsPlugins: [
       { name: "vite-plus", specifier: "vite-plus/oxlint-plugin" },
+      { name: "projector", specifier: "./scripts/lint/projector-plugin.mjs" },
       ...(feodLint.jsPlugins ?? []),
     ],
     rules: {
       "vite-plus/prefer-vite-plus-imports": "error",
+      "projector/no-direct-icon-import": "error",
       ...(feodLint.rules as Record<string, "error" | "warn" | "off" | [string, object]>),
     },
     options: { typeAware: true, typeCheck: true },
