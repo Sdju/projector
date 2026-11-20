@@ -1,4 +1,5 @@
 import { randomBytes } from "node:crypto";
+import { existsSync } from "node:fs";
 import { mkdir, readFile, readdir, rm, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
@@ -127,10 +128,15 @@ export async function rememberSession(id: string, session: string): Promise<void
   });
 }
 
-/** A disconnected/replaced reader must never erase a run that still has a live owner. */
-export async function removeRun(id: string): Promise<boolean> {
-  if ((await liveHost(id)) !== undefined) return false;
+/**
+ * A disconnected/replaced reader must never erase a run that still has a live owner.
+ * A soft keep-alive marker means the host still needs its directory after `done`: deleting the
+ * marker would make the host SIGTERM a background task that was deliberately kept alive.
+ */
+export async function removeRun(id: string, options: { force?: boolean } = {}): Promise<boolean> {
   const dir = runDirectory(id);
+  if (!options.force && existsSync(join(dir, "keep-alive"))) return false;
+  if ((await liveHost(id)) !== undefined) return false;
   // A deep data directory puts the socket in /tmp instead (see `agentHostAddress`).
   await os.tools.removeAgentHostAddress(dir, os.tools.agentHostAddress(dir));
   // A host that was just signalled may still write; retry instead of failing on ENOTEMPTY.
@@ -194,7 +200,7 @@ export async function pruneRuns(now = Date.now()): Promise<void> {
       const job = (await readRun(id))?.chat?.startsWith(JOB_CHAT);
       if (age < (job ? JOB_RETAIN_MS : RETAIN_MS)) continue;
     }
-    await removeRun(id).catch(() => {});
+    await removeRun(id, { force: true }).catch(() => {});
   }
 }
 
@@ -235,5 +241,5 @@ export async function cancelRun(id: string): Promise<void> {
       endedAt: Date.now(),
     }).catch(() => {});
   }
-  await removeRun(id);
+  await removeRun(id, { force: true });
 }

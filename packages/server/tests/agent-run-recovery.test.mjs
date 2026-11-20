@@ -105,6 +105,24 @@ async function handshake(connection) {
   await connection.request("session/new", {});
 }
 
+test("a keep-alive marker keeps a finished run directory until forced", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "projector-keep-alive-"));
+  const previous = process.env.XDG_DATA_HOME;
+  process.env.XDG_DATA_HOME = directory;
+  try {
+    const id = await createRun({ backend: "kimi", message: "probe", history: [], chat: "probe" });
+    await writeFile(join(runDirectory(id), "keep-alive"), "1\n");
+    expect(await removeRun(id)).toBe(false);
+    expect(await readRun(id)).not.toBeNull();
+    expect(await removeRun(id, { force: true })).toBe(true);
+    expect(await readRun(id)).toBeNull();
+  } finally {
+    if (previous === undefined) delete process.env.XDG_DATA_HOME;
+    else process.env.XDG_DATA_HOME = previous;
+    await rm(directory, { recursive: true, force: true, maxRetries: 20, retryDelay: 200 });
+  }
+});
+
 test("a replaced reader cannot erase the live run owned by the new reader", async () => {
   await withHost(async ({ id, first, pid, identity, finish }) => {
     let working = false;
