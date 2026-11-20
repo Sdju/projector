@@ -2,6 +2,7 @@ import {
   appearanceOptions,
   builtinAppearance,
   isBuiltinAppearance,
+  themePaletteStyle,
   type AppearanceSettings,
 } from "@ai-projector/core/modules/appearance/index.ts";
 import {
@@ -12,6 +13,8 @@ import {
 import {
   discoverUserThemes,
   readAppearance,
+  saveWallpaper,
+  sendWallpaper,
   writeAppearance,
 } from "../../modules/appearance/index.ts";
 import { discoverPlugins } from "../../modules/plugins/index.ts";
@@ -30,12 +33,14 @@ function bootstrapScript(
   const properties = {
     ...(theme && themeStyleProperties(theme.tokens)),
     ...themeEffectStyle(fields, themeSettings[preferred]),
+    ...themePaletteStyle(preferred, themeSettings[preferred]),
   };
   const colors = Object.fromEntries(
     appearanceOptions.flatMap((option) =>
       "themeColor" in option ? [[option.id, option.themeColor]] : [],
     ),
   );
+  const paintedThemeColor = theme?.tokens.bg ?? properties["--bg-2"] ?? properties["--bg"];
   return `(() => {
   const choice = ${JSON.stringify(preferred)};
   const root = document.documentElement;
@@ -53,7 +58,7 @@ function bootstrapScript(
   for (const [name, value] of Object.entries(properties)) root.style.setProperty(name, value);
   const themeColors = ${JSON.stringify(colors)};
   document.querySelector('meta[name="color-scheme"]')?.setAttribute("content", mode);
-  document.querySelector('meta[name="theme-color"]')?.setAttribute("content", ${theme ? JSON.stringify(theme.tokens.bg) : "themeColors[scheme] ?? themeColors.dark"});
+  document.querySelector('meta[name="theme-color"]')?.setAttribute("content", ${paintedThemeColor ? JSON.stringify(paintedThemeColor) : "themeColors[scheme] ?? themeColors.dark"});
   document.getElementById("app-favicon")?.setAttribute("href", light ? "/favicon-light.svg" : "/favicon.svg");
   document.getElementById("app-touch-icon")?.setAttribute("href", light ? "/icons/apple-touch-icon-light.png" : "/icons/apple-touch-icon.png");
   document.getElementById("app-manifest")?.setAttribute("href", light ? "/manifest-light.webmanifest" : "/manifest.webmanifest");
@@ -112,6 +117,25 @@ export const routes: RouteDefinition[] = [
         throw new HttpError(403, "Настройки доступны только со страницы Projector");
       res.setHeader("Cache-Control", "no-store");
       json(res, 200, await appearanceResponse());
+    },
+  },
+  {
+    method: "POST",
+    path: "/api/appearance/wallpaper",
+    handler: async ({ req, res }) => {
+      if (!accessAllowed(req, true))
+        throw new HttpError(403, "Настройки доступны только со страницы Projector");
+      res.setHeader("Cache-Control", "no-store");
+      json(res, 201, await saveWallpaper(req, req.headers["content-type"]));
+    },
+  },
+  {
+    method: "GET",
+    path: "/api/appearance/wallpaper",
+    handler: async ({ req, res }) => {
+      if (!accessAllowed(req, false))
+        throw new HttpError(403, "Настройки доступны только со страницы Projector");
+      await sendWallpaper(res);
     },
   },
   {

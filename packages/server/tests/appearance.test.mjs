@@ -71,6 +71,15 @@ test("appearance API reads and writes the saved choice", async () => {
   await once(server, "listening");
   onTestFinished(() => new Promise((resolve) => server.close(resolve)));
   const base = `http://127.0.0.1:${server.address().port}`;
+  const imageServer = createServer((req, res) => {
+    if (req.url === "/missing.png") res.statusCode = 404;
+    res.setHeader("Content-Type", "image/png");
+    res.end(Buffer.from([137, 80, 78, 71]));
+  });
+  imageServer.listen(0, "127.0.0.1");
+  await once(imageServer, "listening");
+  onTestFinished(() => new Promise((resolve) => imageServer.close(resolve)));
+  const imageBase = `http://127.0.0.1:${imageServer.address().port}`;
 
   const initial = await fetch(`${base}/api/appearance`);
   expect(initial.status).toBe(200);
@@ -121,25 +130,52 @@ test("appearance API reads and writes the saved choice", async () => {
       headers: { "Content-Type": "application/json", Origin: base },
       body: JSON.stringify(body),
     });
-  const backgroundUrl = "https://example.test/wallpaper.webp";
+  const backgroundUrl = `${imageBase}/wallpaper.png`;
   const frozenGlass = (values) => ({ themeSettings: { "frozen-glass": values } });
   expect((await save({ choice: "frozen-glass", ...frozenGlass({ backgroundUrl }) })).status).toBe(
     200,
   );
   expect((await save(frozenGlass({ blur: 24 }))).status).toBe(200);
+  const upload = await fetch(`${base}/api/appearance/wallpaper`, {
+    method: "POST",
+    headers: { "Content-Type": "image/png", Origin: base },
+    body: Buffer.from([137, 80, 78, 71]),
+  });
+  expect(upload.status).toBe(201);
+  expect(await upload.json()).toStrictEqual({ url: "/api/appearance/wallpaper" });
+  const wallpaper = await fetch(`${base}/api/appearance/wallpaper`);
+  expect(wallpaper.status).toBe(200);
+  expect(wallpaper.headers.get("content-type")).toBe("image/png");
+  expect(Buffer.from(await wallpaper.arrayBuffer())).toStrictEqual(Buffer.from([137, 80, 78, 71]));
+  expect((await save(frozenGlass({ backgroundUrl: "/api/appearance/wallpaper" }))).status).toBe(
+    200,
+  );
+  expect((await save(frozenGlass({ backgroundUrl }))).status).toBe(200);
+  expect((await save(frozenGlass({ backgroundUrl: `${imageBase}/missing.png` }))).status).toBe(400);
   expect((await save(frozenGlass({ backgroundUrl: "file:///tmp/image.jpg" }))).status).toBe(400);
   expect((await save({ themeSettings: { light: { blur: 20 } } })).status).toBe(400);
+  expect((await save(frozenGlass({ seed: "sunset" }))).status).toBe(400);
   expect(
     normalizeAppearance({ frozenGlass: { backgroundUrl, blur: 24 } }).themeSettings,
   ).toStrictEqual(frozenGlass({ backgroundUrl, blur: 24 }).themeSettings);
   const settings = await (await fetch(`${base}/api/appearance`)).json();
   expect(settings.choice).toBe("frozen-glass");
-  expect(settings.themeSettings["frozen-glass"]).toStrictEqual({ backgroundUrl, blur: 24 });
+  expect(settings.themeSettings["frozen-glass"]).toStrictEqual({
+    seed: "ice",
+    backgroundUrl: "/api/appearance/wallpaper",
+    blur: 24,
+  });
   expect(settings.fonts.terminal).toBe(18);
   const bootstrap = await (await fetch(`${base}/api/appearance/bootstrap.js`)).text();
   expect(bootstrap).toContain('const choice = "frozen-glass"');
-  expect(bootstrap).toContain(backgroundUrl);
+  expect(bootstrap).toContain("/api/appearance/wallpaper");
+  expect(bootstrap).not.toContain(imageBase);
   expect(bootstrap).toContain("blur(24px)");
+  expect(bootstrap).toContain('"--accent":"#a4e1ff"');
+  expect((await save(frozenGlass({ seed: "indigo" }))).status).toBe(200);
+  const tinted = await (await fetch(`${base}/api/appearance/bootstrap.js`)).text();
+  expect(tinted).toContain('"--accent":"#ccd8fa"');
+  expect(tinted).not.toContain('"--accent":"#a4e1ff"');
   expect((await save({ choice: "light" })).status).toBe(200);
 });
 

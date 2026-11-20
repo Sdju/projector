@@ -1,6 +1,22 @@
-import { isExternalThemeId, type SavedThemeValues, type ThemeSetting } from "../plugins/index.ts";
-import { frozenGlass } from "./frozen-glass.ts";
-export { frozenGlass };
+import {
+  isExternalThemeId,
+  type SavedThemeValues,
+  type ThemeSetting,
+  type ThemeValues,
+} from "../plugins/index.ts";
+import { frozenGlass, frozenGlassStyle } from "./frozen-glass.ts";
+export {
+  frozenGlass,
+  frozenGlassOverlayProperties,
+  frozenGlassPalette,
+  frozenGlassSeeds,
+  frozenGlassStyle,
+} from "./frozen-glass.ts";
+export { hctFromHex, hexFromHct, hueDistance } from "./hct.ts";
+
+export function themePaletteStyle(scheme: string, saved?: ThemeValues): Record<string, string> {
+  return scheme === frozenGlass.id ? frozenGlassStyle(saved) : {};
+}
 
 /** Встроенная схема или namespaced ID темы из включённого плагина. */
 export type ThemeId = ColorScheme | (string & {});

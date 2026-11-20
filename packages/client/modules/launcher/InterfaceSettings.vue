@@ -935,7 +935,11 @@ fieldset {
   overflow: hidden;
   border: 1px solid var(--line);
   border-radius: var(--r-md);
-  background: var(--bg);
+  background:
+    var(--theme-wallpaper-overlay, linear-gradient(transparent, transparent)),
+    var(--theme-wallpaper, none) center / cover no-repeat,
+    var(--theme-wallpaper-fallback, none),
+    var(--bg);
   color: var(--text);
 }
 .sample-toolbar {
@@ -945,7 +949,8 @@ fieldset {
   gap: var(--sp-3);
   padding: var(--sp-2) var(--sp-3);
   border-bottom: 1px solid var(--line);
-  background: var(--bg-2);
+  background: var(--theme-chrome, var(--bg-2));
+  backdrop-filter: var(--theme-backdrop, none);
   color: var(--muted);
   font-size: var(--fs-2xs);
 }
@@ -966,6 +971,8 @@ fieldset {
   grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr);
   gap: var(--sp-4);
   padding: var(--sp-4);
+  background: var(--theme-surface, transparent);
+  backdrop-filter: var(--theme-backdrop, none);
 }
 .sample-message {
   display: flex;
@@ -1010,7 +1017,7 @@ fieldset {
   overflow-x: auto;
   border: 1px solid var(--line);
   border-radius: var(--r-sm);
-  background: var(--bg-sunken);
+  background: var(--theme-inset-background, var(--bg-sunken));
   color: var(--text-2);
   font-family: var(--mono);
   font-size: var(--fs-xs);
@@ -1093,6 +1100,7 @@ fieldset {
   height: 20px;
   margin: 0;
   appearance: none;
+  border: 0;
   background: transparent;
   cursor: pointer;
 }

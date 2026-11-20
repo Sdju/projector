@@ -48,6 +48,7 @@ export {
   themeEffectStyle,
   validateThemeSettings,
   type SavedThemeValues,
+  type ThemeSeedOption,
   type ThemeSetting,
   type ThemeValues,
 } from "./theme-settings.ts";

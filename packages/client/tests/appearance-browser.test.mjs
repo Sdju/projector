@@ -601,12 +601,18 @@ const appearance = {
   themes: [],
 };
 window.fetch = async (input, options) => {
+  if (input === '/api/appearance/wallpaper' && options?.method === 'POST') {
+    return Response.json({ url: '/api/appearance/wallpaper' }, { status: 201 });
+  }
   if (input === '/api/appearance') {
     if (options?.method === 'PUT') {
       const patch = JSON.parse(options.body);
       if (patch.choice) appearance.choice = patch.choice;
-      for (const [id, values] of Object.entries(patch.themeSettings ?? {}))
-        appearance.themeSettings[id] = { ...appearance.themeSettings[id], ...values };
+      for (const [id, values] of Object.entries(patch.themeSettings ?? {})) {
+        const imported = { ...values };
+        if (/^https?:/.test(imported.backgroundUrl)) imported.backgroundUrl = '/api/appearance/wallpaper';
+        appearance.themeSettings[id] = { ...appearance.themeSettings[id], ...imported };
+      }
     }
     return Response.json(appearance);
   }
@@ -682,13 +688,11 @@ test(
   async () => {
     const fixture = await createBrowserFixture({
       pages: { "/__appearance_settings": settingsHtml },
-      responses: [
-        {
-          equals: "/__ice.svg",
-          type: "image/svg+xml",
-          body: '<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200"><path fill="#7ddcff" d="M0 0h200v200H0z"/><path fill="#152856" d="M0 0h200L0 200z"/></svg>',
-        },
-      ],
+      responses: ["/__ice.svg", "/api/appearance/wallpaper"].map((path) => ({
+        equals: path,
+        type: "image/svg+xml",
+        body: '<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200"><path fill="#7ddcff" d="M0 0h200v200H0z"/><path fill="#152856" d="M0 0h200L0 200z"/></svg>',
+      })),
     });
     const browser = await createChromium(fixture.directory);
     try {
@@ -723,7 +727,7 @@ test(
       await browser.call("Input.insertText", { text: backgroundUrl });
       await browser.evaluate(`document.querySelector(${JSON.stringify(range)}).focus()`);
       await browser.key("End");
-      const button = ".interface-settings div:has(> input[type=url]) ~ .actions button";
+      const button = ".interface-settings .actions button";
       await browser.evaluate(
         `document.querySelector(${JSON.stringify(button)}).scrollIntoView({ block: 'center' })`,
       );
@@ -731,7 +735,7 @@ test(
       await expect
         .poll(() => browser.evaluate("window.fixture.saved()"))
         .toStrictEqual({
-          backgroundUrl,
+          backgroundUrl: "/api/appearance/wallpaper",
           blur: 40,
         });
       await expect
@@ -741,14 +745,62 @@ test(
           ),
         )
         .toBe("blur(40px)");
-      expect(
-        await browser.evaluate("getComputedStyle(document.documentElement).backgroundImage"),
-      ).toContain(backgroundUrl);
+      await expect
+        .poll(() => browser.evaluate("getComputedStyle(document.documentElement).backgroundImage"))
+        .toContain("/api/appearance/wallpaper");
       expect(
         await browser.evaluate(
           `getComputedStyle(document.querySelector('.settings-workbench')).position`,
         ),
       ).toBe("relative");
+      expect(
+        await browser.evaluate(
+          `getComputedStyle(document.querySelector('.glass-panel')).backdropFilter`,
+        ),
+      ).toBe("blur(40px)");
+      expect(
+        await browser.evaluate(
+          `getComputedStyle(document.querySelector(${JSON.stringify(range)})).borderTopWidth`,
+        ),
+      ).toBe("0px");
+      await browser.evaluate(`(() => {
+        const transfer = new DataTransfer();
+        transfer.items.add(new File([new Uint8Array([137, 80, 78, 71])], 'ice.png', { type: 'image/png' }));
+        const input = document.querySelector('input[type="file"]');
+        input.files = transfer.files;
+        input.dispatchEvent(new Event('change', { bubbles: true }));
+      })()`);
+      await expect
+        .poll(() => browser.evaluate(`document.querySelector(${JSON.stringify(wallpaper)}).value`))
+        .toBe("/api/appearance/wallpaper");
+      await browser.click(button);
+      await expect
+        .poll(() => browser.evaluate("window.fixture.saved()"))
+        .toStrictEqual({
+          backgroundUrl: "/api/appearance/wallpaper",
+          blur: 40,
+        });
+      const iceAccent = await browser.evaluate(
+        "document.documentElement.style.getPropertyValue('--accent')",
+      );
+      await browser.evaluate(
+        `document.querySelector('.frozen-settings input[value="indigo"]').click()`,
+      );
+      await browser.click(button);
+      await expect
+        .poll(() => browser.evaluate("window.fixture.saved()"))
+        .toStrictEqual({
+          backgroundUrl: "/api/appearance/wallpaper",
+          blur: 40,
+          seed: "indigo",
+        });
+      await expect
+        .poll(() => browser.evaluate("document.documentElement.style.getPropertyValue('--accent')"))
+        .toBe("#ccd8fa");
+      expect(iceAccent).toBe("#a4e1ff");
+      await expect
+        .poll(() => browser.evaluate(`document.querySelector(${JSON.stringify(range)}).disabled`))
+        .toBe(false);
       await browser.evaluate(`document.querySelector(${JSON.stringify(range)}).focus()`);
       await browser.key("Home");
       await browser.click(button);

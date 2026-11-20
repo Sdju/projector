@@ -1330,14 +1330,11 @@ window.fixture = {
     expect(dark.pre).toBe("rgb(23, 23, 22)");
     expect(dark.code).toBe("rgb(32, 32, 28)");
     await browser.evaluate("document.documentElement.dataset.themeEffects = ''");
-    await expect
-      .poll(async () => browser.evaluate("window.fixture.read()"))
-      .toMatchObject({
-        card: expect.stringMatching(/0\.38/),
-        tile: expect.stringMatching(/0\.38/),
-        pre: expect.stringMatching(/0\.38/),
-        code: expect.stringMatching(/0\.5/),
-      });
+    await wait(`(() => {
+      const value = window.fixture.read();
+      return /0\\.38/.test(value.card) && /0\\.38/.test(value.tile) &&
+        /0\\.38/.test(value.pre) && /0\\.5/.test(value.code);
+    })()`);
     expect(browser.errors).toEqual([]);
   },
 );

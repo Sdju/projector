@@ -17,8 +17,22 @@ const prefix = useId();
       {{ field.title
       }}<template v-if="field.kind === 'blur'"> · {{ values[field.id] }} px</template>
     </UiLabel>
+    <div v-if="field.kind === 'seed'" class="seed-options" role="radiogroup">
+      <label v-for="option in field.options" :key="option.id" class="seed-option">
+        <UiControl
+          type="radio"
+          :name="`${prefix}-${field.id}`"
+          :value="option.id"
+          :disabled="disabled"
+          :model-value="values[field.id]"
+          @update:model-value="values = { ...values, [field.id]: String($event) }"
+        />
+        <span class="seed-swatch" :style="{ background: option.color }" />
+        {{ option.title }}
+      </label>
+    </div>
     <UiControl
-      v-if="field.kind === 'wallpaper'"
+      v-else-if="field.kind === 'wallpaper'"
       :id="`${prefix}-${field.id}`"
       type="url"
       maxlength="4096"
@@ -46,5 +60,22 @@ const prefix = useId();
 <style scoped>
 input[type="range"] {
   max-width: 320px;
+}
+.seed-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+}
+.seed-option {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--fs-xs);
+}
+.seed-swatch {
+  width: 14px;
+  height: 14px;
+  border-radius: var(--r-full);
+  box-shadow: inset 0 0 0 1px var(--line);
 }
 </style>

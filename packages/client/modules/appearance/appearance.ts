@@ -4,12 +4,14 @@ import {
   defaultAppearanceFonts,
   builtinAppearance,
   effectiveAppearance,
+  frozenGlassOverlayProperties,
   isAppearanceChoice,
   isBuiltinAppearance,
   normalizeSavedThemeValues,
   normalizeAppearanceFonts,
   resolveScheme,
   schemeMode,
+  themePaletteStyle,
   type AppearanceChoice,
   type AppearanceFonts,
   type AppearanceSettings,
@@ -113,10 +115,13 @@ export function applyAppearance(value: AppearanceChoice): ThemeId {
   root.dataset.theme = scheme;
   const fields = theme?.settings ?? builtinAppearance(scheme)?.settings ?? [];
   root.toggleAttribute("data-theme-effects", fields.length > 0);
-  for (const name of Object.values(themeEffectProperties)) root.style.removeProperty(name);
-  for (const [name, token] of Object.entries(
-    themeEffectStyle(fields, themeSettingsValues.value[scheme]),
-  ))
+  for (const name of [...Object.values(themeEffectProperties), ...frozenGlassOverlayProperties])
+    root.style.removeProperty(name);
+  const savedTheme = themeSettingsValues.value[scheme];
+  for (const [name, token] of Object.entries({
+    ...themeEffectStyle(fields, savedTheme),
+    ...themePaletteStyle(scheme, savedTheme),
+  }))
     root.style.setProperty(name, token);
   appearanceScheme.value = scheme;
   if (theme) {

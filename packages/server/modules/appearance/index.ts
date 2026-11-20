@@ -18,8 +18,10 @@ import {
 } from "@ai-projector/core/modules/appearance/index.ts";
 import { mergeThemeValues, type AvailableTheme } from "@ai-projector/core/modules/plugins/index.ts";
 import { writeFileAtomic, withFileLock } from "../atomic-files/index.ts";
+import { importWallpaper } from "./wallpaper.ts";
 
 export { discoverUserThemes, findUserTheme, userThemesDirectory } from "./user-themes.ts";
+export { importWallpaper, saveWallpaper, sendWallpaper } from "./wallpaper.ts";
 
 const appearancePath = () => join(dataDir(), appearanceFile);
 const legacyTypographyPath = () => join(dataDir(), legacyTypographyFile);
@@ -95,7 +97,14 @@ export function writeAppearance(
         const fields = (builtinAppearance(id) ?? externalThemes?.find((theme) => theme.id === id))
           ?.settings;
         if (!fields?.length) throw new Error("Настройки для этой темы недоступны");
-        themeSettings[id] = mergeThemeValues(fields, themeSettings[id], values);
+        const merged = mergeThemeValues(fields, themeSettings[id], values);
+        for (const field of fields) {
+          const value = merged[field.id];
+          if (field.kind === "wallpaper" && typeof value === "string" && /^https?:/.test(value)) {
+            merged[field.id] = (await importWallpaper(value)).url;
+          }
+        }
+        themeSettings[id] = merged;
       }
     }
     return writeSettings({ choice, fonts, themeSettings });
