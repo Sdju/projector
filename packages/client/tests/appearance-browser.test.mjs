@@ -694,17 +694,17 @@ test(
     try {
       await browser.viewport(1000);
       await browser.open(fixture.url("/__appearance_settings"));
-      const scheme = ".interface-settings select:has(option[value='frozen-glass'])";
       const selectScheme = async (value) => {
+        const scheme = `.interface-settings input[name="color-scheme"][value="${value}"]`;
         await expect
           .poll(() =>
             browser.evaluate(`document.querySelector(${JSON.stringify(scheme)})?.disabled`),
           )
           .toBe(false);
         await browser.evaluate(`(() => {
-          const select = document.querySelector(${JSON.stringify(scheme)});
-          select.value = ${JSON.stringify(value)};
-          select.dispatchEvent(new Event('change', { bubbles: true }));
+          const input = document.querySelector(${JSON.stringify(scheme)});
+          input.checked = true;
+          input.dispatchEvent(new Event('change', { bubbles: true }));
         })()`);
       };
       await selectScheme("frozen-glass");
@@ -831,9 +831,9 @@ test(
     const browser = await createChromium(fixture.directory);
     onTestFinished(() => browser.close());
     await browser.open(fixture.url("/__plugin_theme"));
-    const select = `.interface-settings select:has(option[value='${theme.id}'])`;
+    const choice = `.interface-settings input[name="color-scheme"][value="${theme.id}"]`;
     await expect
-      .poll(() => browser.evaluate(`document.querySelector(${JSON.stringify(select)})?.disabled`), {
+      .poll(() => browser.evaluate(`document.querySelector(${JSON.stringify(choice)})?.disabled`), {
         timeout: 5000,
       })
       .toBe(false);
@@ -841,9 +841,9 @@ test(
       const runtime = await import('/packages/client/modules/plugin-runtime/index.ts');
       window.disableThemeWidget = () => runtime.applyRuntimeCatalog({plugins: []});
       await runtime.applyRuntimeCatalog({plugins: [${JSON.stringify(plugin)}]});
-      const select = document.querySelector(${JSON.stringify(select)});
-      select.value = ${JSON.stringify(theme.id)};
-      select.dispatchEvent(new Event('change', {bubbles: true}));
+      const input = document.querySelector(${JSON.stringify(choice)});
+      input.checked = true;
+      input.dispatchEvent(new Event('change', {bubbles: true}));
     })()`);
     await expect
       .poll(() => browser.evaluate("document.querySelector('#plugin-theme-demo')?.textContent"))
