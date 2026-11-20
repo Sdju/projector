@@ -85,6 +85,9 @@ export default defineConfig({
       // emitted packages, bin, resources). Vite ignores only its own outDir, so a copied
       // `packages/hub/dist/hub.html` reloaded every open page — a chat mid-answer included.
       ignored: [
+        // Local clones for porting (`.samples/orca`, `.samples/t3code`) are gitignored scratch:
+        // watching them cost ~76k inotify watches of ~78k the dev server held in total.
+        "**/.samples/**",
         "**/packages/ide/dist/**",
         "**/packages/ide/packages/**",
         "**/packages/ide/resources/**",
