@@ -12,6 +12,13 @@ import UiButton from "../../common/ui/UiButton.vue";
 import { commandArgs, useCommandScope } from "../../common/utilities/commands.ts";
 import { useTabReadout, type TabReadout } from "../../common/utilities/tab-readout.ts";
 import type { SettingsReadoutState, SettingsSection } from "./sections.ts";
+import {
+  filterSettingsSections,
+  listSettingsSections,
+  settingsPageItems,
+  settingsPageOf,
+} from "./query.ts";
+import SettingsPagesIndex from "./SettingsPagesIndex.vue";
 
 const props = withDefaults(
   defineProps<{
@@ -38,14 +45,7 @@ const menu = useIslandMenu({
 });
 const content = ref<HTMLElement>();
 const visited = ref(new Set<string>());
-const filtered = computed(() => {
-  const terms = query.value.toLocaleLowerCase().trim().split(/\s+/).filter(Boolean);
-  return props.sections.filter((section) => {
-    const text =
-      `${section.title} ${section.group} ${section.description} ${section.keywords}`.toLocaleLowerCase();
-    return terms.every((term) => text.includes(term));
-  });
-});
+const filtered = computed(() => filterSettingsSections(props.sections, query.value));
 const groups = computed(() => [...new Set(filtered.value.map((section) => section.group))]);
 /** The section that owns the selected page, or the first one when nothing matches. */
 const active = computed(
@@ -55,19 +55,30 @@ const active = computed(
         section.id === props.selected || section.items?.some((item) => item.id === props.selected),
     ) ?? filtered.value[0],
 );
+const page = computed(() => settingsPageOf(active.value, props.selected));
+const heading = computed(() => {
+  const section = active.value;
+  const item = page.value?.item;
+  if (!section) return;
+  return {
+    title: item?.title ?? section.title,
+    description: item?.description ?? section.description,
+  };
+});
 // Владелец вкладки решает, что попадёт в снапшот; сам workbench отдаёт текущий раздел и поиск.
 useTabReadout(() =>
   props.read?.({
-    section: active.value?.id ?? "",
-    sectionTitle: active.value?.title ?? "",
+    section: page.value?.item?.id ?? active.value?.id ?? "",
+    sectionTitle: heading.value?.title ?? "",
     query: query.value,
     visible: filtered.value.length,
   }),
 );
 watch(
-  active,
-  (section) => {
-    if (section) visited.value.add(section.id);
+  [active, page],
+  ([section, current]) => {
+    if (current?.item) visited.value.add(current.item.id);
+    else if (section?.component) visited.value.add(section.id);
     void nextTick(() => {
       content.value?.scrollTo({ top: 0 });
       const button = sidebar.value?.querySelector<HTMLElement>('[aria-current="page"]');
@@ -141,22 +152,16 @@ function itemKey(event: KeyboardEvent, section: SettingsSection, index: number) 
 
 const commands = useCommandScope(props.scope, () => ({
   surface: "settings",
-  section: active.value?.id ?? "",
+  section: props.selected || active.value?.id || "",
   query: query.value,
 }));
 commands.scope.registerCommand({
   id: "ide.settings.sections.list",
   palette: false,
   title: "Список разделов настроек",
-  description: "Возвращает id, название, группу, описание и ключевые слова всех разделов настроек.",
-  run: () =>
-    props.sections.map(({ id, title, group, description, keywords }) => ({
-      id,
-      title,
-      group,
-      description,
-      keywords,
-    })),
+  description:
+    "Возвращает id, название, группу, описание и ключевые слова разделов и вложенных страниц с собственной формой.",
+  run: () => listSettingsSections(props.sections),
 });
 commands.scope.registerCommand({
   id: "ide.settings.section.open",
@@ -242,7 +247,7 @@ function filter(event: Event) {
       >
         <span
           ><small>Раздел настроек</small
-          ><strong>{{ active?.title ?? "Выбрать раздел" }}</strong></span
+          ><strong>{{ heading?.title ?? "Выбрать раздел" }}</strong></span
         >
         <ProjectorIcon name="chevron-down" aria-hidden="true" />
       </button>
@@ -333,20 +338,36 @@ function filter(event: Event) {
         <p v-if="!filtered.length" class="no-results" role="status">Нет подходящих разделов</p>
       </nav>
       <div ref="content" class="content">
-        <header v-if="active" class="section-heading">
-          <h2>{{ active.title }}</h2>
-          <p>{{ active.description }}</p>
+        <header v-if="heading" class="section-heading">
+          <h2>{{ heading.title }}</h2>
+          <p>{{ heading.description }}</p>
         </header>
         <template v-for="section in sections" :key="section.id">
           <UiControlScope
+            v-if="section.component && visited.has(section.id)"
+            v-show="page?.key === section.id"
             density="compact"
-            v-if="visited.has(section.id)"
-            v-show="section.id === active?.id"
             class="section-body"
           >
             <component :is="section.component" v-bind="section.props" />
           </UiControlScope>
+          <template v-for="item in settingsPageItems(section)" :key="item.id">
+            <UiControlScope
+              v-if="visited.has(item.id)"
+              v-show="page?.key === item.id"
+              density="compact"
+              class="section-body"
+            >
+              <component :is="item.component" v-bind="item.props" />
+            </UiControlScope>
+          </template>
         </template>
+        <SettingsPagesIndex
+          v-if="active && page && !page.item && !active.component"
+          class="section-body"
+          :pages="settingsPageItems(active)"
+          @open="commands.run('ide.settings.section.open', { id: $event })"
+        />
         <div v-if="$slots.footer && active" class="footer"><slot name="footer" /></div>
         <div v-if="!active" class="empty">
           <ProjectorIcon name="search" aria-hidden="true" />

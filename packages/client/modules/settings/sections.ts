@@ -7,7 +7,8 @@ export interface SettingsSection {
   group: string;
   description: string;
   keywords: string;
-  component: Component;
+  /** Own page of the section. Omit when the section is only a group of nested pages. */
+  component?: Component;
   props?: Record<string, unknown>;
   /** Pages of the section listed under it in the navigation, e.g. one per run scenario. */
   items?: SettingsItem[];
@@ -19,10 +20,15 @@ export interface SettingsSection {
 export interface SettingsItem {
   id: string;
   title: string;
+  description?: string;
+  keywords?: string;
   /** A short note next to the title, e.g. "основной". */
   hint?: string;
   /** Marks the page as needing attention. */
   problem?: boolean;
+  /** Own form; without it the parent component reads the selected item id. */
+  component?: Component;
+  props?: Record<string, unknown>;
 }
 
 /** Что общая рабочая область настроек отдаёт владельцу вкладки для снапшота агента. */

@@ -319,7 +319,7 @@ The optional `ide` feature gives Claude Code and ACP agents three tools (`list_c
 
 `ide.workbench.project.settings.open` (**Открыть настройки проекта**) открывает вкладку проекта; кнопка стоит внизу полосы разделов слева. Команда есть только у проекта с записываемыми файлами — у GitHub/GitLab-снимков её нет.
 
-Внутри вкладки scope `settings` предоставляет `ide.settings.sections.list`, `ide.settings.section.open` (`{ id }`) и `ide.settings.search` (`{ query? }`). Эти команды доступны встроенному агенту; формы используют прежние серверные API хранения настроек.
+Внутри вкладки scope `settings` предоставляет `ide.settings.sections.list`, `ide.settings.section.open` (`{ id }`) и `ide.settings.search` (`{ query? }`). `list` включает вложенные страницы с собственной формой (`pwa`, `editor`, `github`, `agent-mcp` и другие); `open` принимает и id родителя, и id страницы. Эти команды доступны встроенному агенту; формы используют прежние серверные API хранения настроек.
 
 `ide.workbench.analytics.open` (**Открыть аналитику расхода**) открывает вкладку `analytics:usage`; её кнопка стоит в правом верхнем блоке шапки рядом с настройками. Внутри вкладки scope `analytics-settings` предоставляет `ide.analytics.refresh` (запросить лимиты и перечитать расход), `ide.analytics.range.set` (`{ days: 7 | 30 | 90 }`), `ide.analytics.tasks.mode.set` (`{ mode: "tokens" | "cost" }`) для карточки «Куда ушли деньги», а также `ide.analytics.day.set` (`{ day: "YYYY-MM-DD" }`), `ide.analytics.day.shift` (`{ offset: -1 | 1 }`) и `ide.analytics.day.today` для карточки дня и календаря активности; команды действуют, пока вкладка открыта.
 
