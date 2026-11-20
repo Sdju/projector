@@ -1,5 +1,6 @@
 import { expect, test } from "vite-plus/test";
 import {
+  frostedSeedHex,
   frozenGlass,
   frozenGlassPalette,
   frozenGlassSeeds,
@@ -65,6 +66,36 @@ test("Frozen Glass rebuilds CSS tokens from a cool HCT seed", () => {
   );
   expect(mergeThemeValues(frozenGlass.settings, undefined, { seed: "lagoon" }).seed).toBe("lagoon");
   expect(() => mergeThemeValues(frozenGlass.settings, undefined, { seed: "sunset" })).toThrow(
+    /опорный цвет/i,
+  );
+});
+
+test("a custom Frozen Glass colour keeps hue and frosts chroma and tone", () => {
+  const ice = frozenGlassPalette("ice");
+  const iceAccent = hctFromHex(ice["--accent"]);
+  for (const hex of ["#ff0000", "#ff6600", "#1f8a4c"]) {
+    const source = hctFromHex(hex);
+    const frosted = hctFromHex(frostedSeedHex(hex));
+    const palette = frozenGlassPalette(hex);
+    const accent = hctFromHex(palette["--accent"]);
+    expect(hueDistance(frosted.h, source.h)).toBeLessThan(4);
+    expect(frosted.c).toBeLessThan(source.c);
+    expect(Math.abs(frosted.t - iceAccent.t)).toBeLessThan(2);
+    expect(palette["--accent"]).not.toBe(ice["--accent"]);
+    expect(palette["--err"]).toBe(ice["--err"]);
+    expect(hueDistance(accent.h, source.h)).toBeLessThan(4);
+    expect(Math.abs(accent.t - iceAccent.t)).toBeLessThan(2);
+    for (const surface of ["--bg", "--bg-2", "--bg-3", "--bg-4"])
+      expect(contrastRatio(palette["--text"], palette[surface])).toBeGreaterThanOrEqual(4.5);
+  }
+  expect(hueDistance(hctFromHex(frozenGlassPalette("#ff0000")["--accent"]).h, 27)).toBeLessThan(8);
+  expect(hueDistance(hctFromHex(frozenGlassPalette("#1f8a4c")["--accent"]).h, 150)).toBeLessThan(
+    20,
+  );
+  expect(mergeThemeValues(frozenGlass.settings, undefined, { seed: "#FF6600" }).seed).toBe(
+    "#ff6600",
+  );
+  expect(() => mergeThemeValues(frozenGlass.settings, undefined, { seed: "#fff" })).toThrow(
     /опорный цвет/i,
   );
 });

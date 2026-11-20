@@ -7,12 +7,12 @@ import UiButton from "../../../common/ui/UiButton.vue";
 import UiControl from "../../../common/ui/UiControl.vue";
 import UiHint from "../../../common/ui/UiHint.vue";
 import UiLabel from "../../../common/ui/UiLabel.vue";
+import FrozenGlassSeedField from "./FrozenGlassSeedField.vue";
 
 const props = defineProps<{ disabled: boolean }>();
 const values = defineModel<ThemeValues>({ required: true });
 const emit = defineEmits<{ submit: [] }>();
 const wallpaperId = useId();
-const seedId = useId();
 const blurId = useId();
 const [seed, wallpaper, blur] = frozenGlass.settings;
 const fileInput = ref<HTMLInputElement>();
@@ -139,24 +139,12 @@ function dropFile(event: DragEvent) {
     </div>
 
     <div class="wallpaper-fields">
-      <div class="seed-setting">
-        <UiLabel :id="seedId" as="span">{{ seed.title }}</UiLabel>
-        <div class="seed-options" role="radiogroup" :aria-labelledby="seedId">
-          <label v-for="option in seed.options" :key="option.id" class="seed-option">
-            <UiControl
-              type="radio"
-              :name="seedId"
-              :value="option.id"
-              :disabled="busy"
-              :model-value="seedValue"
-              @update:model-value="values = { ...values, [seed.id]: String($event) }"
-            />
-            <span class="seed-swatch" :style="{ background: option.color }" />
-            {{ option.title }}
-          </label>
-        </div>
-        <UiHint v-if="seed.hint">{{ seed.hint }}</UiHint>
-      </div>
+      <FrozenGlassSeedField
+        :field="seed"
+        :disabled="busy"
+        :model-value="seedValue"
+        @update:model-value="values = { ...values, [seed.id]: $event }"
+      />
       <UiLabel :for="wallpaperId">{{ wallpaper.title }}</UiLabel>
       <div class="url-control">
         <UiControl
@@ -327,33 +315,6 @@ function dropFile(event: DragEvent) {
   align-content: start;
   gap: var(--sp-2);
   min-width: 0;
-}
-.seed-options {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--sp-2);
-}
-.seed-option {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 4px 8px 4px 4px;
-  border: 1px solid var(--line);
-  border-radius: var(--r-sm);
-  cursor: pointer;
-  font-size: var(--fs-xs);
-}
-.seed-option:has(:checked) {
-  border-color: var(--focus);
-}
-.seed-option:has(:disabled) {
-  cursor: not-allowed;
-}
-.seed-swatch {
-  width: 16px;
-  height: 16px;
-  border-radius: var(--r-full);
-  box-shadow: inset 0 0 0 1px #0003;
 }
 .url-control {
   display: flex;

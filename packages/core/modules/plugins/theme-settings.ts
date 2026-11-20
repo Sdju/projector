@@ -5,7 +5,12 @@ export type ThemeSeedOption = { id: string; title: string; color: string };
 export type ThemeSetting =
   | (Field & { kind: "wallpaper"; default: string })
   | (Field & { kind: "blur"; default: number; min: number; max: number })
-  | (Field & { kind: "seed"; default: string; options: readonly ThemeSeedOption[] });
+  | (Field & {
+      kind: "seed";
+      default: string;
+      options: readonly ThemeSeedOption[];
+      custom?: boolean;
+    });
 export type ThemeValues = Record<string, string | number>;
 export type SavedThemeValues = Record<string, ThemeValues>;
 
@@ -35,7 +40,11 @@ export function validateThemeSettings(value: unknown): ThemeSetting[] | undefine
         "hint",
         "kind",
         "default",
-        ...(field.kind === "blur" ? ["min", "max"] : field.kind === "seed" ? ["options"] : []),
+        ...(field.kind === "blur"
+          ? ["min", "max"]
+          : field.kind === "seed"
+            ? ["options", "custom"]
+            : []),
       ],
       "Настройка темы",
     );
@@ -79,6 +88,8 @@ export function validateThemeSettings(value: unknown): ThemeSetting[] | undefine
           throw new Error("Некорректный опорный цвет");
         optionIds.add(option.id);
       }
+      if (field.custom !== undefined && typeof field.custom !== "boolean")
+        throw new Error("Некорректный признак своего цвета");
     }
     const schema = field as ThemeSetting;
     const initial = normalizeValue(schema, field.default);
@@ -101,9 +112,11 @@ function normalizeValue(field: ThemeSetting, value: unknown): string | number {
     return Math.min(field.max, Math.max(field.min, Math.round(value)));
   }
   if (field.kind === "seed") {
-    if (typeof value !== "string" || !field.options.some((option) => option.id === value))
-      throw new Error("Выберите опорный цвет");
-    return value;
+    if (typeof value === "string" && field.options.some((option) => option.id === value))
+      return value;
+    if (field.custom && typeof value === "string" && hexColor.test(value))
+      return value.toLowerCase();
+    throw new Error("Выберите опорный цвет");
   }
   if (typeof value !== "string" || value.length > 4096)
     throw new Error("Укажите ссылку на изображение длиной до 4096 символов");

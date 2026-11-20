@@ -176,6 +176,13 @@ test("appearance API reads and writes the saved choice", async () => {
   const tinted = await (await fetch(`${base}/api/appearance/bootstrap.js`)).text();
   expect(tinted).toContain('"--accent":"#ccd8fa"');
   expect(tinted).not.toContain('"--accent":"#a4e1ff"');
+  expect((await save(frozenGlass({ seed: "#FF6600" }))).status).toBe(200);
+  const custom = await (await fetch(`${base}/api/appearance`)).json();
+  expect(custom.themeSettings["frozen-glass"].seed).toBe("#ff6600");
+  const cooled = await (await fetch(`${base}/api/appearance/bootstrap.js`)).text();
+  expect(cooled).not.toContain('"--accent":"#a4e1ff"');
+  expect(cooled).not.toContain('"--accent":"#ccd8fa"');
+  expect(cooled).toMatch(/"--accent":"#[0-9a-f]{6}"/);
   expect((await save({ choice: "light" })).status).toBe(200);
 });
 

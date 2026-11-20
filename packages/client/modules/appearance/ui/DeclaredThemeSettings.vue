@@ -5,6 +5,8 @@ import UiControl from "../../../common/ui/UiControl.vue";
 import UiHint from "../../../common/ui/UiHint.vue";
 import UiLabel from "../../../common/ui/UiLabel.vue";
 
+const hexColor = /^#[0-9a-f]{6}$/i;
+
 defineProps<{ fields: readonly ThemeSetting[]; disabled: boolean }>();
 const values = defineModel<ThemeValues>({ required: true });
 const emit = defineEmits<{ submit: [] }>();
@@ -29,6 +31,20 @@ const prefix = useId();
         />
         <span class="seed-swatch" :style="{ background: option.color }" />
         {{ option.title }}
+      </label>
+      <label v-if="field.custom" class="seed-option">
+        <UiControl
+          type="color"
+          appearance="swatch"
+          swatch-size="sm"
+          aria-label="Свой опорный цвет"
+          :disabled="disabled"
+          :model-value="
+            hexColor.test(String(values[field.id] ?? '')) ? values[field.id] : '#e07a5f'
+          "
+          @update:model-value="values = { ...values, [field.id]: String($event).toLowerCase() }"
+        />
+        Свой
       </label>
     </div>
     <UiControl

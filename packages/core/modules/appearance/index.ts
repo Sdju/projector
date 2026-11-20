@@ -6,9 +6,11 @@ import {
 } from "../plugins/index.ts";
 import { frozenGlass, frozenGlassStyle } from "./frozen-glass.ts";
 export {
+  frostedSeedHex,
   frozenGlass,
   frozenGlassOverlayProperties,
   frozenGlassPalette,
+  frozenGlassSeedHue,
   frozenGlassSeeds,
   frozenGlassStyle,
 } from "./frozen-glass.ts";

@@ -798,6 +798,21 @@ test(
         .poll(() => browser.evaluate("document.documentElement.style.getPropertyValue('--accent')"))
         .toBe("#ccd8fa");
       expect(iceAccent).toBe("#a4e1ff");
+      await browser.evaluate(`(() => {
+        const input = document.querySelector('.frozen-settings input[type="color"]');
+        input.value = '#ff6600';
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+        input.dispatchEvent(new Event('change', { bubbles: true }));
+      })()`);
+      await browser.click(button);
+      await expect
+        .poll(() => browser.evaluate("window.fixture.saved()"))
+        .toMatchObject({ seed: "#ff6600" });
+      const customAccent = await browser.evaluate(
+        "document.documentElement.style.getPropertyValue('--accent')",
+      );
+      expect(customAccent).not.toBe("#a4e1ff");
+      expect(customAccent).not.toBe("#ccd8fa");
       await expect
         .poll(() => browser.evaluate(`document.querySelector(${JSON.stringify(range)}).disabled`))
         .toBe(false);

@@ -1,5 +1,5 @@
 import { resolveThemeValues, type ThemeSetting, type ThemeValues } from "../plugins/index.ts";
-import { hctFromHex, shiftHexHue } from "./hct.ts";
+import { hctFromHex, hexFromHct, shiftHexHue } from "./hct.ts";
 
 export const frozenGlassOverlayProperties = [
   "--theme-surface",
@@ -10,6 +10,13 @@ export const frozenGlassOverlayProperties = [
 
 const iceAccent = "#a4e1ff";
 const iceHue = hctFromHex(iceAccent).h;
+const seedHex = /^#[0-9a-f]{6}$/i;
+
+/** Ice-accent chroma/tone at the source hue — a frosted variation of any colour. */
+export function frostedSeedHex(hex: string): string {
+  const ice = hctFromHex(iceAccent);
+  return hexFromHct(hctFromHex(hex).h, ice.c, ice.t);
+}
 
 export const frozenGlassSeeds = [
   { id: "ice", title: "Лёд", color: iceAccent },
@@ -17,6 +24,13 @@ export const frozenGlassSeeds = [
   { id: "lagoon", title: "Лагуна", color: "#9fe7cf" },
   { id: "indigo", title: "Индиго", color: "#cbd8fa" },
 ] as const;
+
+export function frozenGlassSeedHue(seed: string): number {
+  const preset = frozenGlassSeeds.find((option) => option.id === seed);
+  if (preset) return hctFromHex(preset.color).h;
+  if (seedHex.test(seed)) return hctFromHex(seed).h;
+  return iceHue;
+}
 
 const template = {
   "--bg": "#101e2f",
@@ -58,9 +72,8 @@ function remapCss(value: string, deltaHue: number) {
 export function frozenGlassPalette(
   seedId: string = frozenGlassSeeds[0].id,
 ): Record<string, string> {
-  const seed = frozenGlassSeeds.find((option) => option.id === seedId) ?? frozenGlassSeeds[0];
-  if (seed.id === frozenGlassSeeds[0].id) return { ...template };
-  const deltaHue = hctFromHex(seed.color).h - iceHue;
+  const deltaHue = frozenGlassSeedHue(seedId) - iceHue;
+  if (Math.abs(deltaHue) < 0.35) return { ...template };
   return Object.fromEntries(
     Object.entries(template).map(([name, value]) => [
       name,
@@ -85,8 +98,9 @@ export const frozenGlass = {
       id: "seed",
       kind: "seed",
       title: "Опорный цвет",
-      hint: "Палитра строится от выбранного холодного тона в модели HCT.",
+      hint: "Hue своего цвета сохраняется, насыщенность и светлота — как у Frozen Glass: холодные красный, зелёный и остальные.",
       default: frozenGlassSeeds[0].id,
+      custom: true,
       options: frozenGlassSeeds,
     },
     {
