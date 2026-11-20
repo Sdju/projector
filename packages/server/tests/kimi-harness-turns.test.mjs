@@ -122,6 +122,38 @@ test("hydrateKimiHistoryTasks rebuilds Agent receipts into tasks", () => {
   expect(hydrateKimiHistoryTasks(turns)).toBe(false);
 });
 
+test("hydrateKimiHistoryTasks rebuilds detached Bash receipts into shell tasks", () => {
+  const turns = [
+    {
+      role: "assistant",
+      text: "run",
+      tools: [
+        {
+          id: "tool_bash",
+          name: "Bash",
+          status: "done",
+          detail:
+            "task_id: bash-x\npid: 123\ndescription: Bash: vp run check\nstatus: running\nautomatic_notification: true\n",
+        },
+      ],
+      tasks: [],
+    },
+  ];
+  expect(hydrateKimiHistoryTasks(turns)).toBe(true);
+  expect(turns[0].tasks).toEqual([
+    {
+      id: "tool_bash",
+      kind: "shell",
+      title: "vp run check",
+      status: "running",
+      background: true,
+      hold: false,
+      tool: "tool_bash",
+    },
+  ]);
+  expect(hydrateKimiHistoryTasks(turns)).toBe(false);
+});
+
 test("kimi replay builds tasks and hides lost-contact harness turns", () => {
   const collector = createAcpReplayCollector("kimi", "s", createKimiDialect());
   collector.handleUpdate({

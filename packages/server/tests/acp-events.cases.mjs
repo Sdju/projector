@@ -389,6 +389,137 @@ test("kimi background Agent terminal receipt releases the connection hold", () =
   });
 });
 
+test("kimi detached Bash holds ACP until the native process record is completed", async () => {
+  const home = await mkdtemp(join(tmpdir(), "projector-kimi-bash-"));
+  try {
+    const taskDirectory = join(home, ".kimi-code/sessions/wd_test/session_s/agents/main/tasks");
+    await mkdir(taskDirectory, { recursive: true });
+    const manifest = join(taskDirectory, "bash-x.json");
+    const events = [];
+    const mapper = createAcpEventMapper(
+      (type, data) => events.push([type, data]),
+      "Kimi",
+      createKimiDialect(kimiBackgroundState(home)),
+      { sessionId: () => "session_s" },
+    );
+    mapper.handleUpdate("s", {
+      sessionUpdate: "tool_call",
+      toolCallId: "b1",
+      title: "Bash",
+      kind: "execute",
+      status: "in_progress",
+      rawInput: { command: "vp run check", timeout: 300 },
+    });
+    mapper.handleUpdate(
+      "s",
+      readResult(
+        "b1",
+        [
+          "task_id: bash-x",
+          "pid: 123",
+          "description: Bash: vp run check",
+          "status: running",
+          "automatic_notification: true",
+          "next_step: The completion arrives automatically in a later turn.",
+          "human_shell_hint: The task is visible in the background-task panel.",
+        ].join("\n"),
+      ),
+    );
+    expect(mapper.pendingBackground).toBe(1);
+    expect(mapper.keepsProcess).toBe(true);
+    const tasks = events.filter(([type]) => type === "task").map(([, data]) => data);
+    expect(tasks.at(-1)).toMatchObject({
+      id: "b1",
+      kind: "shell",
+      title: "vp run check",
+      status: "running",
+      background: true,
+      tool: "b1",
+    });
+    await writeFile(manifest, "{");
+    expect(mapper.pollBackground()).toBe(1);
+    await writeFile(
+      manifest,
+      JSON.stringify({
+        kind: "process",
+        taskId: "bash-x",
+        status: "completed",
+        endedAt: 123,
+      }),
+    );
+    expect(mapper.pollBackground()).toBe(0);
+    expect(events.at(-1)).toEqual(["task", { id: "b1", status: "done", endedAt: 123 }]);
+    expect(mapper.keepsProcess).toBe(false);
+  } finally {
+    await rm(home, { recursive: true, force: true });
+  }
+});
+
+test("kimi explicit background Bash is a soft hold", () => {
+  const events = [];
+  const mapper = createAcpEventMapper(
+    (type, data) => events.push([type, data]),
+    "Kimi",
+    createKimiDialect(),
+  );
+  mapper.handleUpdate("s", {
+    sessionUpdate: "tool_call",
+    toolCallId: "b2",
+    title: "Bash",
+    kind: "execute",
+    status: "in_progress",
+    rawInput: { command: "dev server", run_in_background: true },
+  });
+  mapper.handleUpdate(
+    "s",
+    readResult(
+      "b2",
+      [
+        "task_id: bash-y",
+        "pid: 456",
+        "description: Dev server",
+        "status: running",
+        "automatic_notification: true",
+      ].join("\n"),
+    ),
+  );
+  expect(mapper.pendingBackground).toBe(0);
+  expect(mapper.keepsProcess).toBe(true);
+  const tasks = events.filter(([type]) => type === "task").map(([, data]) => data);
+  expect(tasks.at(-1)).toMatchObject({
+    id: "b2",
+    kind: "shell",
+    title: "Dev server",
+    status: "running",
+    background: true,
+    hold: false,
+    tool: "b2",
+  });
+});
+
+test("kimi task output receipt does not start another shell task", () => {
+  const events = [];
+  const mapper = createAcpEventMapper(
+    (type, data) => events.push([type, data]),
+    "Kimi",
+    createKimiDialect(),
+  );
+  mapper.handleUpdate("s", {
+    sessionUpdate: "tool_call",
+    toolCallId: "t1",
+    title: "TaskOutput",
+    kind: "other",
+    status: "in_progress",
+    rawInput: { task_id: "bash-x" },
+  });
+  mapper.handleUpdate(
+    "s",
+    readResult("t1", "task_id: bash-x\nstatus: running\nkind: process\ncommand: vp run check\n"),
+  );
+  expect(mapper.pendingBackground).toBe(0);
+  expect(events.some(([type]) => type === "task")).toBe(false);
+});
+
 test("opencode read result loses its frame and line numbers", () => {
   const events = [];
   const mapper = createAcpEventMapper(

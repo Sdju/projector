@@ -29,7 +29,12 @@ export function kimiBackgroundState(home = os.homeDirectory()) {
     if (found?.session !== session) return;
     try {
       const record = JSON.parse(readFileSync(join(found.directory, `${task}.json`), "utf8"));
-      if (record?.kind !== "agent" || record.taskId !== task || typeof record.status !== "string")
+      // `agent` is a subagent; `process` is a Bash command detached by Kimi's tool timeout.
+      if (
+        (record?.kind !== "agent" && record?.kind !== "process") ||
+        record.taskId !== task ||
+        typeof record.status !== "string"
+      )
         return;
       return {
         status: record.status,

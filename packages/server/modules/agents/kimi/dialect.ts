@@ -56,6 +56,25 @@ function agentReceipt(output: string) {
   };
 }
 
+/** A Bash receipt for a command detached from the foreground by Kimi's tool timeout. */
+function bashReceipt(output: string) {
+  const taskId = /(?:^|\n)task_id:\s*(bash-[\w-]+)/i.exec(output)?.[1];
+  const status = /(?:^|\n)status:\s*(\S+)/i.exec(output)?.[1]?.toLowerCase();
+  if (!taskId || status !== "running") return undefined;
+  // `WaitFor` and `TaskOutput` also print `task_id` and `status: running`; only the
+  // initial receipt names the pid and promises an automatic notification.
+  if (!/(?:^|\n)pid:\s*\d+/i.test(output)) return undefined;
+  if (!/(?:^|\n)automatic_notification:\s*true/i.test(output)) return undefined;
+  const description = /(?:^|\n)description:\s*(.+)/i.exec(output)?.[1]?.trim();
+  return { taskId, ...(description ? { description } : {}) };
+}
+
+/** A task row title for a shell: Kimi prefixes detached command descriptions with `Bash: `. */
+function shellTitle(description: string | undefined, command: string | undefined) {
+  const title = description?.replace(/^Bash:\s*/i, "").trim() || command?.trim() || "Bash";
+  return title.length > 200 ? `${title.slice(0, 200)}…` : title;
+}
+
 /** Map Kimi Agent receipt status onto a chat task status. */
 function taskStatusOf(status: string): "running" | "done" | "error" | "stopped" | undefined {
   if (status === "running") return "running";
@@ -77,10 +96,20 @@ export function createKimiDialect(readTask = kimiBackgroundState()): AcpDialect 
   const reads = new Set<string>();
   const open = new Map<string, { background: boolean; description: string }>();
   const background = new Map<string, { taskId: string; deadline: number }>();
+  /** Bash calls by tool id: whether the model asked for a background process, and its command. */
+  const bash = new Map<string, { background: boolean; command?: string }>();
 
   return extendPlainDialect({
     call(update, id) {
       if (readsFile(update)) reads.add(id);
+      if (!bash.has(id)) {
+        const input = inputOf(update);
+        if (typeof input.command === "string" || update.kind === "execute")
+          bash.set(id, {
+            background: input.run_in_background === true,
+            ...(typeof input.command === "string" ? { command: input.command } : {}),
+          });
+      }
       const agent = agentInput(update);
       if (!agent || open.has(id)) return [];
       open.set(id, { background: agent.background, description: agent.description });
@@ -101,6 +130,26 @@ export function createKimiDialect(readTask = kimiBackgroundState()): AcpDialect 
       return reads.has(id) ? stripReadLineNumbers(output) : output;
     },
     end(update, id, output) {
+      const shell = bash.get(id);
+      const shellReceipt = bashReceipt(output);
+      bash.delete(id);
+      if (shellReceipt) {
+        // A timeout-detached command must keep the ACP process alive until its native
+        // record is terminal; an explicit `run_in_background` process may outlive the turn.
+        background.set(id, { taskId: shellReceipt.taskId, deadline: Date.now() + 121 * 60_000 });
+        return [
+          {
+            id,
+            kind: "shell",
+            title: shellTitle(shellReceipt.description, shell?.command),
+            status: "running",
+            background: true,
+            ...(shell?.background ? { hold: false } : {}),
+            tool: id,
+          },
+        ];
+      }
+
       const known = open.get(id);
       if (!known) return [];
       const receipt = agentReceipt(output);

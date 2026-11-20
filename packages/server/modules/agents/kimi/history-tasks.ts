@@ -25,6 +25,22 @@ function agentReceipt(output: string) {
   };
 }
 
+/** A Bash receipt for a command detached by Kimi's tool timeout. */
+function bashReceipt(output: string) {
+  const taskId = /(?:^|\n)task_id:\s*(bash-[\w-]+)/i.exec(output)?.[1];
+  const status = /(?:^|\n)status:\s*(\S+)/i.exec(output)?.[1]?.toLowerCase();
+  if (!taskId || status !== "running") return undefined;
+  if (!/(?:^|\n)pid:\s*\d+/i.test(output)) return undefined;
+  if (!/(?:^|\n)automatic_notification:\s*true/i.test(output)) return undefined;
+  const description = /(?:^|\n)description:\s*(.+)/i.exec(output)?.[1]?.trim();
+  return { taskId, ...(description ? { description } : {}) };
+}
+
+function shellTitle(description: string | undefined): string {
+  const title = description?.replace(/^Bash:\s*/i, "").trim() || "Bash";
+  return title.length > 200 ? `${title.slice(0, 200)}…` : title;
+}
+
 function taskStatusOf(status: string): AgentTask["status"] | undefined {
   if (status === "running") return "running";
   if (status === "completed" || status === "done") return "done";
@@ -51,8 +67,8 @@ function titleFromDetail(detail: string): string | undefined {
 }
 
 /**
- * Older Kimi replays stored Agent tool chips without `tasks[]`. Rebuild background agent rows
- * from receipts so the chat island and lost-contact sanitize have something to update.
+ * Older Kimi replays stored tool chips without `tasks[]`. Rebuild background Agent and detached
+ * Bash rows from receipts so the chat island and lost-contact sanitize have something to update.
  */
 export function hydrateKimiHistoryTasks(turns: KimiHistoryTurn[]): boolean {
   let changed = false;
@@ -62,9 +78,23 @@ export function hydrateKimiHistoryTasks(turns: KimiHistoryTurn[]): boolean {
         const tools = turn.tools ?? [];
         const tasks = (turn.tasks ??= []);
         for (const tool of tools) {
-          if (tool.name !== "Agent") continue;
           if (tasks.some((item) => item.id === tool.id || item.tool === tool.id)) continue;
           const detail = tool.detail ?? "";
+          if (tool.name !== "Agent") {
+            const shell = bashReceipt(detail);
+            if (!shell) continue;
+            tasks.push({
+              id: tool.id,
+              kind: "shell",
+              title: shellTitle(shell.description),
+              status: "running",
+              background: true,
+              hold: false,
+              tool: tool.id,
+            });
+            changed = true;
+            continue;
+          }
           const receipt = agentReceipt(detail);
           const fromReceipt = receipt ? taskStatusOf(receipt.status) : undefined;
           const title = receipt?.description ?? titleFromDetail(detail) ?? "Agent";
