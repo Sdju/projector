@@ -40,6 +40,14 @@ export function pluginAssetPath(packageName: string, hash: string, relative: str
   return `/api/plugins/assets/${pluginPackageKey(packageName)}/${hash}/${path}`;
 }
 
+/** `/api/plugins/<key>/readme` or a package-relative image next to the README. */
+export function pluginReadmePath(packageName: string, relative?: string): string {
+  const base = `/api/plugins/${pluginPackageKey(packageName)}/readme`;
+  if (!relative) return base;
+  if (!isSafePluginPath(relative)) throw new Error("Небезопасный путь к файлу README плагина");
+  return `${base}/${relative.split("/").map(encodeURIComponent).join("/")}`;
+}
+
 /** Reserved namespace for a package's own IDE commands; it cannot shadow host commands. */
 export function pluginCommandPrefix(packageName: string): string {
   return `ide.plugin.command.${pluginPackageKey(packageName)}.`;

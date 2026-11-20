@@ -33,6 +33,8 @@ export interface PluginInfo {
   browser?: PluginBrowserEntry & { hash: string };
   /** The package runs code in the server or the page; it is not a declarative-only plugin. */
   code: boolean;
+  /** The package root has a README the settings page can render. */
+  readme?: boolean;
   path?: string;
   dependencies?: Record<string, string>;
   diagnostics: PluginDiagnostic[];

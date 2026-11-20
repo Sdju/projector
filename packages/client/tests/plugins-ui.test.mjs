@@ -15,11 +15,16 @@ const check=(value,label)=>{if(!value)throw new Error(label);};
 const originalFetch=window.fetch;
 const wait=async(condition,label)=>{const until=Date.now()+8000;while(!condition()){if(Date.now()>until)throw new Error(label);await originalFetch('/__tick');}};
 const theme={id:'example/ocean',packageName:'example',title:'Ocean',mode:'dark',tokens:{bg:'#010203','bg-2':'#040506',text:'#fafafa',accent:'#ff0000'}};
-const plugin={id:'example',version:'1.0.0',description:'Local test theme',status:'disabled',enabled:false,path:'/tmp/example',diagnostics:[],themes:[theme]};
+const plugin={id:'example',version:'1.0.0',description:'Local test theme',status:'disabled',enabled:false,path:'/tmp/example',readme:true,diagnostics:[],themes:[theme]};
 let failLoad=true;
 const posts=[];
 const appearancePosts=[];
 window.fetch=async(input,options={})=>{
+ const url=String(input);
+ if(url.includes('/readme')){
+  if(url.includes('/readme/')) return new Response('',{status:404});
+  return new Response('# Hello **world**',{headers:{'Content-Type':'text/markdown; charset=utf-8'}});
+ }
  if(input==='/api/plugins'){
   await originalFetch('/__tick');
   if(options.method==='POST'){
@@ -53,6 +58,11 @@ let app;
  check((await sdk.executeCommand('ide.plugins.list',undefined,{scope:scope()})).length===1,'list command');
  document.querySelector('.plugin-open').click();await nextTick();
  check(document.querySelector('.plugin-details'),'plugin details open');
+ await wait(()=>document.querySelector('.plugin-readme')?.textContent.includes('Hello'),'readme');
+ check(document.querySelector('.plugin-readme strong')?.textContent==='world','readme markdown');
+ await sdk.executeCommand('ide.plugin.page.tab',{tab:'features'},{scope:scope()});
+ await nextTick();
+ check(document.querySelector('.theme-card'),'features tab');
  button('Включить').click();
  await wait(()=>posts.some(item=>item.action==='enable')&&!button('Включить'),'enable');
  await sdk.executeCommand('ide.plugin.theme.apply',{pluginId:'example',themeId:'ocean'},{scope:scope()});
@@ -62,6 +72,10 @@ let app;
  await sdk.executeCommand('ide.plugin.disable',{id:'example'},{scope:scope()});
  check(document.documentElement.dataset.theme==='dark','disabled active theme falls back');
  check(document.documentElement.style.getPropertyValue('--bg')==='','external tokens cleared');
+ await sdk.executeCommand('ide.plugin.close',undefined,{scope:scope()});
+ await nextTick();
+ check(!document.querySelector('.plugin-details'),'back to catalog');
+ check((await sdk.executeCommand('ide.plugins.filter',{kind:'themes'},{scope:scope()})).kind==='themes','kind filter');
  const input=document.querySelector('input[placeholder="/path/to/theme-plugin"]');
  input.value='/tmp/manual-plugin';input.dispatchEvent(new Event('input',{bubbles:true}));await nextTick();
  button('Установить').click();

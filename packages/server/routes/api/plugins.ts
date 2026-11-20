@@ -6,7 +6,9 @@ import {
   discoverPlugins,
   installPlugin,
   openPluginAsset,
+  openPluginReadmeFile,
   pluginPackageExists,
+  readPluginReadme,
   readPluginStorage,
   removePlugin,
   setPluginEnabled,
@@ -23,6 +25,8 @@ import { asString, json, readBody, type RouteDefinition } from "../../modules/tr
 
 const assetPath = "/api/plugins/assets/:key/:hash/**";
 const storagePath = "/api/plugins/:key/storage";
+const readmePath = "/api/plugins/:key/readme";
+const readmeFilePath = "/api/plugins/:key/readme/**";
 /** The envelope around one value is small; the quota itself is checked after serialization. */
 const storageBodyLimit = pluginStorageMaxBytes + 64_000;
 
@@ -33,6 +37,13 @@ async function storagePackage(key: string | undefined): Promise<string> {
   return name;
 }
 
+async function catalogPlugin(key: string | undefined) {
+  const name = pluginPackageName(key ?? "");
+  if (!name) return undefined;
+  const catalog = await discoverPlugins();
+  return catalog.plugins.find((item) => item.id === name);
+}
+
 function storageFailure(error: unknown): never {
   if (error instanceof PluginStorageLimitError) throw new HttpError(413, error.message);
   if (error instanceof PluginStoragePathError) throw new HttpError(409, error.message);
@@ -40,6 +51,79 @@ function storageFailure(error: unknown): never {
 }
 
 export const routes: RouteDefinition[] = [
+  {
+    method: ["GET", "HEAD"],
+    path: readmePath,
+    handler: async ({ req, res, method, params }) => {
+      if (!accessAllowed(req, false))
+        throw new HttpError(403, "Плагины доступны только со страницы Projector");
+      res.setHeader("Cache-Control", "no-store");
+      res.setHeader("X-Content-Type-Options", "nosniff");
+      const markdown = await readPluginReadme(await catalogPlugin(params.key));
+      if (markdown === null) {
+        json(res, 404, { error: "README недоступен" });
+        return;
+      }
+      const body = Buffer.from(markdown, "utf8");
+      res.setHeader("Content-Type", "text/markdown; charset=utf-8");
+      res.setHeader("Content-Length", body.byteLength);
+      if (method === "HEAD") {
+        res.end();
+        return;
+      }
+      res.end(body);
+    },
+  },
+  {
+    method: ["GET", "HEAD"],
+    path: readmeFilePath,
+    handler: async ({ req, res, method, params }) => {
+      if (!accessAllowed(req, false))
+        throw new HttpError(403, "Плагины доступны только со страницы Projector");
+      res.setHeader("Cache-Control", "no-store");
+      res.setHeader("X-Content-Type-Options", "nosniff");
+      let relative: string;
+      try {
+        relative = (params["0"] ?? "").split("/").map(decodeURIComponent).join("/");
+      } catch {
+        throw new HttpError(400, "Некорректный путь README");
+      }
+      const asset = await openPluginReadmeFile(await catalogPlugin(params.key), relative);
+      if (!asset) {
+        json(res, 404, { error: "Файл README недоступен" });
+        return;
+      }
+      res.setHeader("Content-Type", asset.type);
+      res.setHeader("Content-Length", asset.size);
+      res.setHeader("Cross-Origin-Resource-Policy", "same-origin");
+      if (method === "HEAD") {
+        asset.stream.destroy();
+        res.end();
+        return;
+      }
+      await pipeline(asset.stream, res).catch(() => res.destroy());
+    },
+  },
+  {
+    method: "",
+    path: readmePath,
+    handler: ({ req, res }) => {
+      if (!accessAllowed(req, false))
+        throw new HttpError(403, "Плагины доступны только со страницы Projector");
+      res.setHeader("Cache-Control", "no-store");
+      json(res, 405, { error: "Допустим только GET" });
+    },
+  },
+  {
+    method: "",
+    path: readmeFilePath,
+    handler: ({ req, res }) => {
+      if (!accessAllowed(req, false))
+        throw new HttpError(403, "Плагины доступны только со страницы Projector");
+      res.setHeader("Cache-Control", "no-store");
+      json(res, 405, { error: "Допустим только GET" });
+    },
+  },
   {
     method: ["GET", "HEAD"],
     path: assetPath,

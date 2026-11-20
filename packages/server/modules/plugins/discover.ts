@@ -8,6 +8,7 @@ import {
 import { syncPluginTrustNotices, type RevokedPlugin } from "../trust-notices/index.ts";
 import { packagesDirectory, pluginsDirectory } from "./directory.ts";
 import { loadPluginPackage, readJson } from "./load.ts";
+import { pluginHasReadme } from "./readme.ts";
 import { readState } from "./state.ts";
 import { hashPackage, isTrusted } from "./trust.ts";
 import type { PluginApply, PluginCatalog, PluginCodeDiagnostic, PluginInfo } from "./types.ts";
@@ -181,6 +182,7 @@ export async function discoverPlugins(): Promise<PluginCatalog> {
           ? { browser: { ...loaded.browser, hash: currentHash } }
           : {}),
         code: !!loaded.server || !!loaded.browser,
+        ...((await pluginHasReadme(selected[0].candidate.path)) ? { readme: true } : {}),
         diagnostics,
         themes: loaded.themes,
         agents,

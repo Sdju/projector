@@ -164,11 +164,14 @@ const plugin={
   panels:[],
   tabs:[],
   agents:[{id:'remote-bot',title:'Remote Bot',caption:'Cloud agent'}],
+  http:[{id:'status',path:'api/status',methods:['GET']}],
   dependencies:{acp:'^0.5.0','@agent/sdk':'1.2.3'},
 };
 window.fetch=async(input,options={})=>{
-  if(String(input).includes('/api/plugins')) return Response.json({directory:'/tmp/plugins',plugins:[plugin],availableThemes:[]});
-  if(String(input).includes('/api/agent/backends')) return Response.json({backends:[]});
+  const url=String(input);
+  if(/\\/api\\/plugins\\/.+\\/readme/.test(url)) return new Response('',{status:404});
+  if(url.includes('/api/plugins')) return Response.json({directory:'/tmp/plugins',plugins:[plugin],availableThemes:[]});
+  if(url.includes('/api/agent/backends')) return Response.json({backends:[]});
   return originalFetch(input,options);
 };
 const sdk=createCommandService();
@@ -184,6 +187,8 @@ let app;
   check(badges.includes('acp@^0.5.0'),'acp dependency');
   check(badges.includes('@agent/sdk@1.2.3'),'sdk dependency');
   check(document.querySelector('.agent-row strong')?.textContent==='Remote Bot','agent title');
+  check(document.querySelector('.http-row code')?.textContent.includes('api/status'),'http route');
+  check(document.querySelector('.http-row .ui-badge')?.textContent.trim()==='GET','http method');
   app.unmount();app=null;
   document.getElementById('result').textContent='PASS';
 }catch(error){document.getElementById('result').textContent='FAIL: '+error.stack;}

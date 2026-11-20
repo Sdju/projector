@@ -95,11 +95,14 @@ The settings endpoint is `GET /api/ide/keybindings` and same-origin `PUT /api/id
 
 ## Локальные плагины
 
-Раздел **Настройки → Плагины** создаёт scope `plugins:settings:<uid>` с `{ surface: "plugins", view: "settings", plugin, query, mode, ready, busy }`. Команды действуют только пока раздел смонтирован; изменяющие операции недоступны во время другой операции. Формат пакета и HTTP API описаны в [plugins](plugins.md).
+Раздел **Настройки → Плагины** создаёт scope `plugins:settings:<uid>` с `{ surface: "plugins", view: "settings", page, tab, plugin, query, kind, mode, ready, busy }`. `page` — `catalog` или `package`; на странице пакета `tab` — `readme` или `features`. Команды действуют только пока раздел смонтирован; изменяющие операции недоступны во время другой операции. Формат пакета и HTTP API описаны в [plugins](plugins.md).
 
 - `ide.plugins.list` — возвращает элементы текущего каталога со статусами, диагностикой, темами и агентами.
 - `ide.plugins.refresh` — заново читает пакеты и обновляет доступные темы и агентов.
-- `ide.plugin.open` `{ id }` — выбирает пакет и открывает его карточку.
+- `ide.plugins.filter` `{ kind?, mode? }` — отбирает каталог по виду вклада (`all | themes | agents | ui | code | issues`) и режиму темы (`all | dark | light`).
+- `ide.plugin.open` `{ id }` — выбирает пакет и открывает его страницу (README, если файл есть).
+- `ide.plugin.close` — возвращает к каталогу установленных плагинов.
+- `ide.plugin.page.tab` `{ tab }` — переключает просмотр пакета: `readme` или `features`.
 - `ide.plugin.enable` / `ide.plugin.disable` `{ id }` — включает или выключает пакет. После выключения его темы и агент недоступны, активная внешняя тема временно заменяется тёмной.
 - `ide.plugin.trust` `{ id }` — подтверждает доверие к текущему содержимому агентского пакета; без этого агент нельзя включить.
 - `ide.plugin.remove` `{ id }` — удаляет управляемую установку и её состояние.

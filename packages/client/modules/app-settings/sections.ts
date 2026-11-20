@@ -36,7 +36,7 @@ export const settingsSections: SettingsSection[] = [
     id: "plugins",
     title: "Плагины",
     group: "Среда",
-    description: "Локальные пакеты с темами и декларативными ACP-агентами.",
+    description: "Локальные пакеты с темами, агентами, панелями и доверенным кодом.",
     keywords:
       "плагины расширения темы цвета схемы агент ACP доверие локальная папка plugins agents themes",
     component: PluginSettings,

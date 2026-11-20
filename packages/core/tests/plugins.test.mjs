@@ -10,6 +10,7 @@ import {
   pluginHttpPath,
   pluginPackageKey,
   pluginPackageName,
+  pluginReadmePath,
   sanitizePluginIconSvg,
   serializeThemeTokens,
   themeStyleProperties,
@@ -579,6 +580,13 @@ describe("plugin browser contract", () => {
     expect(pluginAssetPath("@acme/fict", "a".repeat(64), "dist/chunk.js")).toBe(
       `/api/plugins/assets/${pluginPackageKey("@acme/fict")}/${"a".repeat(64)}/dist/chunk.js`,
     );
+    expect(pluginReadmePath("@acme/fict")).toBe(
+      `/api/plugins/${pluginPackageKey("@acme/fict")}/readme`,
+    );
+    expect(pluginReadmePath("@acme/fict", "docs/shot.png")).toBe(
+      `/api/plugins/${pluginPackageKey("@acme/fict")}/readme/docs/shot.png`,
+    );
+    expect(() => pluginReadmePath("@acme/fict", "../secret.png")).toThrow(/Небезопасный путь/);
     expect(isSafePluginPath("dist/chunks/a.js")).toBe(true);
     for (const path of ["../a.js", "/a.js", "dist/../../a.js", "dist\\a.js", "dist//a.js", ""])
       expect(isSafePluginPath(path)).toBe(false);
@@ -779,5 +787,14 @@ describe("plugin HTTP routes", () => {
     const badAccess = structuredClone(httpManifest);
     badAccess.projector.contributes.http[0].access = "public";
     expect(() => validatePluginManifest(badAccess)).toThrow(/режим доступа/);
+
+    for (const path of ["storage", "readme", "readme/docs"]) {
+      const reserved = structuredClone(httpManifest);
+      reserved.projector.contributes.http[0].path = path;
+      expect(() => validatePluginManifest(reserved)).toThrow(/зарезервирован/);
+    }
+    const reservedId = structuredClone(httpManifest);
+    reservedId.projector.contributes.http[0] = { id: "readme" };
+    expect(() => validatePluginManifest(reservedId)).toThrow(/зарезервирован/);
   });
 });

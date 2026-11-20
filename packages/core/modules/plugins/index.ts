@@ -71,6 +71,7 @@ export {
   pluginCommandPrefix,
   pluginPackageKey,
   pluginPackageName,
+  pluginReadmePath,
 } from "./asset.ts";
 export {
   parsePluginStorage,

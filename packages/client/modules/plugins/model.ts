@@ -14,12 +14,25 @@ import {
 import { refreshClientAgents } from "../agents-integration/catalog/index.ts";
 import { applyRuntimeCatalog, runtimeIssues } from "../plugin-runtime/index.ts";
 import { fetchPlugins, pluginAction, saveAppearance, type PluginCatalog } from "./client.ts";
+import {
+  defaultPluginPageTab,
+  filterPlugins,
+  isPluginKindFilter,
+  isPluginPageTab,
+  isThemeModeFilter,
+  pluginSummary,
+  type PluginKindFilter,
+  type PluginPageTab,
+  type ThemeModeFilter,
+} from "./kinds.ts";
 
 export function usePluginSettings() {
   const catalog = shallowRef<PluginCatalog>();
   const selectedId = ref("");
   const query = ref("");
-  const mode = ref<"all" | "dark" | "light">("all");
+  const kind = ref<PluginKindFilter>("all");
+  const mode = ref<ThemeModeFilter>("all");
+  const pageTab = ref<PluginPageTab>("features");
   const installPath = ref("");
   const busy = ref(false);
   const error = ref("");
@@ -34,25 +47,18 @@ export function usePluginSettings() {
       ? runtimeIssues.value.filter((issue) => issue.plugin === selectedId.value)
       : [],
   );
-  const filtered = computed(() => {
-    const needle = query.value.trim().toLocaleLowerCase();
-    return (catalog.value?.plugins ?? []).filter((plugin) => {
-      const matchesText = `${plugin.id} ${plugin.description ?? ""}`
-        .toLocaleLowerCase()
-        .includes(needle);
-      return (
-        matchesText &&
-        (mode.value === "all" ||
-          plugin.agents.length > 0 ||
-          plugin.themes.some((theme) => theme.mode === mode.value))
-      );
-    });
-  });
+  const filtered = computed(() =>
+    filterPlugins(catalog.value?.plugins ?? [], query.value, kind.value, mode.value),
+  );
+  const summary = computed(() => pluginSummary(catalog.value?.plugins ?? []));
   const commands = useCommandScope(`plugins:settings:${useId()}`, () => ({
     surface: "plugins",
     view: "settings",
+    page: selectedId.value ? "package" : "catalog",
+    tab: selectedId.value ? pageTab.value : "",
     plugin: selectedId.value,
     query: query.value,
+    kind: kind.value,
     mode: mode.value,
     ready: !!catalog.value,
     busy: busy.value,
@@ -101,9 +107,33 @@ export function usePluginSettings() {
   }
 
   function open(id: string) {
-    if (!catalog.value?.plugins.some((item) => item.id === id)) throw new Error("Плагин не найден");
+    const plugin = catalog.value?.plugins.find((item) => item.id === id);
+    if (!plugin) throw new Error("Плагин не найден");
     selectedId.value = id;
-    return catalog.value.plugins.find((item) => item.id === id);
+    pageTab.value = defaultPluginPageTab(plugin);
+    return plugin;
+  }
+
+  function close() {
+    selectedId.value = "";
+  }
+
+  function setPageTab(tab: string) {
+    if (!isPluginPageTab(tab)) throw new Error("Неизвестная вкладка плагина");
+    pageTab.value = tab;
+    return tab;
+  }
+
+  function setFilter(next: { kind?: string; mode?: string }) {
+    if (next.kind !== undefined) {
+      if (!isPluginKindFilter(next.kind)) throw new Error("Неизвестный фильтр плагинов");
+      kind.value = next.kind;
+    }
+    if (next.mode !== undefined) {
+      if (!isThemeModeFilter(next.mode)) throw new Error("Неизвестный режим темы");
+      mode.value = next.mode;
+    }
+    return { kind: kind.value, mode: mode.value };
   }
 
   function setEnabled(id: string, enabled: boolean) {
@@ -185,9 +215,38 @@ export function usePluginSettings() {
   commands.scope.registerCommand({
     id: "ide.plugin.open",
     title: "Открыть карточку плагина",
-    description: "Выбирает локальный плагин и показывает его темы и диагностику.",
+    description: "Выбирает локальный плагин и показывает README или вклады пакета.",
     arguments: { id: "string: имя пакета плагина" },
     run: (value) => open(optionalStringArg(commandArgs(value), "id") ?? ""),
+  });
+  commands.scope.registerCommand({
+    id: "ide.plugin.close",
+    title: "Закрыть страницу плагина",
+    description: "Возвращает к каталогу установленных плагинов.",
+    run: close,
+  });
+  commands.scope.registerCommand({
+    id: "ide.plugin.page.tab",
+    title: "Вкладка страницы плагина",
+    description: "Переключает просмотр пакета между README и списком вкладов.",
+    arguments: { tab: "string: readme | features" },
+    run: (value) => setPageTab(optionalStringArg(commandArgs(value), "tab") ?? ""),
+  });
+  commands.scope.registerCommand({
+    id: "ide.plugins.filter",
+    title: "Фильтр каталога плагинов",
+    description: "Отбирает пакеты по виду вклада и режиму темы.",
+    arguments: {
+      kind: "string: all | themes | agents | ui | code | issues",
+      mode: "string: all | dark | light — режим темы",
+    },
+    run: (value) => {
+      const args = commandArgs(value);
+      return setFilter({
+        kind: optionalStringArg(args, "kind"),
+        mode: optionalStringArg(args, "mode"),
+      });
+    },
   });
   for (const enabled of [true, false]) {
     commands.scope.registerCommand({
@@ -262,9 +321,12 @@ export function usePluginSettings() {
     selected,
     selectedId,
     filtered,
+    summary,
     runtimeDiagnostics,
     query,
+    kind,
     mode,
+    pageTab,
     installPath,
     busy,
     error,

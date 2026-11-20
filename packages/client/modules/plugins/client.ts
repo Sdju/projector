@@ -1,12 +1,13 @@
-import type {
-  AvailableTheme,
-  PluginAgentContribution,
-  PluginBalanceContribution,
-  PluginBrowserEntry,
-  PluginHttpContribution,
-  PluginLanguageContribution,
-  PluginPanelContribution,
-  PluginTabContribution,
+import {
+  pluginReadmePath,
+  type AvailableTheme,
+  type PluginAgentContribution,
+  type PluginBalanceContribution,
+  type PluginBrowserEntry,
+  type PluginHttpContribution,
+  type PluginLanguageContribution,
+  type PluginPanelContribution,
+  type PluginTabContribution,
 } from "@ai-projector/core/modules/plugins/index.ts";
 
 export type PluginStatus = "enabled" | "disabled" | "error" | "missing";
@@ -20,6 +21,7 @@ export interface PluginInfo {
   trusted: boolean;
   requiresTrust?: boolean;
   code?: boolean;
+  readme?: boolean;
   hash?: string;
   server?: string;
   browser?: PluginBrowserEntry & { hash: string };
@@ -66,6 +68,7 @@ function normalizeCatalog(catalog: PluginCatalog): PluginCatalog {
           (plugin.agents?.length ?? 0) > 0 ||
           (plugin.balances?.length ?? 0) > 0),
       code: plugin.code === true,
+      readme: plugin.readme === true,
       agents: Array.isArray(plugin.agents) ? plugin.agents : [],
       balances: Array.isArray(plugin.balances) ? plugin.balances : [],
       http: Array.isArray(plugin.http) ? plugin.http : [],
@@ -87,6 +90,13 @@ export function pluginAction(
   return request<PluginCatalog>({ method: "POST", body: JSON.stringify({ action, ...body }) }).then(
     normalizeCatalog,
   );
+}
+
+export async function fetchPluginReadme(id: string): Promise<string | null> {
+  const response = await fetch(deviceUrl(pluginReadmePath(id)));
+  if (response.status === 404) return null;
+  if (!response.ok) throw new Error("Не удалось прочитать README плагина");
+  return response.text();
 }
 
 export async function saveAppearance(choice: string): Promise<void> {

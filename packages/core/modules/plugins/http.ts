@@ -101,6 +101,8 @@ export function validateHttpContributions(value: unknown): PluginHttpContributio
     if (route.path !== undefined && !isPluginHttpPath(route.path))
       throw new Error(`Небезопасный путь маршрута плагина: ${route.id}`);
     const path = typeof route.path === "string" ? route.path : route.id;
+    if (path === "storage" || path === "readme" || path.startsWith("readme/"))
+      throw new Error(`Маршрут ${route.id}: путь ${path} зарезервирован`);
     if (paths.has(path)) throw new Error(`Повторяющийся путь маршрута плагина: ${path}`);
     paths.add(path);
     if (route.methods !== undefined) {
