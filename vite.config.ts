@@ -6,7 +6,7 @@ import { defineConfig, type Plugin } from "vite-plus";
 import { createConfig as createFeodConfig } from "@o-feod/oxlint-structure-plugin/configs";
 import feod from "./feod.config.mjs";
 import { checkFeod, checkFeodAsync } from "./scripts/check-feod.mjs";
-import { APP_PORT, readNetworkMode } from "./packages/core/modules/app-paths/index.ts";
+import { configuredAppPort, readNetworkMode } from "./packages/core/modules/app-paths/index.ts";
 import { networkHost } from "./packages/core/modules/network-mode/index.ts";
 import { projectorPlugin } from "./packages/server/app/dev-plugin.ts";
 
@@ -78,7 +78,7 @@ export default defineConfig({
   },
   server: {
     host: networkHost(readNetworkMode()),
-    port: APP_PORT,
+    port: configuredAppPort(),
     strictPort: true,
     watch: {
       // Build scripts of the published packages copy generated trees into the workspace (dist,
@@ -98,7 +98,7 @@ export default defineConfig({
   },
   preview: {
     host: networkHost(readNetworkMode()),
-    port: APP_PORT,
+    port: configuredAppPort(),
     strictPort: true,
   },
   run: {

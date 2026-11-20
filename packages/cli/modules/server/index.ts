@@ -1,4 +1,4 @@
-import { appendFileSync, mkdirSync } from "node:fs";
+import { appendFileSync, mkdirSync, readFileSync } from "node:fs";
 import { open, readFile, unlink } from "node:fs/promises";
 import { join } from "node:path";
 import { os } from "@ai-projector/core/modules/os/index.ts";
@@ -7,9 +7,14 @@ import {
   isServerMode,
   type ServerMode,
 } from "@ai-projector/core/modules/server-mode/index.ts";
-import { serverLogPath, writeServerMode } from "@ai-projector/core/modules/app-paths/index.ts";
+import {
+  appUrl,
+  instancePath,
+  serverLogPath,
+  writeServerMode,
+} from "@ai-projector/core/modules/app-paths/index.ts";
 import type { CliOptions } from "../arguments/index.ts";
-import type { AppOpenRequest, HealthInfo } from "../api/index.ts";
+import type { AppOpenRequest, HealthInfo, ProjectorApi } from "../api/index.ts";
 import type { Output } from "../../common/output.ts";
 import { createServerProcesses, type ServerProcesses } from "../server-process/index.ts";
 
@@ -24,10 +29,32 @@ function isPidAlive(pid: number): boolean {
   }
 }
 
+/** Older instance files may have a default URL alongside the real port. */
+export function localServerUrl(fallback: string): string {
+  try {
+    const { pid, port } = JSON.parse(readFileSync(instancePath(), "utf8")) as {
+      pid: number;
+      port: number;
+    };
+    if (
+      Number.isSafeInteger(pid) &&
+      pid > 0 &&
+      Number.isInteger(port) &&
+      port > 0 &&
+      port <= 65535 &&
+      isPidAlive(pid)
+    )
+      return appUrl(port);
+  } catch {
+    // No usable instance yet: startup probes the configured port.
+  }
+  return fallback;
+}
+
 export interface ServerControlConfig {
   root: string;
   dataDir: string;
-  appUrl: string;
+  api: ProjectorApi;
   packaged: boolean;
   launchMode: () => ServerMode;
   options: CliOptions;
@@ -48,7 +75,7 @@ export interface ServerControl {
 export function createServerControl({
   root,
   dataDir,
-  appUrl,
+  api,
   packaged,
   launchMode,
   options,
@@ -63,17 +90,7 @@ export function createServerControl({
     options,
   });
 
-  async function serverInfo(): Promise<HealthInfo | null> {
-    try {
-      const response = await fetch(`${appUrl}/api/health`, { signal: AbortSignal.timeout(500) });
-      const data = (await response.json()) as Partial<HealthInfo>;
-      return response.ok && data.ok === true && data.app === "projector"
-        ? (data as HealthInfo)
-        : null;
-    } catch {
-      return null;
-    }
-  }
+  const serverInfo = api.health;
 
   async function health(): Promise<boolean> {
     return Boolean(await serverInfo());
@@ -83,7 +100,7 @@ export function createServerControl({
     appOptions: AppOpenRequest = {},
     action: "open" | "quit" = "open",
   ): Promise<unknown> {
-    const response = await fetch(`${appUrl}/api/app/${action}`, {
+    const response = await fetch(`${api.baseUrl}/api/app/${action}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(appOptions),
@@ -181,7 +198,7 @@ export function createServerControl({
     };
     try {
       if (await health()) {
-        out(`уже запущен: ${appUrl}`);
+        out(`уже запущен: ${api.baseUrl}`);
         return;
       }
       const vp = serverProcesses.findVp();

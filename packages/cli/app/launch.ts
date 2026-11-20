@@ -3,7 +3,11 @@ import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { os } from "@ai-projector/core/modules/os/index.ts";
-import { readServerMode } from "@ai-projector/core/modules/app-paths/index.ts";
+import {
+  appUrl,
+  configuredAppPort,
+  readServerMode,
+} from "@ai-projector/core/modules/app-paths/index.ts";
 import type { ServerMode } from "@ai-projector/core/modules/server-mode/index.ts";
 import { commandLogs } from "../commands/logs.ts";
 import { commandOpen, commandSettings, commandToggle } from "../commands/open.ts";
@@ -15,14 +19,16 @@ import { commandStatus } from "../commands/status.ts";
 import type { Output } from "../common/output.ts";
 import { createApi } from "../modules/api/index.ts";
 import { helpText, parseArgs, type ParsedArgs } from "../modules/arguments/index.ts";
-import { createServerControl } from "../modules/server/index.ts";
+import { createServerControl, localServerUrl } from "../modules/server/index.ts";
 
 const ROOT = fileURLToPath(new URL("../../..", import.meta.url));
 const packaged = existsSync(join(ROOT, "packages/server/app/standalone.js"));
 const launchMode = (): ServerMode => (packaged ? "prod" : readServerMode());
-const APP_URL = (process.env.PROJECTOR_URL || "http://localhost:4177").replace(/\/+$/, "");
+const fallbackUrl = appUrl(configuredAppPort());
 const DATA_DIR = join(os.dataHome(), "projector");
-const api = createApi(APP_URL);
+const api = createApi(
+  () => process.env.PROJECTOR_URL?.replace(/\/+$/, "") || localServerUrl(fallbackUrl),
+);
 
 /**
  * The Start Menu hides the console: a launch that fails before the message box leaves no trace.
@@ -64,7 +70,7 @@ const out: Output = (line = "") => {
 const serverControl = createServerControl({
   root: ROOT,
   dataDir: DATA_DIR,
-  appUrl: APP_URL,
+  api,
   packaged,
   launchMode,
   options,
@@ -104,7 +110,7 @@ async function execute(): Promise<void> {
   if (command === "start") {
     const info = await serverControl.ensureServer();
     if (options.json) out(JSON.stringify(info, null, 2));
-    else out(`Projector запущен: ${info.url ?? APP_URL}`);
+    else out(`Projector запущен: ${info.url ?? api.baseUrl}`);
     return;
   }
   if (command === "quit") {
@@ -116,7 +122,7 @@ async function execute(): Promise<void> {
       const info = await serverControl.ensureServer();
       if (options.json)
         out(JSON.stringify({ server: info, previousPid: null, started: true }, null, 2));
-      else out(`Projector запущен: ${info.url ?? APP_URL}`);
+      else out(`Projector запущен: ${info.url ?? api.baseUrl}`);
       return;
     }
     await commandRestart(api, options, out);

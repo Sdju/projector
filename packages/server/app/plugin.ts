@@ -6,8 +6,9 @@ import type { HttpServer } from "vite-plus";
 import { handleApi } from "./api.ts";
 import { clearInstance, writeInstance } from "../modules/instance/index.ts";
 import {
-  APP_PORT,
   appUrl,
+  appPort,
+  setAppPort,
   startServerLogRotation,
 } from "@ai-projector/core/modules/app-paths/index.ts";
 import { os, PARENT_SESSION_ENV } from "@ai-projector/core/modules/os/index.ts";
@@ -44,13 +45,6 @@ const runtime = globalThis as typeof globalThis & {
   projectorRuntimeMode?: ServerMode;
   projectorExitHook?: () => void;
 };
-
-function listenAddress(address: string | { port: number } | null): string {
-  if (address && typeof address === "object") {
-    return `http://localhost:${address.port}`;
-  }
-  return appUrl();
-}
 
 function bindHooks(): void {
   if (runtime.projectorExitHook) process.off("exit", runtime.projectorExitHook);
@@ -127,8 +121,12 @@ export function bindRuntime(
   });
   const listening = () => {
     const address = httpServer.address();
-    const port = address && typeof address === "object" ? address.port : APP_PORT;
-    void writeInstance(port);
+    const port = address && typeof address === "object" ? address.port : appPort();
+    setAppPort(port);
+    const url = appUrl();
+    // Child agents and their MCP servers reach the actual listening address.
+    process.env.PROJECTOR_URL = url;
+    void writeInstance(port).catch((error) => console.error("Запись экземпляра Projector:", error));
     bindHooks();
     // Jobs first: they rejoin the runs that the cleanup keeps for them.
     void recoverJobs()
@@ -141,9 +139,6 @@ export function bindRuntime(
     void reconcileOnStartup().catch((error) =>
       console.error("Очистка контейнеров:", error.message),
     );
-    const url = listenAddress(address);
-    // Child agents and their MCP servers reach this exact address, even on a non-default port.
-    process.env.PROJECTOR_URL = url;
     if (process.env.PROJECTOR_WINDOW === "1") {
       void openLauncher(url).catch(console.error);
     } else if (os.supported) {

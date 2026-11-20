@@ -786,3 +786,47 @@ test("post-login return path preserves device, query and fragment", () => {
     "/devices/desk/projects/demo?ref=main#file",
   );
 });
+
+test("Hub and standalone agree on missing builds, SPA fallback and asset caching", async () => {
+  const { mkdir } = await import("node:fs/promises");
+  const { serveStatic: standalone } = await import("../../server/app/static.ts");
+  const { serveStatic: hub } = await import("../modules/static/index.ts");
+  const root = await dataDir();
+  const server = createServer((req, res) => {
+    const isHub = req.headers["x-fixture-hub"] === "1";
+    void (isHub ? hub : standalone)(root, req, res);
+  });
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  cleanups.push(() => new Promise((resolve) => server.close(resolve)));
+  const origin = `http://127.0.0.1:${server.address().port}`;
+  for (const fixture of ["0", "1"]) {
+    for (const method of ["GET", "HEAD"]) {
+      const reply = await fetch(origin + "/", { method, headers: { "x-fixture-hub": fixture } });
+      expect(reply.status).toBe(503);
+      expect(await reply.text()).toBe(method === "GET" ? "Сначала выполните vp run build" : "");
+    }
+  }
+  await mkdir(join(root, "assets"));
+  await writeFile(join(root, "assets/app.js"), "export {}");
+  await writeFile(join(root, "index.html"), '<script src="/api/appearance/bootstrap.js"></script>');
+  for (const fixture of ["0", "1"]) {
+    const headers = { "x-fixture-hub": fixture };
+    for (const method of ["GET", "HEAD"]) {
+      const fallback = await fetch(origin + "/devices/desk/project", { method, headers });
+      expect(fallback.status).toBe(200);
+      expect(fallback.headers.get("cache-control")).toBe("no-cache");
+      const script =
+        fixture === "1"
+          ? "/api/devices/desk/appearance/bootstrap.js"
+          : "/api/appearance/bootstrap.js";
+      expect(await fallback.text()).toBe(
+        method === "GET" ? `<script src="${script}"></script>` : "",
+      );
+      const asset = await fetch(origin + "/assets/app.js", { method, headers });
+      expect(asset.status).toBe(200);
+      expect(asset.headers.get("cache-control")).toBe("public, max-age=31536000, immutable");
+      expect(await asset.text()).toBe(method === "GET" ? "export {}" : "");
+      expect((await fetch(origin + "/assets/missing.js", { method, headers })).status).toBe(404);
+    }
+  }
+});

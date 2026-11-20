@@ -89,9 +89,11 @@ function interrupted(error: unknown): boolean {
 }
 
 /** Minimal client for the local Projector server. Opening a window may outlast a dev restart. */
-export function createApi(baseUrl: string): ProjectorApi {
+export function createApi(address: string | (() => string)): ProjectorApi {
+  const baseUrl = () => (typeof address === "string" ? address : address());
+
   async function send<T>(path: string, method: string, body: unknown, timeout: number): Promise<T> {
-    const response = await fetch(baseUrl + path, {
+    const response = await fetch(baseUrl() + path, {
       method,
       headers: body === undefined ? undefined : { "Content-Type": "application/json" },
       body: body === undefined ? undefined : JSON.stringify(body),
@@ -133,7 +135,7 @@ export function createApi(baseUrl: string): ProjectorApi {
 
   async function health(): Promise<HealthInfo | null> {
     try {
-      const response = await fetch(`${baseUrl}/api/health`, {
+      const response = await fetch(`${baseUrl()}/api/health`, {
         signal: AbortSignal.timeout(500),
       });
       const data = (await response.json()) as Partial<HealthInfo>;
@@ -146,7 +148,9 @@ export function createApi(baseUrl: string): ProjectorApi {
   }
 
   return {
-    baseUrl,
+    get baseUrl() {
+      return baseUrl();
+    },
     request,
     health,
     projects: () => request<ProjectsResponse>("/api/projects"),

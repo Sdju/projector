@@ -1,4 +1,3 @@
-// The Hub is published separately from the server, so it keeps its own copy of this wrapper.
 import { Duplex } from "node:stream";
 
 /** A tunnel message stays small even when the HTTP side writes a whole JSON body at once. */

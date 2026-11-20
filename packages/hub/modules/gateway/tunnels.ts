@@ -3,7 +3,7 @@ import type { IncomingMessage, Server } from "node:http";
 import { Duplex } from "node:stream";
 import { WebSocket, WebSocketServer, createWebSocketStream } from "ws";
 import { HUB_PROTOCOL, isDeviceId, type HubDevice } from "@ai-projector/core/modules/hub/index.ts";
-import { chunkedStream } from "./stream.ts";
+import { chunkedStream } from "@ai-projector/core/modules/node-http/index.ts";
 
 interface Device {
   info: HubDevice;

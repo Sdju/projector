@@ -6,7 +6,7 @@ import {
   type HubConnection,
   type HubDevice,
 } from "@ai-projector/core/modules/hub/index.ts";
-import { chunkedStream } from "./stream.ts";
+import { chunkedStream } from "@ai-projector/core/modules/node-http/index.ts";
 import { markHubSocket } from "../access/index.ts";
 import { broadcastEvent } from "../events/index.ts";
 import {

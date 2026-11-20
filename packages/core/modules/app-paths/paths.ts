@@ -6,8 +6,24 @@ export const APP_HOST = "localhost";
 export const APP_CLASS = "Projector";
 export const APP_NAME = "projector";
 
-export function appUrl(): string {
-  return `http://${APP_HOST}:${APP_PORT}`;
+// Shared across Vite runtime generations. Only the HTTP listener sets it.
+const runtime = globalThis as typeof globalThis & { projectorAppPort?: number };
+
+export function setAppPort(port: number): void {
+  runtime.projectorAppPort = port;
+}
+
+export function appPort(): number {
+  return runtime.projectorAppPort ?? APP_PORT;
+}
+
+export function configuredAppPort(): number {
+  const port = Number(process.env.PROJECTOR_PORT);
+  return Number.isInteger(port) && port > 0 && port <= 65535 ? port : APP_PORT;
+}
+
+export function appUrl(port = appPort()): string {
+  return `http://${APP_HOST}:${port}`;
 }
 
 export function projectAppUrl(id: string): string {

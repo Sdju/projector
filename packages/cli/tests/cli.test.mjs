@@ -137,14 +137,26 @@ test("CLI project commands use the running server and do not start another one",
     await rm(root, { recursive: true, force: true });
   });
 
+  await mkdir(join(data, "projector"), { recursive: true });
+  await writeFile(
+    join(data, "projector/instance.json"),
+    JSON.stringify({
+      pid: process.pid,
+      port: server.address().port,
+      url: "http://localhost:4177", // Old installations wrote the default URL.
+    }),
+  );
   const cli = async (...args) => {
     const { stdout, stderr } = await run(process.execPath, [launch, ...args], {
-      env: { ...process.env, PROJECTOR_URL: base, XDG_DATA_HOME: data },
+      env: { ...process.env, PROJECTOR_URL: "", XDG_DATA_HOME: data },
       timeout: 15_000,
     });
     expect(stderr).toBe("");
     return JSON.parse(stdout);
   };
+
+  for (let i = 0; i < 2; i++)
+    expect(await cli("start", "--json")).toMatchObject({ pid: 1234, url: base });
 
   const projects = await cli("projects", "--json");
   expect(projects.source).toBe("server");

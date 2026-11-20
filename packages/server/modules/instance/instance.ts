@@ -1,7 +1,7 @@
 import { readFileSync, unlinkSync } from "node:fs";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
-import { dirname } from "node:path";
-import { APP_PORT, appUrl, instancePath } from "@ai-projector/core/modules/app-paths/index.ts";
+import { readFile } from "node:fs/promises";
+import { appPort, appUrl, instancePath } from "@ai-projector/core/modules/app-paths/index.ts";
+import { writeFileAtomic } from "../atomic-files/index.ts";
 
 export interface InstanceInfo {
   pid: number;
@@ -19,16 +19,15 @@ export function isPidAlive(pid: number): boolean {
   }
 }
 
-export async function writeInstance(port = APP_PORT): Promise<void> {
+export async function writeInstance(port = appPort()): Promise<void> {
   const file = instancePath();
-  await mkdir(dirname(file), { recursive: true });
   const info: InstanceInfo = {
     pid: process.pid,
     port,
-    url: appUrl(),
+    url: appUrl(port),
     startedAt: new Date().toISOString(),
   };
-  await writeFile(file, `${JSON.stringify(info, null, 2)}\n`, "utf8");
+  await writeFileAtomic(file, `${JSON.stringify(info, null, 2)}\n`);
 }
 
 export async function readInstance(): Promise<InstanceInfo | null> {

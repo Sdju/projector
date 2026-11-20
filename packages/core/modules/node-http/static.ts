@@ -1,0 +1,88 @@
+import type { IncomingMessage, ServerResponse } from "node:http";
+import { createReadStream } from "node:fs";
+import { readFile, stat } from "node:fs/promises";
+import { extname, join, normalize, resolve, sep } from "node:path";
+
+const TYPES: Record<string, string> = {
+  ".html": "text/html; charset=utf-8",
+  ".js": "text/javascript; charset=utf-8",
+  ".mjs": "text/javascript; charset=utf-8",
+  ".css": "text/css; charset=utf-8",
+  ".json": "application/json; charset=utf-8",
+  ".webmanifest": "application/manifest+json; charset=utf-8",
+  ".svg": "image/svg+xml",
+  ".png": "image/png",
+  ".jpg": "image/jpeg",
+  ".ico": "image/x-icon",
+  ".webp": "image/webp",
+  ".woff": "font/woff",
+  ".woff2": "font/woff2",
+  ".ttf": "font/ttf",
+  ".wasm": "application/wasm",
+  ".map": "application/json",
+};
+
+async function isFile(path: string): Promise<boolean> {
+  return stat(path).then(
+    (info) => info.isFile(),
+    () => false,
+  );
+}
+
+/** Отдаёт файл из `root`; неизвестные пути без расширения уходят в index.html (SPA). */
+export async function serveStatic(
+  root: string,
+  req: IncomingMessage,
+  res: ServerResponse,
+  {
+    shell = "index.html",
+    transformHtml,
+  }: {
+    shell?: string;
+    transformHtml?: (html: string, pathname: string) => string;
+  } = {},
+): Promise<void> {
+  if (req.method !== "GET" && req.method !== "HEAD") {
+    res.writeHead(405, { Allow: "GET, HEAD" }).end();
+    return;
+  }
+  let pathname: string;
+  try {
+    pathname = decodeURIComponent(new URL(req.url ?? "/", "http://localhost").pathname);
+  } catch {
+    res.writeHead(400).end();
+    return;
+  }
+  root = resolve(root);
+  const candidate = normalize(join(root, pathname));
+  let file = candidate === root || candidate.startsWith(root + sep) ? candidate : "";
+  if (!file || !(await isFile(file))) {
+    if (extname(pathname)) {
+      res.writeHead(404).end();
+      return;
+    }
+    file = join(root, shell);
+    if (!(await isFile(file))) {
+      res.writeHead(503).end("Сначала выполните vp run build");
+      return;
+    }
+  }
+  const immutable = file.startsWith(join(root, "assets") + sep);
+  const headers = {
+    "Content-Type": TYPES[extname(file)] ?? "application/octet-stream",
+    "Cache-Control": immutable ? "public, max-age=31536000, immutable" : "no-cache",
+  };
+  if (transformHtml && file === join(root, "index.html") && req.method !== "HEAD") {
+    const html = transformHtml(await readFile(file, "utf8"), pathname);
+    res.writeHead(200, headers).end(html);
+    return;
+  }
+  res.writeHead(200, headers);
+  if (req.method === "HEAD") res.end();
+  else {
+    const stream = createReadStream(file);
+    stream.once("error", (error) => res.destroy(error));
+    res.once("close", () => stream.destroy());
+    stream.pipe(res);
+  }
+}

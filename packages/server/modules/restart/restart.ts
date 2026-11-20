@@ -2,7 +2,12 @@ import { spawn } from "node:child_process";
 import { closeSync, mkdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { os } from "@ai-projector/core/modules/os/index.ts";
-import { dataDir, openLog, serverLogPath } from "@ai-projector/core/modules/app-paths/index.ts";
+import {
+  appPort,
+  dataDir,
+  openLog,
+  serverLogPath,
+} from "@ai-projector/core/modules/app-paths/index.ts";
 import { quitDesktop } from "../window/index.ts";
 
 const host = globalThis as typeof globalThis & { projectorRestart?: Promise<void> };
@@ -20,7 +25,11 @@ async function prepareRestart(url: string): Promise<void> {
           String(process.pid),
           String(nativePid ?? ""),
         ],
-        { detached: true, stdio: ["ignore", log, log, "ipc"] },
+        {
+          detached: true,
+          stdio: ["ignore", log, log, "ipc"],
+          env: { ...process.env, PROJECTOR_PORT: String(appPort()) },
+        },
       );
     } finally {
       closeSync(log);

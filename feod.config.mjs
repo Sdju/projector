@@ -30,12 +30,14 @@ const nodeOnly = [
       "packages/core/modules/app-paths/**",
       "packages/core/modules/os/**",
       "packages/core/modules/os-posix/**",
+      "packages/core/modules/node-http/**",
     ],
     message: "Platform dependency in browser/domain code",
   },
   {
     name: "node-infrastructure-modules",
     imports: [
+      "@ai-projector/core/modules/node-http/**",
       "@ai-projector/core/modules/os",
       "@ai-projector/core/modules/os/**",
       "@ai-projector/core/modules/app-paths",

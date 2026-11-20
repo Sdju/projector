@@ -1,5 +1,5 @@
 import { networkInterfaces } from "node:os";
-import { APP_PORT } from "@ai-projector/core/modules/app-paths/index.ts";
+import { appPort } from "@ai-projector/core/modules/app-paths/index.ts";
 
 function privateAddresses(): string[] {
   const result: string[] = [];
@@ -14,7 +14,7 @@ function privateAddresses(): string[] {
 
 /** Все адреса Projector в локальной сети для открытия с других устройств. */
 export function lanUrls(): string[] {
-  return privateAddresses().map((address) => `http://${address}:${APP_PORT}`);
+  return privateAddresses().map((address) => `http://${address}:${appPort()}`);
 }
 
 /** Первый адрес Projector в локальной сети. */
