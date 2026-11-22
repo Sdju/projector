@@ -88,6 +88,13 @@ export const baseTabTypes = [
     },
   }),
   mediaTab,
+  singletonTab("review", "review:changes", "Ревью", "Ревью изменений", {
+    subtitle: "замечания к diff",
+    read: (_params, content) => ({
+      text: content,
+      note: "Ревью изменений",
+    }),
+  }),
   defineTab<{ hash: string; subject?: string }>({
     id: "commit",
     key: ({ hash }) => `commit:${hash}`,

@@ -214,6 +214,19 @@ Commit contents are immutable, so the client caches them by hash; the list is re
 the loaded extent. Merge commits are shown against their first parent, and files are limited to the project folder.
 Commit diff tabs are history: staging, discarding or moving files never closes them.
 
+## Review of working changes
+
+The editor scope of a writable Git workspace registers `ide.review.*`. Remarks belong to this browser tab (`sessionStorage`), not to `.projector/` or the Git history; sending them to chat is an explicit command. No separate review mode is required: local diffs show a `+` gutter trigger and inline remark cards directly below the remarked lines.
+
+- `ide.review.open` — opens or focuses the **Ревью** tab (grouped list by file with code snippets, inline editing, jump to lines, send to chat);
+- `ide.review.comment.add` `{ path, from, to?, text?, staged?, snippet? }` — with `text` records a remark; without it opens the file/diff and shows the inline composer below the lines. `from`/`to` are 1-based and inclusive;
+- `ide.review.comment.update` `{ id, text }` — edits the text of an existing remark;
+- `ide.review.comment.remove` `{ id }`, `ide.review.comment.open` `{ id }` — drop a remark or open its file/diff with the lines selected;
+- `ide.review.clear` — removes every remark of the current review;
+- `ide.review.toChat` `{ chat? }` — puts every remark into the agent composer as file chips (`@path:12-14`) plus the remark texts, without sending. Same chat targeting as `ide.editor.selection.toChat`.
+
+On a live diff, clicking `+` in the gutter opens the inline composer for that line, and selecting a range shows **Замечание** on the modified side. Saved remarks render inline under their lines and add counters to the Git tree and the file topbar.
+
 ## Корзина проекта
 
 The `trash` section of the left rail (utility group) exists for writable profiles. Its scope is

@@ -109,7 +109,7 @@ export const singletonTab = (
   key: string,
   path: string,
   title: string,
-  extra: Pick<TabType, "subtitle" | "command"> = {},
+  extra: Pick<TabType, "subtitle" | "command" | "read"> = {},
 ) => defineTab({ id, key: () => key, path: () => path, title: () => title, ...extra });
 
 /** The work inbox of all agents and devices; the bell of the header opens it. */

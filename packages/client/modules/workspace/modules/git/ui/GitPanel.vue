@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import ProjectorIcon from "../../../../../common/icons/ProjectorIcon.vue";
 import UiScrollArea from "../../../../../common/ui/UiScrollArea.vue";
-import { computed, ref } from "vue";
+import { computed, inject, ref } from "vue";
 import ContextMenu from "../../../../../common/ui/ContextMenu.vue";
 import UiButton from "../../../../../common/ui/UiButton.vue";
 import UiSectionRefresh from "../../../../../common/ui/UiSectionRefresh.vue";
@@ -40,6 +40,34 @@ const emit = defineEmits<{
   openCommitTree: [hash: string];
   openCommitDiff: [hash: string, path: string, pinned?: boolean];
 }>();
+/** Review of the working copy; absent when the workspace did not start one. */
+interface ReviewHost {
+  comments: { value: readonly { path: string; staged?: boolean }[] };
+  sentAt: { value?: number };
+  open: () => void;
+  sendToChat: () => Promise<unknown>;
+}
+const review = inject<ReviewHost | undefined>(Symbol.for("projector.review"), undefined);
+const reviewCount = computed(() => review?.comments.value.length ?? 0);
+const reviewLabel = computed(() => {
+  const n = reviewCount.value;
+  const mod100 = n % 100;
+  const mod10 = mod100 % 10;
+  if (mod100 > 10 && mod100 < 20) return `${n} замечаний`;
+  if (mod10 === 1) return `${n} замечание`;
+  if (mod10 >= 2 && mod10 <= 4) return `${n} замечания`;
+  return `${n} замечаний`;
+});
+function commentCount(path: string, staged: boolean) {
+  const list = review?.comments.value;
+  if (!list?.length) return 0;
+  let count = 0;
+  for (const item of list) {
+    if (item.path !== path) continue;
+    if (staged ? item.staged === true : item.staged !== true) count++;
+  }
+  return count;
+}
 const { git, error: gitError, loading: gitLoading, load } = props.overview;
 toastErrors(() => gitError.value, { label: "Обновить", run: () => void load() });
 const gitBusy = ref(false);
@@ -169,6 +197,29 @@ defineExpose({
     <div v-else class="git-refresh">
       <UiSectionRefresh />
     </div>
+    <div v-if="review && writable && git.available && reviewCount" class="review-summary">
+      <button
+        type="button"
+        class="review-open"
+        title="Открыть вкладку ревью"
+        data-command="ide.review.open"
+        @click="review.open()"
+      >
+        <ProjectorIcon name="message-square" class="review-icon" aria-hidden="true" />
+        <span class="u-truncate">{{ reviewLabel }}</span>
+      </button>
+      <UiButton
+        size="sm"
+        appearance="quiet"
+        class="review-send"
+        title="Положить замечания в черновик чата агента"
+        data-command="ide.review.toChat"
+        @click="review.sendToChat()"
+      >
+        <ProjectorIcon name="message-square-share" class="review-send-icon" aria-hidden="true" />
+        В чат
+      </UiButton>
+    </div>
     <p v-if="!gitLoading && !gitError && !git.available" class="notice">
       В этой папке нет Git-репозитория.
     </p>
@@ -242,6 +293,7 @@ defineExpose({
                 })?.enabled
             "
             :selected="selected?.staged === group.staged ? selected.path : ''"
+            :comment-count="(path) => commentCount(path, group.staged)"
             @change="
               gitCommands.run(group.staged ? 'ide.git.unstage' : 'ide.git.stage', {
                 path: $event,
@@ -297,6 +349,49 @@ defineExpose({
   display: flex;
   justify-content: flex-end;
   padding: 4px var(--sp-2) 0;
+}
+.review-summary {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+  margin: 4px var(--sp-2) 2px;
+  padding: 2px 4px 2px var(--sp-2);
+  border: 1px solid color-mix(in srgb, var(--accent) 28%, var(--line));
+  border-left: 2px solid var(--accent);
+  border-radius: var(--r-md);
+  background: color-mix(in srgb, var(--accent) 7%, var(--bg-2));
+}
+.review-open {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 2px;
+  text-align: left;
+  font-size: var(--fs-xs);
+  color: var(--text);
+}
+.review-open:hover {
+  color: var(--accent);
+}
+.review-icon {
+  width: 13px;
+  height: 13px;
+  flex-shrink: 0;
+  color: var(--accent);
+}
+.review-send {
+  min-height: 24px;
+  padding: 0 7px;
+  gap: 4px;
+  flex-shrink: 0;
+  font-size: var(--fs-2xs);
+  color: var(--text-2);
+}
+.review-send-icon {
+  width: 12px;
+  height: 12px;
 }
 .git-stack {
   flex: 1;

@@ -55,6 +55,7 @@ import { useMobileSurfaces, registerMobileCommands } from "../lib/mobile-surface
 import { useSurfaceSwipe } from "../lib/surface-swipe.ts";
 import { registerProjectWidgetCommands } from "../../project-widgets/index.ts";
 import { useWorkspaceZen } from "../lib/zen.ts";
+import { connectReviewWorkspace } from "../modules/review/index.ts";
 const props = defineProps<{
   projectId: string;
   projectSettingsDirty?: boolean;
@@ -334,6 +335,14 @@ provideTabHost({
   openSection,
   run: (command, args) => editorCommands.run(command, args),
   executeCommand: (command, args) => editorCommands.scope.executeCommand(command, args),
+});
+connectReviewWorkspace({
+  projectId: props.projectId,
+  register: registerEditor,
+  run: (id, args) => editorCommands.scope.executeCommand(id, args),
+  openTab: () => openTab("review"),
+  openFile: (path, from, to, staged) =>
+    openFile(path, from, undefined, staged, { endLine: to, preview: false }),
 });
 const { tabActions, editorKeydown, editorFocus } = registerEditorCommands({
   projectId: props.projectId,

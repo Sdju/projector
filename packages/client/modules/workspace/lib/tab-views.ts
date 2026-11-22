@@ -40,6 +40,7 @@ import {
   PullRequestView,
   ReleaseView,
 } from "../modules/viewers/index.ts";
+import { ReviewTab } from "../modules/review/index.ts";
 import { PluginContributionMount, pluginTabKind, runtimeTabs } from "../../plugin-runtime/index.ts";
 import { MediaPanel } from "../../media/index.ts";
 
@@ -246,6 +247,15 @@ export function baseTabViews(): TabViews {
       }),
     },
     release: releaseTabView(),
+    review: {
+      component: ReviewTab,
+      keepAlive: true,
+      scroll: true,
+      props: (_tab, host) => ({
+        projectId: host.projectId,
+        run: (id: string, args?: unknown) => host.run(id, args),
+      }),
+    },
     commit: {
       component: CommitOverview,
       keepAlive: true,

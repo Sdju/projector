@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import ProjectorIcon from "../../../../../common/icons/ProjectorIcon.vue";
+import UiButton from "../../../../../common/ui/UiButton.vue";
 import UiPanel from "../../../../../common/ui/UiPanel.vue";
-import { inject, onMounted, onBeforeUnmount, ref, watch } from "vue";
+import { computed, inject, onMounted, onBeforeUnmount, ref, watch } from "vue";
 import {
   EditorView,
   lineNumbers,
@@ -9,12 +10,8 @@ import {
   highlightActiveLineGutter,
   keymap,
   drawSelection,
-  showTooltip,
-  ViewPlugin,
-  type Tooltip,
-  type ViewUpdate,
 } from "@codemirror/view";
-import { EditorState, StateEffect, StateField } from "@codemirror/state";
+import { EditorState, type StateEffect } from "@codemirror/state";
 import { defaultKeymap, history, historyKeymap, indentWithTab } from "@codemirror/commands";
 import { bracketMatching, foldGutter, indentOnInput } from "@codemirror/language";
 import { highlightSelectionMatches, searchKeymap } from "@codemirror/search";
@@ -29,6 +26,12 @@ import {
   themeCompartment,
   themeExtension,
 } from "../lib/codemirror.ts";
+import {
+  reviewEditorExtension,
+  setReviewState,
+  type InlineReviewState,
+} from "../lib/review-editor.ts";
+import { selectionActionsTooltip, selectionLines } from "../lib/selection-tooltip.ts";
 import { useEditorStatusStore } from "../lib/editor-status.ts";
 import { languageRevision } from "../../../../plugin-runtime/index.ts";
 import {
@@ -36,6 +39,8 @@ import {
   appearanceScheme,
   loadAppearanceFonts,
 } from "../../../../appearance/index.ts";
+import EditorTopbarActions from "./EditorTopbarActions.vue";
+
 const props = defineProps<{
   path: string;
   content: string;
@@ -49,6 +54,8 @@ const props = defineProps<{
   editable?: boolean;
   projectId?: string;
   revision?: number;
+  /** Git index side of a local diff; remarks of a review open this side. */
+  staged?: boolean;
 }>();
 const emit = defineEmits<{ change: [content: string]; save: []; ready: [] }>();
 const container = ref<HTMLElement>();
@@ -73,126 +80,117 @@ const editorSelection = inject<EditorSelectionSink | undefined>(
   Symbol.for("projector.editor-selection"),
   undefined,
 );
+interface ReviewSinkComment {
+  id: string;
+  path: string;
+  from: number;
+  to: number;
+  staged?: boolean;
+  text: string;
+}
+interface ReviewSink {
+  comments: { value: readonly ReviewSinkComment[] };
+  composing: { value?: { path: string; from: number; to: number; staged?: boolean } };
+  editing: { value?: string };
+  commentsFor: (path: string, staged?: boolean) => readonly ReviewSinkComment[];
+  begin: (range: {
+    path: string;
+    from: number;
+    to: number;
+    staged?: boolean;
+    snippet?: string;
+  }) => void;
+  finish: (text: string) => void;
+  update: (id: string, text: string) => void;
+  remove: (id: string) => void;
+  edit: (id?: string) => void;
+  cancel: () => void;
+  open: () => void;
+}
+const review = inject<ReviewSink | undefined>(Symbol.for("projector.review"), undefined);
+
+/** A live project file: diffs and snapshots without a project id stay out of chat and review. */
+const liveFile = () => !!props.projectId && !props.path.startsWith("/");
+const matchesSide = (staged?: boolean) =>
+  props.staged === true ? staged === true : staged !== true;
 
 /** Only a live project file with a tab reports: diffs, previews and external paths are not chat context. */
 const tracksSelection = () =>
-  !!editorSelection &&
-  !!props.projectId &&
-  props.editable === true &&
-  props.original === undefined &&
-  !props.path.startsWith("/");
+  !!editorSelection && liveFile() && props.editable === true && props.original === undefined;
+/** Diffs always allow commenting; plain files offer it once a review has remarks. */
+const tracksReview = () =>
+  liveFile() && !!review && (props.original !== undefined || review.comments.value.length > 0);
+
+const fileReviewCount = computed(() =>
+  liveFile() && review ? review.commentsFor(props.path, props.staged).length : 0,
+);
+const totalReviewCount = computed(() => (liveFile() && review ? review.comments.value.length : 0));
+const showReviewIndicator = computed(
+  () => fileReviewCount.value > 0 || (props.original !== undefined && totalReviewCount.value > 0),
+);
 
 function reportSelection(state: EditorState) {
   if (!tracksSelection()) return;
-  const { main } = state.selection;
-  const first = state.doc.lineAt(main.from);
-  let last = state.doc.lineAt(main.to);
-  // A selection ending at the start of the next line does not include that line.
-  if (main.to > main.from && last.from === main.to && last.number > first.number)
-    last = state.doc.line(last.number - 1);
-  editorSelection!.report({ path: props.path, from: first.number, to: last.number });
+  const { from, to } = selectionLines(state);
+  editorSelection!.report({ path: props.path, from, to });
 }
 
-/** A selection is settled only after the pointer is released or typing stops: no button mid-drag. */
-const selectionSettled = StateEffect.define<boolean>();
-const selectionSettledField = StateField.define<boolean>({
-  create: () => true,
-  update(settled, transaction) {
-    let next = settled;
-    if (transaction.selection) next = transaction.state.selection.main.empty;
-    for (const effect of transaction.effects) if (effect.is(selectionSettled)) next = effect.value;
-    return next;
-  },
-});
-const selectionSettlePlugin = ViewPlugin.fromClass(
-  class {
-    private timer: ReturnType<typeof setTimeout> | undefined;
-    private pointerDown = false;
-    private readonly view: EditorView;
-    private readonly onMouseDown: (event: MouseEvent) => void;
-    private readonly onMouseUp: () => void;
-    constructor(view: EditorView) {
-      this.view = view;
-      const doc = view.dom.ownerDocument;
-      this.onMouseDown = (event) => {
-        const target = event.target;
-        if (!(target instanceof Node) || !view.dom.contains(target)) return;
-        // The button itself keeps the selection: do not hide it in its own mousedown.
-        if (target instanceof Element && target.closest(".selection-chat")) return;
-        this.pointerDown = true;
-        this.clear();
-        view.dispatch({ effects: selectionSettled.of(false) });
-      };
-      this.onMouseUp = () => {
-        if (!this.pointerDown) return;
-        this.pointerDown = false;
-        this.schedule(120);
-      };
-      doc.addEventListener("mousedown", this.onMouseDown, true);
-      doc.addEventListener("mouseup", this.onMouseUp, true);
-    }
-    private clear() {
-      clearTimeout(this.timer);
-      this.timer = undefined;
-    }
-    private schedule(delay: number) {
-      this.clear();
-      this.timer = setTimeout(() => {
-        this.timer = undefined;
-        if (!this.view.state.selection.main.empty)
-          this.view.dispatch({ effects: selectionSettled.of(true) });
-      }, delay);
-    }
-    update(update: ViewUpdate) {
-      if (!update.selectionSet) return;
-      this.clear();
-      if (update.state.selection.main.empty) return;
-      if (!this.pointerDown) this.schedule(180);
-    }
-    destroy() {
-      this.clear();
-      const doc = this.view.dom.ownerDocument;
-      doc.removeEventListener("mousedown", this.onMouseDown, true);
-      doc.removeEventListener("mouseup", this.onMouseUp, true);
-    }
-  },
-);
-
-/** A small button at the end of a non-empty selection: adds those lines to the agent chat. */
-function selectionChatTooltip() {
-  const field = StateField.define<readonly Tooltip[]>({
-    create: () => [],
-    update(_tooltips, transaction) {
-      const range = transaction.state.selection.main;
-      if (range.empty || !transaction.state.field(selectionSettledField)) return [];
-      return [
-        {
-          // Anchor to the cursor end, not to the end of the range: a backwards selection
-          // must show the button where the user actually is.
-          pos: range.head,
-          above: false,
-          create: () => {
-            const button = document.createElement("button");
-            button.type = "button";
-            button.className = "selection-chat";
-            button.textContent = "В чат";
-            button.title = "Добавить выделенные строки в чат агента";
-            button.setAttribute("aria-label", "Добавить выделенные строки в чат агента");
-            // Keep the selection while the button is pressed.
-            button.addEventListener("mousedown", (event) => event.preventDefault());
-            button.addEventListener("click", () => editorSelection?.add());
-            return { dom: button };
-          },
-        },
-      ];
-    },
+function selectionTooltipExtension() {
+  return selectionActionsTooltip({
+    canChat: tracksSelection,
+    canReview: tracksReview,
+    onChat: () => editorSelection?.add(),
+    onReview: (range) => review?.begin({ path: props.path, staged: props.staged, ...range }),
   });
-  return [
-    selectionSettledField,
-    selectionSettlePlugin,
-    field,
-    showTooltip.computeN([field], (state) => state.field(field)),
-  ];
+}
+
+function currentReviewState(): InlineReviewState {
+  if (!liveFile() || !review) return { comments: [] };
+  const comments = review.commentsFor(props.path, props.staged).map((item) => ({
+    id: item.id,
+    from: item.from,
+    to: item.to,
+    text: item.text,
+  }));
+  const composing = review.composing.value;
+  const activeComposing =
+    composing && composing.path === props.path && matchesSide(composing.staged)
+      ? { from: composing.from, to: composing.to }
+      : undefined;
+  const editing =
+    review.editing.value && comments.some((item) => item.id === review.editing.value)
+      ? review.editing.value
+      : undefined;
+  return { comments, composing: activeComposing, editing };
+}
+
+function syncReview(scrollToComposer = false) {
+  if (!view || !liveFile() || !review) return;
+  const next = currentReviewState();
+  const effects: StateEffect<unknown>[] = [setReviewState.of(next)];
+  if (scrollToComposer && next.composing) {
+    const lineNo = Math.max(1, Math.min(next.composing.to, view.state.doc.lines));
+    effects.push(
+      EditorView.scrollIntoView(view.state.doc.line(lineNo).to, { y: "nearest", yMargin: 160 }),
+    );
+  }
+  view.dispatch({ effects });
+}
+
+function reviewExtensionFor(pane: "original" | "modified") {
+  if (!liveFile() || !review || pane === "original") return [];
+  return reviewEditorExtension(
+    {
+      onStart: (from, to, snippet) =>
+        review.begin({ path: props.path, from, to, staged: props.staged, snippet }),
+      onSubmit: (text) => review.finish(text),
+      onUpdate: (id, text) => review.update(id, text),
+      onRemove: (id) => review.remove(id),
+      onEdit: (id) => review.edit(id),
+      onCancel: () => review.cancel(),
+    },
+    { showGutter: props.original !== undefined },
+  );
 }
 
 function reportCursor(state: EditorState) {
@@ -238,9 +236,14 @@ function revertButton(type: "reject" | "accept", action: (event: MouseEvent) => 
   }
   return element;
 }
-function extensions(mode: "inline" | "side" = "inline") {
+function extensions(
+  mode: "inline" | "side" = "inline",
+  pane: "original" | "modified" = "modified",
+) {
+  const isModified = pane === "modified";
   return [
     lineNumbers(),
+    ...(isModified ? [reviewExtensionFor(pane)] : []),
     foldGutter(),
     drawSelection(),
     indentOnInput(),
@@ -250,10 +253,10 @@ function extensions(mode: "inline" | "side" = "inline") {
     highlightSelectionMatches(),
     history(),
     keymap.of([...defaultKeymap, ...searchKeymap, ...historyKeymap, indentWithTab]),
-    EditorState.readOnly.of(!props.editable),
-    EditorView.editable.of(!!props.editable),
+    EditorState.readOnly.of(!props.editable || !isModified),
+    EditorView.editable.of(!!props.editable && isModified),
     props.editable ? EditorView.lineWrapping : [],
-    ...(tracksSelection() ? selectionChatTooltip() : []),
+    ...(liveFile() && isModified ? [selectionTooltipExtension()] : []),
     themeCompartment.of(themeExtension(editorTheme.value, appearanceFonts.value.editor)),
     languageCompartment.of([]),
     EditorState.phrases.of({
@@ -271,7 +274,8 @@ function extensions(mode: "inline" | "side" = "inline") {
           })
         : [],
     EditorView.updateListener.of((update) => {
-      if (update.docChanged && props.editable) emit("change", update.state.doc.toString());
+      if (update.docChanged && props.editable && isModified)
+        emit("change", update.state.doc.toString());
       if (update.view !== view) return;
       if (update.selectionSet) statusStore.activate(statusId, reportCursor(update.state));
       else if (update.docChanged) statusStore.update(statusId, reportCursor(update.state));
@@ -310,13 +314,9 @@ function render() {
       parent: container.value,
       a: {
         doc: props.original,
-        extensions: [
-          ...extensions("side"),
-          EditorState.readOnly.of(true),
-          EditorView.editable.of(false),
-        ],
+        extensions: extensions("side", "original"),
       },
-      b: { doc: props.content, extensions: extensions("side") },
+      b: { doc: props.content, extensions: extensions("side", "modified") },
       gutter: true,
       revertControls: props.editable ? "a-to-b" : undefined,
       highlightChanges: true,
@@ -333,6 +333,7 @@ function render() {
   statusStore.activate(statusId, reportCursor(target.state));
   applyLanguage(target);
   void loadGutter();
+  syncReview(true);
   reveal();
 }
 function reveal() {
@@ -393,6 +394,19 @@ watch(
   () => void loadGutter(),
 );
 watch(() => [props.line, props.column, props.endLine], reveal);
+watch(
+  () => [
+    review?.comments.value,
+    review?.composing.value,
+    review?.editing.value,
+    props.path,
+    props.staged,
+  ],
+  ([, composing], [, prevComposing]) => {
+    syncReview(!!composing && composing !== prevComposing);
+  },
+  { deep: true },
+);
 onBeforeUnmount(() => {
   ++gutterToken;
   merge?.destroy();
@@ -404,6 +418,24 @@ onBeforeUnmount(() => {
 </script>
 <template>
   <UiPanel as="div" class="code-viewer-root">
+    <EditorTopbarActions v-if="showReviewIndicator">
+      <UiButton
+        size="sm"
+        appearance="quiet"
+        class="review-topbar-btn"
+        :class="{ active: fileReviewCount > 0 }"
+        :title="
+          fileReviewCount > 0
+            ? `Замечаний в файле: ${fileReviewCount} (всего в ревью: ${totalReviewCount}). Открыть ревью`
+            : `Замечаний в ревью: ${totalReviewCount}. Открыть ревью`
+        "
+        data-command="ide.review.open"
+        @click="review?.open()"
+      >
+        <ProjectorIcon name="message-square" class="review-topbar-icon" aria-hidden="true" />
+        <span>{{ fileReviewCount > 0 ? fileReviewCount : totalReviewCount }}</span>
+      </UiButton>
+    </EditorTopbarActions>
     <div v-if="original !== undefined" class="diff-layout" role="group" aria-label="Вид сравнения">
       <button
         type="button"
@@ -446,6 +478,20 @@ onBeforeUnmount(() => {
 <style scoped>
 .code-viewer-root {
   position: relative;
+}
+.review-topbar-btn {
+  min-height: 22px;
+  padding: 0 7px;
+  gap: 4px;
+  font: var(--fs-2xs) var(--mono);
+  color: var(--muted);
+}
+.review-topbar-btn.active {
+  color: var(--accent);
+}
+.review-topbar-icon {
+  width: 12px;
+  height: 12px;
 }
 .diff-header {
   display: flex;
@@ -517,6 +563,10 @@ onBeforeUnmount(() => {
 [data-theme-effects] .code-viewer :deep(.cm-gutters) {
   background-color: var(--theme-panel-background);
 }
+.code-viewer :deep(.selection-actions) {
+  display: flex;
+  gap: 4px;
+}
 .code-viewer :deep(.selection-chat) {
   display: inline-flex;
   align-items: center;
@@ -536,6 +586,9 @@ onBeforeUnmount(() => {
 .code-viewer :deep(.selection-chat:focus-visible) {
   border-color: var(--focus);
   background: var(--bg-4);
+}
+.code-viewer :deep(.selection-review) {
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--line-strong));
 }
 .code-viewer :deep(.cm-dirty-gutter) {
   width: 10px;

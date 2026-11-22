@@ -23,6 +23,8 @@ const props = withDefaults(
     projectId?: string;
     /** Хеш коммита: перетаскивание открывает diff именно этого коммита. */
     commit?: string;
+    /** Число замечаний ревью на файле для текущей стороны diff. */
+    commentCount?: (path: string) => number;
   }>(),
   { path: "", depth: 0 },
 );
@@ -97,6 +99,11 @@ const rows = computed(() => {
       ),
       change: entry.changes[0]!,
       tint: entryTint(entry.changes),
+      remarks: props.commentCount
+        ? entry.directory
+          ? entry.changes.reduce((sum, change) => sum + (props.commentCount?.(change.path) ?? 0), 0)
+          : props.commentCount(entry.path)
+        : 0,
     }));
 });
 function toggle(path: string) {
@@ -168,6 +175,14 @@ function startDrag(event: DragEvent, path: string) {
           <FileIcon :icon="entry.icon" />
           <span class="name u-truncate">{{ entry.name }}</span>
           <span v-if="entry.tint" class="u-sr-only">, {{ tintLabels[entry.tint] }}</span>
+          <span
+            v-if="entry.remarks && (!entry.directory || collapsed.has(entry.path))"
+            class="remarks"
+            :title="`Замечаний ревью: ${entry.remarks}`"
+          >
+            <ProjectorIcon name="message-square" aria-hidden="true" />
+            {{ entry.remarks }}
+          </span>
           <span v-if="entry.directory" class="count">{{ entry.changes.length }}</span>
         </UiActionRow>
         <button
@@ -200,6 +215,7 @@ function startDrag(event: DragEvent, path: string) {
         :project-id="projectId"
         :commit="commit"
         :selected="selected"
+        :comment-count="commentCount"
         @change="emit('change', $event)"
         @open="(path, pinned) => emit('open', path, pinned)"
         @target="emit('target', $event)"
@@ -298,5 +314,17 @@ function startDrag(event: DragEvent, path: string) {
   flex-shrink: 0;
   font: var(--fs-2xs) var(--mono);
   color: var(--faint);
+}
+.remarks {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  flex-shrink: 0;
+  color: var(--accent);
+  font: var(--fs-2xs) var(--mono);
+}
+.remarks svg {
+  width: 11px;
+  height: 11px;
 }
 </style>

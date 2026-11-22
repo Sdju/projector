@@ -211,6 +211,7 @@ onMounted(restoreScroll);
         :line="file.line"
         :end-line="file.endLine"
         :column="file.column"
+        :staged="file.staged"
         @change="emit('change', $event)"
         @save="emit('save')"
         @ready="restoreScroll"
