@@ -1,4 +1,5 @@
 import type { AcpDialect, AcpTaskPatch, AcpUpdate, PluginCodeApi } from "./api.ts";
+import { cursorStreamError } from "./errors.ts";
 
 function parentOf(update: AcpUpdate): string | undefined {
   const meta = (update._meta ?? {}) as Record<string, unknown>;
@@ -41,6 +42,7 @@ export function createCursorDialect(api: PluginCodeApi): AcpDialect {
   }
 
   return extendPlainDialect({
+    streamError: cursorStreamError,
     tool(update) {
       const parent = parentOf(update);
       return {

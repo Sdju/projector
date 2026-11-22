@@ -61,6 +61,8 @@ export function createAcpReplayCollector(
     if (kind === "user_message_chunk") replay.user(contentText(update.content));
     else if (kind === "agent_message_chunk") {
       const chunk = contentText(update.content);
+      // A failure the agent printed into the stream was never an answer; history drops it too.
+      if (dialect.streamError?.(update, chunk)) return;
       if (!dialect.chunk(update, chunk)) replay.text(chunk);
     } else if (kind === "agent_thought_chunk") {
       const chunk = contentText(update.content);

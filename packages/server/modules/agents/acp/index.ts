@@ -22,6 +22,7 @@ export {
   uuidV7Time,
   type AcpCompaction,
   type AcpDialect,
+  type AcpStreamFailure,
   type AcpTaskPatch,
   type AcpUpdate,
 } from "./acp-dialect.ts";

@@ -169,6 +169,50 @@ test("generate_image and task extensions emit chat events, not protocol names ou
   });
 });
 
+test("a failure Cursor printed into the answer becomes a retriable transport error", () => {
+  const dialect = createCursorDialect(testApi());
+  const failure = dialect.streamError(
+    { sessionUpdate: "agent_message_chunk" },
+    "\n\nError: RetriableError: [internal] Stream closed with error code NGHTTP2_INTERNAL_ERROR",
+  );
+  expect(failure).toMatchObject({
+    class: "transport_error",
+    code: "cursor_retriable",
+    retryable: true,
+  });
+  expect(failure.message).toContain("NGHTTP2_INTERNAL_ERROR");
+  expect(failure.message).toContain("Cursor потерял соединение");
+});
+
+test("Cursor's printed failures distinguish login, rejection and ordinary answers", () => {
+  const dialect = createCursorDialect(testApi());
+  expect(
+    dialect.streamError({ sessionUpdate: "agent_message_chunk" }, "\n\nPlease sign in to continue"),
+  ).toMatchObject({ class: "permission_error", retryable: false });
+  expect(
+    dialect.streamError(
+      { sessionUpdate: "agent_message_chunk" },
+      "\n\nError: [unauthenticated] Backend rejected authentication",
+    ),
+  ).toMatchObject({ class: "permission_error", retryable: false });
+  expect(
+    dialect.streamError(
+      { sessionUpdate: "agent_message_chunk" },
+      "\n\nError: NonRetriableError: Context window exceeded",
+    ),
+  ).toMatchObject({ code: "cursor_non_retriable", retryable: false });
+  expect(
+    dialect.streamError({ sessionUpdate: "agent_message_chunk" }, "Реализован режим Zen"),
+  ).toBeUndefined();
+  // A model answer that starts with the word error is not Cursor's printed failure.
+  expect(
+    dialect.streamError(
+      { sessionUpdate: "agent_message_chunk" },
+      "Error: это часть ответа, а не сбой",
+    ),
+  ).toBeUndefined();
+});
+
 test("Cursor's dialect starts a task from a task tool call", () => {
   const dialect = createCursorDialect(testApi());
   const patches = dialect.call(

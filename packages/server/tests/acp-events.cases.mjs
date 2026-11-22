@@ -1289,6 +1289,107 @@ test("waitBackground resolves immediately when abort fires", async () => {
   expect(mapper.pendingBackground).toBe(1);
 });
 
+/** A dialect whose agent prints a failed turn as an ordinary message chunk. */
+function createPrintedErrorDialect() {
+  return extendPlainDialect({
+    streamError(_update, text) {
+      const match = /^\n\nFAIL: (.+)$/.exec(text);
+      return match
+        ? {
+            message: match[1],
+            code: "printed",
+            class: "transport_error",
+            retryable: true,
+          }
+        : undefined;
+    },
+  });
+}
+
+test("an error-only answer becomes a failure with a retry when the answer ends", () => {
+  const events = [];
+  const mapper = createAcpEventMapper(
+    (event, data) => events.push([event, data]),
+    "Cursor",
+    createPrintedErrorDialect(),
+  );
+  mapper.handleUpdate("s", {
+    sessionUpdate: "agent_message_chunk",
+    content: { type: "text", text: "\n\nFAIL: stream closed" },
+  });
+  expect(events).toStrictEqual([]);
+  expect(mapper.text).toBe("");
+  mapper.finish();
+  expect(events).toHaveLength(1);
+  expect(events[0]).toMatchObject([
+    "error",
+    {
+      error: "stream closed",
+      failure: { class: "transport_error", code: "printed", retryable: true },
+    },
+  ]);
+});
+
+test("a real answer after a printed error clears it", () => {
+  const events = [];
+  const mapper = createAcpEventMapper(
+    (event, data) => events.push([event, data]),
+    "Cursor",
+    createPrintedErrorDialect(),
+  );
+  mapper.handleUpdate("s", {
+    sessionUpdate: "agent_message_chunk",
+    content: { type: "text", text: "\n\nFAIL: stream closed" },
+  });
+  mapper.handleUpdate("s", {
+    sessionUpdate: "agent_message_chunk",
+    content: { type: "text", text: "Ответ получен" },
+  });
+  expect(events).toStrictEqual([["text", { text: "Ответ получен" }]]);
+  expect(mapper.text).toBe("Ответ получен");
+  mapper.finish();
+  expect(events.some(([event]) => event === "error")).toBe(false);
+});
+
+test("a printed error after the answer started fails the turn at once, once", () => {
+  const events = [];
+  const mapper = createAcpEventMapper(
+    (event, data) => events.push([event, data]),
+    "Cursor",
+    createPrintedErrorDialect(),
+  );
+  mapper.handleUpdate("s", {
+    sessionUpdate: "agent_message_chunk",
+    content: { type: "text", text: "Начало" },
+  });
+  mapper.handleUpdate("s", {
+    sessionUpdate: "agent_message_chunk",
+    content: { type: "text", text: "\n\nFAIL: stream closed" },
+  });
+  expect(events.map(([event]) => event)).toStrictEqual(["text", "error"]);
+  expect(events[1][1]).toMatchObject({ error: "stream closed" });
+  mapper.finish();
+  expect(events.filter(([event]) => event === "error")).toHaveLength(1);
+});
+
+test("replay drops a failure the agent printed into the answer", () => {
+  const replay = createAcpReplayCollector("cursor", "s", createPrintedErrorDialect());
+  replay.handleUpdate({
+    sessionUpdate: "user_message_chunk",
+    content: { type: "text", text: "вопрос" },
+  });
+  replay.handleUpdate({
+    sessionUpdate: "agent_message_chunk",
+    content: { type: "text", text: "\n\nFAIL: stream closed" },
+  });
+  replay.handleUpdate({
+    sessionUpdate: "agent_message_chunk",
+    content: { type: "text", text: "Ответ получен" },
+  });
+  const assistant = replay.turns.at(-1);
+  expect(assistant.text).toBe("Ответ получен");
+});
+
 test("live and replay decode the same ACP text, diff and raw output", () => {
   const events = [];
   const live = createAcpEventMapper((event, data) => events.push({ event, data }), "Test ACP");

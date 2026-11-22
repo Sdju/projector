@@ -3,6 +3,7 @@
 export type {
   AcpDialect,
   AcpProgram,
+  AcpStreamFailure,
   AcpTaskPatch,
   AcpUpdate,
   AgentBackend,

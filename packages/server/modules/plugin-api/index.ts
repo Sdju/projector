@@ -44,6 +44,7 @@ export type {
   AcpFormField,
   AcpFormOption,
   AcpProgram,
+  AcpStreamFailure,
   AcpTaskPatch,
   AcpUpdate,
 } from "../agents/acp/index.ts";

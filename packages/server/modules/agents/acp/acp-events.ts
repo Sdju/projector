@@ -1,10 +1,11 @@
-import { type AgentCommand, type AgentEmitter } from "../../agent/index.ts";
+import { makeFailure, type AgentCommand, type AgentEmitter } from "../../agent/index.ts";
 import { createBackgroundHold } from "./acp-background-hold.ts";
 import {
   createPlainDialect,
   isOver,
   type AcpCompaction,
   type AcpDialect,
+  type AcpStreamFailure,
   type AcpTaskPatch,
 } from "./acp-dialect.ts";
 
@@ -59,8 +60,23 @@ export function createAcpEventMapper(
 ) {
   let text = "";
   let model = "";
+  /** An error the agent printed before the answer started; a real chunk cancels it. */
+  let printedFailure: AcpStreamFailure | undefined;
+  let failureReported = false;
   const toolNames = new Map<string, string>();
   const background = createBackgroundHold();
+  const reportFailure = (failure: AcpStreamFailure) => {
+    if (failureReported) return;
+    failureReported = true;
+    printedFailure = undefined;
+    const info = makeFailure({
+      message: failure.message,
+      code: failure.code ?? null,
+      class: failure.class,
+      retryable: failure.retryable,
+    });
+    emit("error", { error: info.message, failure: info });
+  };
   const poll = () => emitTasks(dialect.poll?.(options.sessionId?.() ?? "") ?? []);
   const emitTasks = (patches: AcpTaskPatch[]) => {
     for (const patch of patches) {
@@ -129,12 +145,21 @@ export function createAcpEventMapper(
     if (kind === "agent_message_chunk") {
       const chunk = contentText(update.content);
       if (!chunk) return;
+      // Cursor prints a failed turn as an ordinary message; it is not part of the answer.
+      const printed = dialect.streamError?.(update, chunk);
+      if (printed) {
+        if (text.trim()) reportFailure(printed);
+        else printedFailure = printed;
+        return;
+      }
       // What a subagent says is its progress, not part of the answer.
       const progress = dialect.chunk(update, chunk);
       if (progress) {
         emitTasks(progress);
         return;
       }
+      /** A real answer after a printed error means the agent recovered from it. */
+      printedFailure = undefined;
       emitTasks(dialect.speak());
       text += chunk;
       emit("text", { text: chunk });
@@ -227,7 +252,12 @@ export function createAcpEventMapper(
   return {
     handleUpdate,
     /** The answer ended: commands still running will outlive it. */
-    finish: () => emitTasks(dialect.finish()),
+    finish: () => {
+      // An error-only answer has no text to show, so it becomes a failure with a retry.
+      if (printedFailure && !text.trim()) reportFailure(printedFailure);
+      printedFailure = undefined;
+      emitTasks(dialect.finish());
+    },
     setModel(name: string) {
       model = name;
     },

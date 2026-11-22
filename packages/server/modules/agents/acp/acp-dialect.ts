@@ -1,3 +1,4 @@
+import type { AgentFailureClass } from "@ai-projector/core/modules/agent-failure/index.ts";
 import type { AgentTaskPatch } from "@ai-projector/core/modules/agent-task/index.ts";
 
 /**
@@ -37,6 +38,22 @@ export type AcpCompaction =
   | { id?: string; status: "completed"; summary?: string }
   | { id?: string; status: "cancelled" }
   | { id?: string; status: "failed"; error?: string };
+
+/**
+ * A failed turn an agent printed into the answer stream instead of returning a JSON-RPC error.
+ * The text is not an answer: the mapper withholds it and reports the failure when the answer ends
+ * without any other content. An error after the answer has started is reported immediately.
+ */
+export interface AcpStreamFailure {
+  /** Readable failure text for the chat. */
+  message: string;
+  /** Stable code for diagnostics; optional. */
+  code?: string;
+  /** Classification; absent lets the shared classifier read the message. */
+  class?: AgentFailureClass;
+  /** Whether repeating the request can help; absent lets the chat decide by the message. */
+  retryable?: boolean;
+}
 
 /** Text of an ACP content block (a string, one block or a list of blocks). */
 function contentText(value: unknown): string {
@@ -87,6 +104,12 @@ export interface AcpDialect {
    * and the mapper drops the text. `undefined` is a chunk of the answer itself.
    */
   chunk(update: AcpUpdate, text: string): AcpTaskPatch[] | undefined;
+  /**
+   * A failure the agent wrote as an answer chunk instead of failing the request (Cursor does
+   * this). The mapper withholds the text and reports the failure when the answer ends without
+   * content; after the answer started, it reports the failure at once.
+   */
+  streamError?(update: AcpUpdate, text: string): AcpStreamFailure | undefined;
   /** The update comes from inside a subagent, not from the agent answering the user. */
   inner(update: AcpUpdate): boolean;
   /** Any tool call or its update: subagents and background commands it starts or advances. */
@@ -138,6 +161,7 @@ export function createPlainDialect(): AcpDialect {
     tool: (update) => ({ name: String(update.title || update.kind || "tool") }),
     inner: () => false,
     chunk: () => undefined,
+    streamError: () => undefined,
     call: () => [],
     output: () => "",
     outputChunk: () => "",
