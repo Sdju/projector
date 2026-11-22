@@ -14,7 +14,7 @@
 
 - [review-workflow.md](review-workflow.md) — цикл ревью изменений: замечания к diff, stage по хунку, commit и push, частичное принятие работы задания, удалённые комментарии и approve.
 - [workspace-ux.md](workspace-ux.md) — навигация и сохранность рабочего места: быстрое открытие, история и blame файла, поиск в терминале, внешний редактор, восстановление окна и локальная история.
-- [delivery.md](delivery.md) — установка без сборочного окружения и доступ с телефона: бинарная поставка, автообновление, HTTPS, QR для LAN и Web Push.
+- [delivery.md](delivery.md) — npm как единственный канал: проверка registry, предложение обновиться, HTTPS/QR для LAN и телефон.
 - [cursor-acp.md](cursor-acp.md) — оставшиеся пункты ACP Cursor: форк и подпись модели; ограничения CLI (`--trust`, Team MCP) описаны в [usage](../usage.md).
 - [agent-roadmap.md](agent-roadmap.md) — открытые пункты штатного агента Projector и проверки Судьи в браузере.
 - [plugin-agents.md](plugin-agents.md) — что осталось у агентов-плагинов: hosted-жизненный цикл, статусы исчезнувшего агента, пресеты диалектов и изолированный runtime.

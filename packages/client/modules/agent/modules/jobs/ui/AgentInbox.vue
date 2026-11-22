@@ -12,6 +12,7 @@ import { useCommandScope, commandArgs } from "../../../../../common/utilities/co
 import { notify, reportError } from "../../../../../common/utilities/notice.ts";
 import { cancelAgentRun, requestNotifications, stopJob } from "../../../../agent-core/index.ts";
 import { deviceRoute } from "../../../../../common/utilities/device-url.ts";
+import { appUpdateInboxPending, AppUpdateNotice } from "../../../../app-update/index.ts";
 import { useAgentInbox, type InboxGroup, type InboxItem } from "../model/inbox.ts";
 import AgentInboxNotice from "./AgentInboxNotice.vue";
 import AgentInboxRow from "./AgentInboxRow.vue";
@@ -72,6 +73,12 @@ const waiting = computed(() => Math.max(0, attention.value - noticeUnread.value)
 const summary = computed(() =>
   [
     { key: "attention", text: `${waiting.value} ждут вас`, count: waiting.value, alert: true },
+    {
+      key: "update",
+      text: "доступно обновление",
+      count: Number(appUpdateInboxPending()),
+      alert: true,
+    },
     { key: "working", text: `${working.value} работают`, count: working.value },
     {
       key: "trust",
@@ -329,7 +336,7 @@ const groupBadge = (group: InboxGroup) =>
     </header>
 
     <UiLoader
-      v-if="!hostRefresh && loading && !items.length && !notices.length"
+      v-if="!hostRefresh && loading && !items.length && !notices.length && !appUpdateInboxPending()"
       label="Читаю работы…"
     />
     <UiMessage v-if="error" tone="danger" size="xs" role="alert" class="message">{{
@@ -351,11 +358,15 @@ const groupBadge = (group: InboxGroup) =>
       Уведомления запрещены в настройках браузера. Запросы останутся в этом списке.
     </UiHint>
 
-    <p v-if="!loading && !items.length && !notices.length" class="empty">
+    <p
+      v-if="!loading && !items.length && !notices.length && !appUpdateInboxPending()"
+      class="empty"
+    >
       Ничего не работает и не ждёт ответа. Задания и чаты появятся здесь для всех проектов и
       устройств.
     </p>
 
+    <AppUpdateNotice />
     <section v-if="notices.length" class="group">
       <header class="group-head">
         <span class="project">Доверие</span>

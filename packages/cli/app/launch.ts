@@ -1,4 +1,4 @@
-import { appendFileSync, existsSync, mkdirSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync, readFileSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -8,6 +8,14 @@ import {
   configuredAppPort,
   readServerMode,
 } from "@ai-projector/core/modules/app-paths/index.ts";
+import {
+  detectInstallSource,
+  IDE_PACKAGE,
+  isNewer,
+  MANAGED_BY_NPM_ENV,
+  managedByNpmFlag,
+  type InstallSource,
+} from "@ai-projector/core/modules/app-update/index.ts";
 import type { ServerMode } from "@ai-projector/core/modules/server-mode/index.ts";
 import { commandLogs } from "../commands/logs.ts";
 import { commandOpen, commandSettings, commandToggle } from "../commands/open.ts";
@@ -23,6 +31,18 @@ import { createServerControl, localServerUrl } from "../modules/server/index.ts"
 
 const ROOT = fileURLToPath(new URL("../../..", import.meta.url));
 const packaged = existsSync(join(ROOT, "packages/server/app/standalone.js"));
+const rootManifest = (): { name?: string; version?: string } => {
+  try {
+    return JSON.parse(readFileSync(join(ROOT, "package.json"), "utf8")) as {
+      name?: string;
+      version?: string;
+    };
+  } catch {
+    return {};
+  }
+};
+const manifest = rootManifest();
+if (manifest.name === IDE_PACKAGE) process.env[MANAGED_BY_NPM_ENV] ??= "1";
 const launchMode = (): ServerMode => (packaged ? "prod" : readServerMode());
 const fallbackUrl = appUrl(configuredAppPort());
 const DATA_DIR = join(os.dataHome(), "projector");
@@ -77,26 +97,62 @@ const serverControl = createServerControl({
   out,
 });
 
-async function version(): Promise<string> {
+function installSource(): InstallSource {
+  return detectInstallSource({
+    packageName: manifest.name,
+    packagePath: ROOT,
+    managedByNpm: managedByNpmFlag(process.env[MANAGED_BY_NPM_ENV]),
+  });
+}
+
+function installedVersion(): string {
+  return manifest.version || "";
+}
+
+async function latestFromCache(): Promise<string | undefined> {
   try {
-    const manifest = JSON.parse(await readFile(join(ROOT, "package.json"), "utf8")) as {
-      version?: string;
-    };
-    return manifest.version || "";
+    const value: unknown = JSON.parse(await readFile(join(DATA_DIR, "update.json"), "utf8"));
+    if (!value || typeof value !== "object" || Array.isArray(value)) return;
+    const latest = (value as { latest?: unknown }).latest;
+    return typeof latest === "string" ? latest : undefined;
   } catch {
-    return "";
+    return;
+  }
+}
+
+async function versionJson(): Promise<Record<string, unknown>> {
+  const version = installedVersion();
+  const source = installSource();
+  const payload: Record<string, unknown> = { version, source };
+  try {
+    const update = await api.request<{
+      latest?: string;
+      outdated?: boolean;
+      error?: string;
+    }>("/api/app/update", { timeout: 2_000 });
+    if (update.latest) payload.latest = update.latest;
+    if (typeof update.outdated === "boolean") payload.outdated = update.outdated;
+    else if (update.latest) payload.outdated = isNewer(update.latest, version);
+    if (update.error) payload.error = update.error;
+    return payload;
+  } catch {
+    const latest = await latestFromCache();
+    if (latest) {
+      payload.latest = latest;
+      payload.outdated = isNewer(latest, version);
+    }
+    return payload;
   }
 }
 
 async function execute(): Promise<void> {
   if (command === "help") {
-    console.log(helpText(await version()));
+    console.log(helpText(installedVersion()));
     return;
   }
   if (command === "version") {
-    const value = await version();
-    if (options.json) out(JSON.stringify({ version: value }, null, 2));
-    else out(value || "неизвестно");
+    if (options.json) out(JSON.stringify(await versionJson(), null, 2));
+    else out(installedVersion() || "неизвестно");
     return;
   }
   if (command === "mode") {

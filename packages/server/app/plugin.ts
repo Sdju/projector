@@ -26,6 +26,7 @@ import { registerBuiltinWidgetDefinitions } from "./widgets.ts";
 import { registerBuiltinAgentFeatures } from "./features.ts";
 import { ensureIdeMcpToken, bindIdeCommandEvents } from "../modules/ide/index.ts";
 import { reconcileOnStartup } from "../modules/environments/index.ts";
+import { scheduleAppUpdateCheck } from "../modules/app-update/index.ts";
 import {
   discoverPlugins,
   pluginsDirectory,
@@ -139,6 +140,7 @@ export function bindRuntime(
     void reconcileOnStartup().catch((error) =>
       console.error("Очистка контейнеров:", error.message),
     );
+    scheduleAppUpdateCheck();
     if (process.env.PROJECTOR_WINDOW === "1") {
       void openLauncher(url).catch(console.error);
     } else if (os.supported) {

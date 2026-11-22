@@ -22,7 +22,7 @@ CLI запускает сервер по требованию, открывае�
 | `projector mode [dev\|prod]` | Показывает или переключает режим сервера                             |
 | `projector settings`         | Открывает страницу настроек                                          |
 | `projector logs`             | Показывает путь к журналу сервера                                    |
-| `projector version`          | Показывает версию                                                    |
+| `projector version`          | Показывает версию; `--json` добавляет канал установки и npm latest   |
 | `projector help`             | Показывает справку                                                   |
 
 Псевдонимы: `projects` = `list` = `ls`, `start` = `serve`.
@@ -69,7 +69,7 @@ projector status .
 
 ## JSON
 
-`projects`, `status`, `search`, `run`, `stop`, `open`, `start`, `restart` и `quit` поддерживают `--json`. Ошибки по-прежнему печатаются в stderr, а команда завершается с ненулевым кодом.
+`projects`, `status`, `search`, `run`, `stop`, `open`, `start`, `restart`, `quit` и `version` поддерживают `--json`. Ошибки по-прежнему печатаются в stderr, а команда завершается с ненулевым кодом. `version --json` не падает, если registry или сервер недоступны: тогда в объекте остаются `version` и `source` (`checkout` / `npm` / `other`).
 
 ```bash
 projector projects --json

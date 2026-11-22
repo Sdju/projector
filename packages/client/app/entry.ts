@@ -9,6 +9,7 @@ import { deviceRoute } from "../common/utilities/device-url.ts";
 import { setInboxNotificationNavigator } from "../modules/agent-core/index.ts";
 import { authedFetch } from "../common/utilities/lan-auth.ts";
 import { initAppearance } from "../modules/appearance/index.ts";
+import { initAppUpdate } from "../modules/app-update/index.ts";
 import { initPwa } from "../modules/pwa/index.ts";
 import { initAppViewport } from "../common/utilities/app-viewport.ts";
 import "./styles.css";
@@ -24,6 +25,7 @@ const disposeViewport = initAppViewport();
 registerBuiltinWidgets();
 registerBuiltinClientAgents();
 initPwa();
+void initAppUpdate();
 
 // Plugin agents join before the first screen: menus, tabs and settings read one catalog.
 await refreshClientAgents();

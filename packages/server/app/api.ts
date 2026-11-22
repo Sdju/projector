@@ -15,6 +15,7 @@ import { routes as appRestartRoutes } from "../routes/api/app/restart.ts";
 import { routes as appModeRoutes } from "../routes/api/app/mode.ts";
 import { routes as appQuitRoutes } from "../routes/api/app/quit.ts";
 import { routes as appNetworkRoutes } from "../routes/api/app/network.ts";
+import { routes as appUpdateRoutes } from "../routes/api/app/update.ts";
 import { routes as launcherSettingsRoutes } from "../routes/api/launcher/settings.ts";
 import { routes as launcherSearchRoutes } from "../routes/api/launcher/search.ts";
 import { routes as launcherLaunchRoutes } from "../routes/api/launcher/launch.ts";
@@ -104,6 +105,7 @@ const dispatch = createRouteDispatcher([
   ...appQuitRoutes,
   ...appModeRoutes,
   ...appNetworkRoutes,
+  ...appUpdateRoutes,
   ...launcherSettingsRoutes,
   ...launcherSearchRoutes,
   ...launcherLaunchRoutes,

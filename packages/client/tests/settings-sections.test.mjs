@@ -56,6 +56,7 @@ test("app settings nest window, files, git and projector agent pages", async () 
   const ids = settingsSections.map((section) => section.id);
   expect(ids).toEqual(
     expect.arrayContaining([
+      "about",
       "interface",
       "plugins",
       "folders",

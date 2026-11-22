@@ -1,7 +1,9 @@
 <script setup lang="ts">
+import { computed } from "vue";
 import ProjectorIcon from "../../../../../common/icons/ProjectorIcon.vue";
 import UiButton from "../../../../../common/ui/UiButton.vue";
 import { useCommandScope } from "../../../../../common/utilities/commands.ts";
+import { appUpdateInboxPending } from "../../../../app-update/index.ts";
 import { useAgentInbox } from "../model/inbox.ts";
 
 /**
@@ -12,9 +14,12 @@ import { useAgentInbox } from "../model/inbox.ts";
 const props = withDefaults(defineProps<{ scopeId?: string }>(), { scopeId: "inbox" });
 const emit = defineEmits<{ open: [] }>();
 const { attention, unread, badgeCount, working, noticeUnread } = useAgentInbox();
+const extra = computed(() => Number(appUpdateInboxPending()));
+const waiting = computed(() => attention.value + extra.value);
+const badge = computed(() => badgeCount.value + extra.value);
 const commands = useCommandScope(props.scopeId, () => ({
   surface: "inbox",
-  attention: attention.value,
+  attention: waiting.value,
   unread: unread.value,
 }));
 commands.scope.registerCommand({
@@ -26,8 +31,9 @@ commands.scope.registerCommand({
 });
 const summary = () => {
   const parts: string[] = [];
-  const waiting = Math.max(0, attention.value - noticeUnread.value);
-  if (waiting) parts.push(`${waiting} ждут вашего ответа`);
+  const jobs = Math.max(0, attention.value - noticeUnread.value);
+  if (jobs) parts.push(`${jobs} ждут вашего ответа`);
+  if (extra.value) parts.push("доступно обновление Projector");
   if (noticeUnread.value) parts.push(`${noticeUnread.value} по доверию`);
   if (unread.value) parts.push(`${unread.value} завершили работу`);
   if (working.value) parts.push(`${working.value} работают`);
@@ -40,7 +46,7 @@ const summary = () => {
 <template>
   <UiButton
     class="bell"
-    :class="{ alert: attention, fresh: !attention && unread }"
+    :class="{ alert: waiting, fresh: !waiting && unread }"
     shape="icon"
     size="sm"
     :title="summary()"
@@ -49,8 +55,8 @@ const summary = () => {
     @click="commands.run('ide.inbox.open')"
   >
     <ProjectorIcon name="bell" aria-hidden="true" />
-    <span v-if="badgeCount" class="count" :class="{ info: !attention }" aria-hidden="true">{{
-      badgeCount
+    <span v-if="badge" class="count" :class="{ info: !waiting }" aria-hidden="true">{{
+      badge
     }}</span>
     <span v-else-if="working" class="dot" aria-hidden="true" />
   </UiButton>

@@ -7,6 +7,7 @@ import { GithubSettings } from "../github/index.ts";
 import { GitlabSettings } from "../gitlab/index.ts";
 import { DockerSettings } from "../docker/index.ts";
 import { ProviderPanel } from "../provider/index.ts";
+import { AboutSettings } from "../app-update/index.ts";
 import { PwaSettings } from "../pwa/index.ts";
 import { PluginSettings } from "../plugins/index.ts";
 import {
@@ -23,6 +24,14 @@ import { AgentPresetsSettings } from "../agent-presets/index.ts";
 import { type SettingsSection } from "../settings/index.ts";
 
 export const settingsSections: SettingsSection[] = [
+  {
+    id: "about",
+    title: "О приложении",
+    group: "Среда",
+    description: "Версия, канал установки и предложение обновиться из npm.",
+    keywords: "версия about обновление npm latest ide native hub install restart projector",
+    component: AboutSettings,
+  },
   {
     id: "interface",
     title: "Интерфейс",

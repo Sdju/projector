@@ -184,7 +184,7 @@ export function helpText(version = ""): string {
   projector mode [dev|prod]                   показать или переключить режим сервера
   projector settings                          открыть настройки
   projector logs                              показать путь к журналу сервера
-  projector version                           показать версию
+  projector version [--json]                  показать версию и канал установки
   projector help                              показать эту справку
 
 Проект:

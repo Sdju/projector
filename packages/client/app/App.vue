@@ -17,6 +17,7 @@ import {
 } from "../modules/project/index.ts";
 import { useRunner } from "../modules/runner/index.ts";
 import { CommandPalette, provideIdeCommands } from "../modules/ide/index.ts";
+import { registerAppUpdateCommands } from "../modules/app-update/index.ts";
 import { registerMediaCommands } from "../modules/media/index.ts";
 import UiMessage from "../common/ui/UiMessage.vue";
 import UiNoticeHost from "../common/ui/UiNoticeHost.vue";
@@ -26,6 +27,8 @@ const { error: commandError, api } = provideIdeCommands();
 /** Media commands live at app level, not in the tab: an agent may use them while it is closed. */
 const mediaCommands = api.createScope("media", () => ({ surface: "media" }));
 registerMediaCommands(mediaCommands);
+const appUpdateCommands = api.createScope("app-update", () => ({ surface: "app-update" }));
+registerAppUpdateCommands(appUpdateCommands);
 const { load, projects } = useProjects();
 const { connect } = useRunner();
 const route = useRoute();

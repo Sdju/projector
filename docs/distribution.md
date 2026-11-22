@@ -40,6 +40,8 @@ projector-install-desktop
 
 Версия в имени tarball соответствует корневому `package.json`. Для установки без глобальных прав можно добавить `--prefix ~/.local` к командам npm и включить `~/.local/bin` в `PATH`.
 
+Обновление — не из процесса сервера. **Настройки → О приложении** проверяет `latest` в registry и копирует `npm install -g --allow-scripts=node-pty @ai-projector/ide@<версия>`; после неё нужен `projector restart`. Checkout исходников это предложение не показывает. Опубликованный CLI выставляет `PROJECTOR_MANAGED_BY_NPM`.
+
 ## Локальные tarball
 
 Если версия ещё не опубликована:

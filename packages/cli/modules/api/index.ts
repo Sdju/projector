@@ -12,6 +12,8 @@ export interface HealthInfo {
   pid: number;
   url?: string;
   mode?: string;
+  version?: string;
+  source?: string;
   network?: {
     mode?: string;
     passwordRequired?: boolean;

@@ -240,6 +240,24 @@ test("CLI reads projects from disk when the server is stopped", async () => {
   });
 });
 
+test("CLI version --json names the checkout and survives a downed server", async () => {
+  const data = await mkdtemp(join(tmpdir(), "projector-cli-version-"));
+  onTestFinished(() => rm(data, { recursive: true, force: true }));
+  const { stdout, stderr } = await run(process.execPath, [launch, "version", "--json"], {
+    env: {
+      ...process.env,
+      PROJECTOR_URL: "http://127.0.0.1:9",
+      XDG_DATA_HOME: data,
+    },
+    timeout: 15_000,
+  });
+  expect(stderr).toBe("");
+  expect(JSON.parse(stdout)).toMatchObject({
+    source: "checkout",
+    version: expect.stringMatching(/^\d+\.\d+\.\d+/),
+  });
+});
+
 test("CLI repeats the palette request when a dev restart drops the socket", async () => {
   let base = "";
   let opens = 0;

@@ -2,7 +2,7 @@
 /** Rendering only: announcement role and async lifecycle belong to the owner. */
 defineProps<{
   as?: "p" | "div" | "span";
-  tone?: "danger" | "muted";
+  tone?: "danger" | "muted" | "warning";
   variant?: "plain" | "note" | "padded";
   size?: "2xs" | "xs" | "sm";
   padding?: 3 | 4;
@@ -27,6 +27,9 @@ defineProps<{
 }
 .muted {
   color: var(--muted);
+}
+.warning {
+  color: var(--warn);
 }
 .note {
   margin: 0;
