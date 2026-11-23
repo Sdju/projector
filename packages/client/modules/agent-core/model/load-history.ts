@@ -11,7 +11,15 @@ export function loadHistory(url: string, state: ChatState, quiet = false): Promi
   if (!quiet) state.loading = true;
   return fetch(url)
     .then(async (response) => {
-      if (!response.ok) throw new Error("Не удалось загрузить историю чата");
+      if (!response.ok) {
+        // The server explains a rejected read (a broken plugin, a bad chat id); a proxy in front
+        // of it answers with its own page, so the status is then the only detail.
+        const detail = await response.json().then(
+          (data) => (typeof data?.error === "string" ? data.error : `HTTP ${response.status}`),
+          () => `HTTP ${response.status}`,
+        );
+        throw new Error(`Не удалось загрузить историю чата: ${detail}`);
+      }
       const data = await response.json();
       const features = Array.isArray(data.features) ? data.features : undefined;
       const judge = data.judge && typeof data.judge === "object" ? data.judge : undefined;
