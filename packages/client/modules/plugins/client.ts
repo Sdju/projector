@@ -26,6 +26,7 @@ export interface PluginInfo {
   server?: string;
   browser?: PluginBrowserEntry & { hash: string };
   path?: string;
+  source?: string;
   diagnostics: { message: string }[];
   themes: AvailableTheme[];
   agents: PluginAgentContribution[];
@@ -84,7 +85,7 @@ export function fetchPlugins(): Promise<PluginCatalog> {
 }
 
 export function pluginAction(
-  action: "refresh" | "enable" | "disable" | "install" | "trust" | "remove",
+  action: "refresh" | "enable" | "disable" | "install" | "rebuild" | "trust" | "remove",
   body: { id?: string; path?: string } = {},
 ): Promise<PluginCatalog> {
   return request<PluginCatalog>({ method: "POST", body: JSON.stringify({ action, ...body }) }).then(

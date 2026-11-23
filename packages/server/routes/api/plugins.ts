@@ -10,6 +10,7 @@ import {
   pluginPackageExists,
   readPluginReadme,
   readPluginStorage,
+  rebuildPlugin,
   removePlugin,
   setPluginEnabled,
   trustPlugin,
@@ -241,6 +242,8 @@ export const routes: RouteDefinition[] = [
       else if (action === "disable")
         json(res, 200, await setPluginEnabled(asString(body.id), false));
       else if (action === "install") json(res, 200, await installPlugin(body.path));
+      else if (action === "rebuild")
+        json(res, 200, await rebuildPlugin({ id: asString(body.id), path: asString(body.path) }));
       else if (action === "trust") json(res, 200, await trustPlugin(asString(body.id)));
       else if (action === "remove") json(res, 200, await removePlugin(asString(body.id)));
       else throw new HttpError(400, "Неизвестное действие с плагином");

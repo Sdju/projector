@@ -41,6 +41,9 @@ defineProps<{
       <div class="identity">
         <h2 :title="selected.path">{{ selected.id }}</h2>
         <p>{{ selected.description || pluginKindHint(selected) }}</p>
+        <p v-if="selected.source" class="source" :title="selected.source">
+          Исходники: <code>{{ selected.source }}</code>
+        </p>
         <UiInline wrap :gap="1">
           <UiBadge v-if="selected.version" mono>v{{ selected.version }}</UiBadge>
           <UiBadge v-if="selected.code" tone="warning">код</UiBadge>
@@ -75,6 +78,14 @@ defineProps<{
           :disabled="busy"
           @click="commands.run('ide.plugin.enable', { id: selected.id })"
           >Включить</UiButton
+        >
+        <UiButton
+          v-if="selected.source"
+          size="sm"
+          :disabled="busy"
+          title="Собрать projector.build в исходниках и включить с доверием"
+          @click="commands.run('ide.plugin.rebuild', { id: selected.id })"
+          >Пересобрать</UiButton
         >
         <UiButton
           size="sm"
@@ -186,10 +197,19 @@ defineProps<{
   color: var(--muted);
   font-size: var(--fs-xs);
 }
+.identity .source {
+  margin-top: calc(var(--sp-1) * -1);
+  font-size: var(--fs-2xs);
+}
+.identity .source code {
+  font-size: inherit;
+}
 .actions {
   display: flex;
   flex: 0 0 auto;
+  flex-wrap: wrap;
   align-items: center;
+  justify-content: flex-end;
   gap: var(--sp-2);
 }
 .diagnostics {

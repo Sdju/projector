@@ -186,8 +186,18 @@ function setEnabled(plugin: PluginInfo, enabled: boolean) {
             @update:model-value="emit('update:installPath', String($event))"
           />
           <UiButton type="submit" :disabled="busy || !installPath.trim()">Установить</UiButton>
+          <UiButton
+            type="button"
+            :disabled="busy || !installPath.trim()"
+            @click="commands.run('ide.plugins.rebuild', { path: installPath.trim() })"
+            >Собрать и подключить</UiButton
+          >
         </UiInline>
       </form>
+      <p class="rebuild-hint">
+        «Собрать и подключить» выполнит <code>projector.build</code> в папке и сразу включит
+        результат с доверием.
+      </p>
     </PluginSettingsGroup>
 
     <UiMessage v-if="error || status" role="status" :tone="error ? 'danger' : undefined">
@@ -389,6 +399,12 @@ function setEnabled(plugin: PluginInfo, enabled: boolean) {
 }
 .install-form input {
   min-width: 220px;
+}
+.rebuild-hint {
+  margin: var(--sp-2) 0 0;
+  color: var(--muted);
+  font-size: var(--fs-2xs);
+  line-height: var(--lh);
 }
 .directory {
   margin: 0;

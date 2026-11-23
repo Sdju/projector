@@ -1,6 +1,7 @@
 import {
   assertAllowedKeys,
   assertRecord,
+  assertSafeText,
   assertText,
   validateAgentContribution,
   type PluginAgentContribution,
@@ -96,6 +97,8 @@ export interface PluginManifest {
   optionalDependencies?: Record<string, string>;
   projector: {
     apiVersion: typeof pluginApiVersion;
+    /** A local build command for the settings rebuild action, run in the package folder. */
+    build?: string;
     /**
      * Server-side code entry inside the package, relative and never outside it.
      * The file runs in the Projector server process, so enabling it requires explicit user trust.
@@ -276,11 +279,13 @@ export function validatePluginManifest(
   assertRecord(value.projector, "projector");
   assertAllowedKeys(
     value.projector,
-    ["apiVersion", "contributes", "server", "browser"],
+    ["apiVersion", "build", "contributes", "server", "browser"],
     "projector",
   );
   if (value.projector.apiVersion !== pluginApiVersion)
     throw new Error("Неподдерживаемая версия API плагина");
+  if (value.projector.build !== undefined)
+    assertSafeText(value.projector.build, "projector.build", 1_000);
   assertRecord(value.projector.contributes, "projector.contributes");
   const contributes = value.projector.contributes;
   assertAllowedKeys(

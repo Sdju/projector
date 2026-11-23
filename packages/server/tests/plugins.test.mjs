@@ -10,7 +10,9 @@ import { readAppearanceChoice } from "../modules/appearance/index.ts";
 import {
   discoverPlugins,
   installPlugin,
+  packagesDirectory,
   pluginsDirectory,
+  rebuildPlugin,
   setPluginEnabled,
 } from "../modules/plugins/index.ts";
 import { handleApi } from "../app/api.ts";
@@ -29,6 +31,40 @@ async function tempFixture() {
   const directory = await mkdtemp(join(tmpdir(), "projector-plugin-test-"));
   const source = join(directory, "theme");
   await cp(fixture, source, { recursive: true });
+  onTestFinished(() => rm(directory, { recursive: true, force: true }));
+  return source;
+}
+
+const rebuiltId = "@projector-tests/rebuilt";
+
+async function rebuildSource(options = {}) {
+  const directory = await mkdtemp(join(tmpdir(), "projector-rebuild-test-"));
+  const source = join(directory, "source");
+  await mkdir(source, { recursive: true });
+  await writeFile(
+    join(source, "package.json"),
+    JSON.stringify({
+      name: rebuiltId,
+      version: "1.0.0",
+      projector: {
+        apiVersion: 1,
+        ...(options.script === false ? {} : { build: "node build.mjs" }),
+        browser: "dist/browser.mjs",
+        contributes: { agents: [{ id: "rebuilt", title: "Rebuilt", command: "echo" }] },
+      },
+    }),
+  );
+  if (options.script !== false) {
+    await writeFile(
+      join(source, "build.mjs"),
+      [
+        'import { mkdirSync, writeFileSync } from "node:fs";',
+        ...(options.fail ? ['console.error("build failed on purpose");', "process.exit(3);"] : []),
+        'mkdirSync("dist", { recursive: true });',
+        `writeFileSync("dist/browser.mjs", ${JSON.stringify(options.output ?? "export default { apiVersion: 1, activate() {} };\\n")});`,
+      ].join("\n"),
+    );
+  }
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
   return source;
 }
@@ -180,6 +216,65 @@ test("plugins API installs a local fixture, applies its theme and falls back aft
   expect(rejected.status).toBe(400);
 
   expect((await request("install", { path: source })).status).toBe(400);
+});
+
+test("rebuild builds the saved source, replaces the same version and trusts it", async () => {
+  const source = await rebuildSource();
+  let catalog = await rebuildPlugin({ path: source });
+  expect(catalog.plugins.find((item) => item.id === rebuiltId)).toMatchObject({
+    enabled: true,
+    trusted: true,
+    version: "1.0.0",
+    source,
+  });
+  const installed = join(packagesDirectory(), ...rebuiltId.split("/"), "1.0.0", "dist/browser.mjs");
+  expect(await readFile(installed, "utf8")).toContain("activate() {}");
+  expect(
+    JSON.parse(await readFile(join(dataDir(), "plugins.json"), "utf8")).plugins[rebuiltId].source,
+  ).toBe(source);
+
+  // The saved folder lets the card rebuild without asking for the path again.
+  await writeFile(
+    join(source, "build.mjs"),
+    [
+      'import { mkdirSync, writeFileSync } from "node:fs";',
+      'mkdirSync("dist", { recursive: true });',
+      'writeFileSync("dist/browser.mjs", "export default { rebuilt: true };\\n");',
+    ].join("\n"),
+  );
+  catalog = await rebuildPlugin({ id: rebuiltId });
+  expect(catalog.plugins.find((item) => item.id === rebuiltId)).toMatchObject({
+    enabled: true,
+    trusted: true,
+  });
+  expect(await readFile(installed, "utf8")).toContain("rebuilt: true");
+});
+
+test("plugins API rebuilds a source folder and trusts it", async () => {
+  const base = await apiServer();
+  const source = await rebuildSource();
+  const response = await fetch(`${base}/api/plugins`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Origin: base },
+    body: JSON.stringify({ action: "rebuild", path: source }),
+  });
+  expect(response.status).toBe(200);
+  const catalog = await response.json();
+  expect(catalog.plugins.find((item) => item.id === rebuiltId)).toMatchObject({
+    enabled: true,
+    trusted: true,
+    source,
+  });
+});
+
+test("rebuild refuses a missing build script or a failed build", async () => {
+  const noScript = await rebuildSource({ script: false });
+  await expect(rebuildPlugin({ path: noScript })).rejects.toThrow(/projector\.build/);
+  expect((await discoverPlugins()).plugins.some((item) => item.id === rebuiltId)).toBe(false);
+
+  const failing = await rebuildSource({ fail: true });
+  await expect(rebuildPlugin({ path: failing })).rejects.toThrow(/Сборка плагина не удалась/);
+  expect((await discoverPlugins()).plugins.some((item) => item.id === rebuiltId)).toBe(false);
 });
 
 test("проверка engines.projector берёт версию из манифеста, а не из кода", async () => {

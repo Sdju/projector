@@ -188,6 +188,18 @@ export function usePluginSettings() {
     return install(picked.path);
   }
 
+  async function rebuild(id: string, path: string) {
+    if (!id && !path) throw new Error("Укажите плагин или папку с исходниками");
+    return perform(
+      () =>
+        pluginAction("rebuild", {
+          ...(id ? { id } : {}),
+          ...(path ? { path } : {}),
+        }),
+      "Плагин пересобран, доверен и включён",
+    );
+  }
+
   function themeArgument(value: unknown): string {
     const args = commandArgs(value);
     const id = optionalStringArg(args, "id");
@@ -299,6 +311,25 @@ export function usePluginSettings() {
     arguments: { path: "string: абсолютный путь к папке с package.json; без него — поле экрана" },
     enabled: () => !busy.value,
     run: (value) => install(optionalStringArg(commandArgs(value), "path") ?? installPath.value),
+  });
+  commands.scope.registerCommand({
+    id: "ide.plugins.rebuild",
+    title: "Собрать и подключить плагин из папки",
+    description:
+      "Запускает projector.build в папке, устанавливает результат, подтверждает доверие и включает плагин. Выполняет код сборки из этой папки.",
+    arguments: { path: "string: абсолютный путь к папке с package.json; без него — поле экрана" },
+    enabled: () => !busy.value,
+    run: (value) =>
+      rebuild("", optionalStringArg(commandArgs(value), "path") ?? installPath.value.trim()),
+  });
+  commands.scope.registerCommand({
+    id: "ide.plugin.rebuild",
+    title: "Пересобрать плагин из сохранённой папки",
+    description:
+      "Запускает projector.build в папке, из которой плагин установлен, затем включает результат с доверием.",
+    arguments: { id: "string: имя пакета плагина; без него — открытая карточка" },
+    enabled: () => !busy.value,
+    run: (value) => rebuild(optionalStringArg(commandArgs(value), "id") ?? selectedId.value, ""),
   });
   commands.scope.registerCommand({
     id: "ide.plugins.folder.open",

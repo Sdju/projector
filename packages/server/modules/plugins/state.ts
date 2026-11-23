@@ -8,6 +8,8 @@ export interface StoredPluginState {
   version?: string;
   /** Content hash the user confirmed for an agent plugin; themes do not need one. */
   trustedHash?: string;
+  /** The local folder the package was installed from, for rebuilding it in place. */
+  source?: string;
 }
 
 export type PluginState = Record<string, StoredPluginState>;
@@ -39,6 +41,7 @@ export async function readState(): Promise<PluginState> {
           enabled: item.enabled,
           version: typeof item.version === "string" ? item.version : undefined,
           trustedHash: typeof item.trustedHash === "string" ? item.trustedHash : undefined,
+          source: typeof item.source === "string" && item.source.trim() ? item.source : undefined,
         };
     }
     return state;

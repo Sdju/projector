@@ -37,6 +37,7 @@ Projector поддерживает локальные плагины: цвето
 - `version` обязателен и должен быть semver `x.y.z`, с необязательными prerelease/build-частями.
 - `description`, `engines.projector`, `dependencies` и `optionalDependencies` необязательны. Для `engines.projector` проверяется совместимость с текущей версией Projector; поддерживаются `*`, `latest`, сравнения, `^`, `~`, пробелы между условиями и `||`. В `dependencies` и `optionalDependencies` запрещены локальные протоколы `workspace:`, `catalog:`, `file:`, `link:`, `portal:`.
 - `projector.apiVersion` обязателен и сейчас равен только `1`; это версия контракта автора.
+- `projector.build` необязателен: команда пересборки локальных исходников для кнопки «Пересобрать» (например, `"vp build"`). Она запускается только по явному действию пользователя.
 - `projector.server` необязателен и указывает на собранный CommonJS-модуль; он допустим вместе с `contributes.agents`, `contributes.balances` или `contributes.http`.
 - `projector.browser` необязателен и указывает на собранный ESM-модуль, например `dist/browser.js`. Entry обязан лежать в подкаталоге артефактов (не в корне пакета), а все относительные chunks и ассеты — рядом с ним.
 - `projector.contributes` содержит хотя бы один непустой вклад: `themes`, `agents`, `balances`, `http`, `languages`, `panels` или `tabs`.
@@ -400,7 +401,7 @@ JSON токенов — плоский объект. Обязательны `bg`
 
 ## API
 
-Все ответы каталога имеют вид `{ directory, plugins, availableThemes }`. Элемент `plugins` содержит `id`, необязательные `version`, `description`, `path`, `status`, `enabled`, `trusted`, `requiresTrust`, `hash`, `server`, `browser`, `readme`, `diagnostics: [{ message }]`, `themes`, `agents`, `balances`, `languages`, `panels` и `tabs`. `readme: true`, если в корне пакета есть обычный `README.md` (или `readme.md` / `.markdown`). `browser` — `{ entry, key, hash }`; абсолютных путей к ассетам нет. Элемент `availableThemes` и `themes` содержит полный `id`, `packageName`, `title`, необязательный `description`, `mode` и проверенные `tokens`.
+Все ответы каталога имеют вид `{ directory, plugins, availableThemes }`. Элемент `plugins` содержит `id`, необязательные `version`, `description`, `path`, `source`, `status`, `enabled`, `trusted`, `requiresTrust`, `hash`, `server`, `browser`, `readme`, `diagnostics: [{ message }]`, `themes`, `agents`, `balances`, `languages`, `panels` и `tabs`. `readme: true`, если в корне пакета есть обычный `README.md` (или `readme.md` / `.markdown`). `browser` — `{ entry, key, hash }`; абсолютных путей к ассетам нет. Элемент `availableThemes` и `themes` содержит полный `id`, `packageName`, `title`, необязательный `description`, `mode` и проверенные `tokens`.
 
 - `GET /api/plugins` — заново обнаруживает и читает локальные пакеты.
 - `GET /api/trust-notices` — ожидающие уведомления об отозванном доверии к плагинам и файлам проектов для центра работ; ответ `{ notices }`. Проектное уведомление содержит id и путь проекта, чтобы открыть нужный раздел настроек; путь плагина не отдаётся.
@@ -418,7 +419,7 @@ JSON токенов — плоский объект. Обязательны `bg`
 - `DELETE /api/plugins/<package-key>/storage?key=<name>` — удаляет один ключ; без `key` — 400.
 - `GET /api/agent/usage/<id>` — лимиты плагинного агента с `usage.command`. Ответ нормализован в `AgentUsage`, ошибки провайдера возвращаются как `unavailable`.
 
-Повторная установка той же версии отклоняется. При копировании допускаются только обычные файлы и папки, симлинки запрещены. Обновления установленной версии нет.
+Повторная установка той же версии отклоняется; исключение — `rebuild`, который заменяет управляемую копию после сборки исходников. При копировании допускаются только обычные файлы и папки, симлинки запрещены. Обновления установленной версии нет.
 
 Внешние темы также включены в `themes` ответа `GET /api/appearance` и принимаются `PUT /api/appearance` как `{"choice":"<package>/<theme>"}`, только пока их пакет включён и валиден. `GET /api/appearance/bootstrap.js` устанавливает токены на `<html>` до первого кадра. API доступны только страницам Projector с соответствующей проверкой доступа и Origin; `Cache-Control: no-store` исключает кеширование каталога.
 
@@ -444,6 +445,24 @@ JSON токенов — плоский объект. Обязательны `bg`
 curl -X POST http://localhost:4177/api/plugins \
   -H 'Content-Type: application/json' \
   --data '{"action":"install","path":"/tmp/sepia-theme"}'
+```
+
+## Пересборка и подключение
+
+Плагин, установленный из папки, запоминает её в `plugins.json` как `source`. В карточке появляется **Пересобрать**, а в блоке установки — **Собрать и подключить**.
+
+Действие `rebuild` запускает `projector.build` в папке исходников, устанавливает результат (заменяя управляемую копию той же версии), сразу подтверждает доверие к новому содержимому и включает пакет. Прямая папка в каталоге плагинов пересобирается на месте. Это единственное место, где установка сама запускает код сборки и доверяет результату; обычный `install` по-прежнему только копирует готовый пакет. Действие всегда инициирует пользователь: кнопка или команда явно разрешают выполнить сборку и доверие.
+
+```bash
+# По папке исходников; путь сохранится для следующих пересборок.
+curl -X POST http://localhost:4177/api/plugins \
+  -H 'Content-Type: application/json' \
+  --data '{"action":"rebuild","path":"/path/to/plugin"}'
+
+# По уже сохранённой папке установленного пакета.
+curl -X POST http://localhost:4177/api/plugins \
+  -H 'Content-Type: application/json' \
+  --data '{"action":"rebuild","id":"@projector/cursor-agent"}'
 ```
 
 Действия также доступны через [IDE-команды](ide-commands.md#локальные-плагины). Контракты и валидация находятся в `packages/core/modules/plugins`, публичный API автора — в `packages/plugin-api`, обнаружение, доверие, установка и ассеты — в `packages/server/modules/plugins`, браузерный runtime и виды вкладов — в `packages/client/modules/plugin-runtime`, настройки и команды — в `packages/client/modules/plugins`.

@@ -36,6 +36,8 @@ export interface PluginInfo {
   /** The package root has a README the settings page can render. */
   readme?: boolean;
   path?: string;
+  /** The folder the package was installed from, when it is known. */
+  source?: string;
   dependencies?: Record<string, string>;
   diagnostics: PluginDiagnostic[];
   themes: AvailableTheme[];

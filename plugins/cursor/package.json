@@ -9,6 +9,7 @@
   },
   "projector": {
     "apiVersion": 1,
+    "build": "vp build",
     "server": "dist/server.cjs",
     "contributes": {
       "agents": [

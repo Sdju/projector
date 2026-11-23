@@ -147,6 +147,9 @@ export async function discoverPlugins(): Promise<PluginCatalog> {
     try {
       const loaded = await loadPluginPackage(selected[0].candidate, installedProjectorVersion());
       const enabled = saved?.enabled ?? false;
+      const source =
+        saved?.source ||
+        (selected[0].candidate.source === "direct" ? selected[0].candidate.path : undefined);
       const agents = loaded.agents;
       const balances = loaded.balances;
       const requiresTrust =
@@ -172,6 +175,7 @@ export async function discoverPlugins(): Promise<PluginCatalog> {
         version: loaded.manifest.version,
         description: loaded.manifest.description,
         path: selected[0].candidate.path,
+        ...(source ? { source } : {}),
         status: diagnostics.length ? "error" : enabled ? "enabled" : "disabled",
         enabled,
         trusted,
