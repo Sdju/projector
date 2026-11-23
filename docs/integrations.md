@@ -84,6 +84,10 @@ Kimi Code выдаёт access token на 15 минут. Projector читает �
 
 У QwenCloud денежного баланса по ключу API нет. `GET /api/providers/usage?id=…` запускает установленный CLI `qwencloud usage summary --format json` и `billing summary --format json`, нормализует расход, бесплатные квоты, план и кредиты и кеширует ответ на минуту. Это не кошелёк и не входит в агрегат балансов; в карточке провайдера блок подписан «расход провайдера». Без CLI ответ `unavailable` с понятной причиной, ключи и вывод CLI наружу не попадают. Команда обновления — `ide.providers.usage.refresh`; читатель выбирается по виду провайдера через общий реестр.
 
+Projector не выбирает регион QwenCloud за пользователя. Новый провайдер создаётся с пустым адресом, а `https://{region}.maas.qwencloudapi.com/compatible-mode/v1` показывается подсказкой: регион и ключ должны совпадать, поэтому адрес вставляется из консоли QwenCloud. Регион хранится в самом URL и переносится вместе с `providers.json`; домен `maas.qwencloudapi.com` без региона обслуживает Singapore, а Token Plan использует `token-plan.maas.qwencloudapi.com`.
+
+Общий разбор `packages/core/modules/providers/qwencloud.ts` принимает origin, медийную базу `/api/v1`, `/compatible-mode/v1` и `/apps/anthropic`, а незнакомый путь (например, прокси) не переписывает. Чат, список моделей и OpenAI-шлюз идут в `/compatible-mode/v1`, медиа-адаптер — в `/api/v1`. Старый `dashscope-intl.aliyuncs.com` продолжает работать, но карточка провайдера показывает регион и предупреждает, что ключи QwenCloud и регионы с ним не совпадают; ответы `401`/`403` получают ту же подсказку. Подробности вида в карточке живут в `packages/client/modules/provider-qwencloud` и регистрируются в общей панели, поэтому `ProviderPanel` не содержит веток QwenCloud.
+
 ## Провайдеры и модели
 
 - Провайдер хранит `models: [{ id, alias }]`: `id` уходит провайдеру, `alias` — имя для агента и шлюза (по умолчанию `id`, уникально в пределах провайдера). Старое поле `model` при чтении превращается в одну модель.

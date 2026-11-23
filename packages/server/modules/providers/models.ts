@@ -1,5 +1,6 @@
 import { HttpError } from "../http/index.ts";
-import { normalizeOpenAiBaseUrl } from "./openai-client.ts";
+import { inferProviderKind } from "./kinds.ts";
+import { providerBaseUrl } from "./openai-client.ts";
 import type { ModelPrice, ProviderModel, ResolvedOpenAIProvider } from "./types.ts";
 
 const MAX_MODELS = 500;
@@ -90,11 +91,15 @@ export function resolveModel(
 }
 
 /** Model ids from `GET <base>/models` of an OpenAI-compatible server (also Ollama's `models`). */
-export async function fetchRemoteModels(url: string, apiKey: string): Promise<string[]> {
+export async function fetchRemoteModels(
+  url: string,
+  apiKey: string,
+  kind?: string,
+): Promise<string[]> {
   if (!url.trim()) throw new HttpError(400, "Укажите адрес провайдера");
   let response: Response;
   try {
-    response = await fetch(`${normalizeOpenAiBaseUrl(url)}/models`, {
+    response = await fetch(`${providerBaseUrl(kind, url)}/models`, {
       headers: {
         Accept: "application/json",
         ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}),
@@ -104,8 +109,14 @@ export async function fetchRemoteModels(url: string, apiKey: string): Promise<st
   } catch (error) {
     throw new HttpError(502, `Провайдер не отвечает: ${(error as Error).message}`);
   }
-  if (!response.ok)
-    throw new HttpError(502, `Провайдер не отдал список моделей (HTTP ${response.status})`);
+  if (!response.ok) {
+    const hint =
+      (kind ?? inferProviderKind(url)) === "qwencloud" &&
+      (response.status === 401 || response.status === 403)
+        ? " — проверьте, что ключ создан в регионе адреса провайдера"
+        : "";
+    throw new HttpError(502, `Провайдер не отдал список моделей (HTTP ${response.status})${hint}`);
+  }
   let body: unknown;
   try {
     body = await response.json();

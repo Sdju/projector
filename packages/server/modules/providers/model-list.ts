@@ -3,6 +3,7 @@ import {
   resolveOpenAIProvider,
   envFallbackFromProcess,
 } from "./provider-store.ts";
+import type { ProviderKind } from "./types.ts";
 import { fetchRemoteModels } from "./models.ts";
 
 /**
@@ -12,15 +13,17 @@ import { fetchRemoteModels } from "./models.ts";
 export async function listProviderModels(input: {
   id?: string;
   url?: string;
+  kind?: string;
   apiKey?: string;
 }): Promise<string[]> {
   const fallback = envFallbackFromProcess();
   const stored = await loadStoredProviders(fallback);
   const known = stored.providers.find((item) => item.id === input.id);
   const url = input.url?.trim() || known?.url || "";
+  const kind: ProviderKind | undefined = input.kind?.trim() || known?.kind;
   const typed = input.apiKey?.trim() ?? "";
   const apiKey =
     typed ||
     (known ? (await resolveOpenAIProvider({ providerId: known.id, fallback })).apiKey : "");
-  return fetchRemoteModels(url, apiKey);
+  return fetchRemoteModels(url, apiKey, kind);
 }

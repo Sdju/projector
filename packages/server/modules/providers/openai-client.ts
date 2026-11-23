@@ -1,4 +1,6 @@
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
+import { qwenCloudEndpoint } from "@ai-projector/core/modules/providers/index.ts";
+import { inferProviderKind } from "./kinds.ts";
 
 export function normalizeOpenAiBaseUrl(rawUrl: string): string {
   const withProtocol = /^https?:\/\//i.test(rawUrl) ? rawUrl : `http://${rawUrl}`;
@@ -10,6 +12,16 @@ export function normalizeOpenAiBaseUrl(rawUrl: string): string {
   }
 
   return url.toString().replace(/\/+$/, "");
+}
+
+/**
+ * Chat base of a provider. QwenCloud has two bases under one origin: `/compatible-mode/v1` for
+ * text and `/api/v1` for media, so an address copied from the media docs still reaches chat.
+ */
+export function providerBaseUrl(kind: string | undefined, rawUrl: string): string {
+  const resolvedKind = kind ?? inferProviderKind(rawUrl);
+  if (resolvedKind === "qwencloud") return qwenCloudEndpoint(rawUrl).openAiBase;
+  return normalizeOpenAiBaseUrl(rawUrl);
 }
 
 interface RawUsage {
@@ -48,11 +60,16 @@ export function convertUsage(usage: RawUsage | null | undefined) {
   };
 }
 
-export function createQwenOpenAI(options: { openaiUrl: string; openaiApiKey?: string }) {
+export function createQwenOpenAI(options: {
+  openaiUrl: string;
+  openaiApiKey?: string;
+  /** Provider kind picks the base path; QwenCloud keeps chat under `/compatible-mode/v1`. */
+  kind?: string;
+}) {
   return createOpenAICompatible({
     convertUsage,
     name: "qwen-openai",
-    baseURL: normalizeOpenAiBaseUrl(options.openaiUrl),
+    baseURL: providerBaseUrl(options.kind, options.openaiUrl),
     apiKey: options.openaiApiKey?.trim() || "not-needed",
   });
 }

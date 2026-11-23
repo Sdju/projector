@@ -51,6 +51,7 @@ export function fetchProviderBalances(): Promise<{
 export async function fetchProviderModels(draft: {
   id: string;
   url: string;
+  kind?: string;
   apiKey?: string;
 }): Promise<string[]> {
   const { models } = await request<{ models: string[] }>("/api/providers/models", {

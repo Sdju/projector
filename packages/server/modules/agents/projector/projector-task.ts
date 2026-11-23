@@ -238,6 +238,7 @@ export async function runProjectorTask(
   const provider = createQwenOpenAI({
     openaiUrl: resolved.url,
     openaiApiKey: resolved.apiKey,
+    kind: resolved.kind,
   });
   const model = provider.chatModel(resolved.model);
   const style = resolved.thinking === false ? "none" : resolved.thinkingStyle;

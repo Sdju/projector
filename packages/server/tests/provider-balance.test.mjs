@@ -205,6 +205,19 @@ describe("balance of the active provider", () => {
   });
 
   test("providers without a balance API are unsupported and make no request", async () => {
+    // The seed leaves the region to the user, so the endpoint is configured explicitly here.
+    await saveProviders({
+      activeProviderId: "qwen-dashscope",
+      providers: [
+        {
+          id: "qwen-dashscope",
+          name: "Qwen Cloud",
+          kind: "qwencloud",
+          url: "https://ap-southeast-1.maas.qwencloudapi.com/compatible-mode/v1",
+          models: [{ id: "qwen3.8-flash", alias: "qwen3.8-flash" }],
+        },
+      ],
+    });
     globalThis.projectorProviderBalance?.clear();
     globalThis.fetch = () => {
       throw new Error("must not request");

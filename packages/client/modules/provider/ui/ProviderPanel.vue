@@ -12,6 +12,7 @@ import { computed, onMounted, ref } from "vue";
 import UiButton from "../../../common/ui/UiButton.vue";
 import UiField from "../../../common/ui/UiField.vue";
 import { commandArgs, useCommandScope } from "../../../common/utilities/commands.ts";
+import { providerKindExtra } from "../model/kind-extra.ts";
 import { useProviders } from "../model/store.ts";
 import { THINKING_STYLES } from "../model/presets.ts";
 import { combineBalances, formatAmount, formatBalance } from "../model/format-balance.ts";
@@ -64,6 +65,7 @@ const modelCount = computed(() =>
 );
 
 const preset = computed(() => presetFor(selected.value?.kind ?? "custom"));
+const extra = computed(() => providerKindExtra(selected.value?.kind));
 // A provider saved with a plugin kind stays editable after the plugin is disabled.
 const shownKinds = computed(() => {
   const list = [...kindOptions.value];
@@ -182,8 +184,8 @@ commands.scope.registerCommand({
   id: "ide.providers.add",
   title: "Добавить провайдера",
   description:
-    "Добавляет провайдера из пресета: deepseek, openrouter, qwencloud, local или custom (по умолчанию custom), а также вид, объявленный включённым плагином. Подставляет адрес и модель; ключ вводится в форме, затем «сохранить».",
-  arguments: { kind: "deepseek | openrouter | qwencloud | local | custom | <вид из плагина>" },
+    "Добавляет провайдера из пресета выбранного вида: встроенного или объявленного включённым плагином. Подставляет имя, адрес и модель; ключ вводится в форме, затем «сохранить».",
+  arguments: { kind: "вид провайдера из списка доступных" },
   run: (value) => {
     const raw = commandArgs(value).kind;
     const kind = typeof raw === "string" ? raw : "custom";
@@ -361,7 +363,7 @@ function balanceKeyDraft(): string {
             aria-label="URL API"
             :value="selected.url"
             spellcheck="false"
-            placeholder="https://dashscope-intl.aliyuncs.com/compatible-mode/v1"
+            :placeholder="preset.urlPlaceholder || preset.url || 'https://…'"
             @input="patchProvider(selected.id, { url: ($event.target as HTMLInputElement).value })"
           />
         </UiField>
@@ -391,6 +393,7 @@ function balanceKeyDraft(): string {
         </UiField>
       </UiFormGrid>
       <UiHint>{{ preset.hint }}</UiHint>
+      <component :is="extra.component" v-if="extra" :provider="selected" />
 
       <UiStack class="models" :gap="2">
         <UiInline wrap justify="between">

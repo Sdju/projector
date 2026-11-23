@@ -4,7 +4,7 @@ import { HttpError } from "../http/index.ts";
 import {
   envFallbackFromProcess,
   loadStoredProviders,
-  normalizeOpenAiBaseUrl,
+  providerBaseUrl,
   resolveOpenAIProvider,
 } from "../providers/index.ts";
 
@@ -139,7 +139,7 @@ export async function forward(req: IncomingMessage, res: ServerResponse, endpoin
   const provider = await providerForModel(body.model);
   // The client asks by registered name; upstream knows the model by its own id.
   body.model = provider.model;
-  const base = normalizeOpenAiBaseUrl(provider.url);
+  const base = providerBaseUrl(provider.kind, provider.url);
 
   const abort = new AbortController();
   res.on("close", () => {
@@ -172,6 +172,9 @@ export async function forward(req: IncomingMessage, res: ServerResponse, endpoin
     const sanitized = sanitizeErrorBody(await readErrorBody(upstream.body));
     res.setHeader("Cache-Control", "no-store");
     if (sanitized) {
+      // A QwenCloud key is bound to the region of its endpoint; the plain 401 reads like a bad key.
+      if (provider.kind === "qwencloud" && (upstream.status === 401 || upstream.status === 403))
+        sanitized.message = `${sanitized.message} Проверьте, что ключ QwenCloud создан в регионе адреса провайдера.`;
       res.statusCode = upstream.status;
       res.setHeader("Content-Type", "application/json; charset=utf-8");
       res.end(JSON.stringify({ error: sanitized }));

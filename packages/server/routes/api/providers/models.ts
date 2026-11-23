@@ -17,6 +17,7 @@ export const routes: RouteDefinition[] = [
         models: await listProviderModels({
           id: asString(body.id),
           url: asString(body.url),
+          kind: asString(body.kind),
           apiKey: asString(body.apiKey),
         }),
       });

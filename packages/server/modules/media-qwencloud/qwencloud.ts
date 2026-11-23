@@ -70,7 +70,15 @@ async function qwenRequest(
         : response.status === 400
           ? 400
           : 502;
-    throw new HttpError(status, `QwenCloud: ${qwenErrorText(payload, `HTTP ${response.status}`)}`);
+    // A 401 usually means the key belongs to another region, not that it is wrong.
+    const hint =
+      response.status === 401 || response.status === 403
+        ? " — проверьте, что ключ создан в регионе адреса провайдера"
+        : "";
+    throw new HttpError(
+      status,
+      `QwenCloud: ${qwenErrorText(payload, `HTTP ${response.status}`)}${hint}`,
+    );
   }
   const payload = await response.json().catch(() => null);
   if (payload === null) throw new HttpError(502, "QwenCloud вернул некорректный JSON");

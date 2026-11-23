@@ -9,6 +9,8 @@ export interface ProviderPreset {
   label: string;
   name: string;
   url: string;
+  /** Shown before the address is chosen; never saved as a value. */
+  urlPlaceholder?: string;
   /** Model registered with a new provider of this kind; the rest come from "load the list". */
   model: string;
   keyPlaceholder: string;
@@ -18,7 +20,8 @@ export interface ProviderPreset {
   hint: string;
 }
 
-export const PROVIDER_PRESETS: Record<BuiltinProviderKind, ProviderPreset> = {
+/** Presets that need no provider-specific module; a kind may register its own at composition. */
+const BUILT_IN_PRESETS: Record<"deepseek" | "openrouter" | "local" | "custom", ProviderPreset> = {
   deepseek: {
     thinking: "deepseek",
     label: "DeepSeek",
@@ -36,15 +39,6 @@ export const PROVIDER_PRESETS: Record<BuiltinProviderKind, ProviderPreset> = {
     model: "openrouter/auto",
     keyPlaceholder: "sk-or-… с openrouter.ai/settings/keys",
     hint: "API key используется для моделей, отдельный management key — для остатка кредитов. Баланс обновляется раз в минуту.",
-  },
-  qwencloud: {
-    thinking: "qwen",
-    label: "Qwen Cloud",
-    name: "Qwen / DashScope",
-    url: "https://dashscope-intl.aliyuncs.com/compatible-mode/v1",
-    model: "qwen3.8-flash",
-    keyPlaceholder: "DASHSCOPE / QWENCLOUD",
-    hint: "Qwen Cloud не отдаёт баланс по ключу API: остаток смотрите в консоли QwenCloud.",
   },
   local: {
     thinking: "ollama",
@@ -66,11 +60,28 @@ export const PROVIDER_PRESETS: Record<BuiltinProviderKind, ProviderPreset> = {
   },
 };
 
-export const BUILTIN_PROVIDER_KINDS = Object.keys(PROVIDER_PRESETS) as BuiltinProviderKind[];
+const presets = new Map<string, ProviderPreset>(Object.entries(BUILT_IN_PRESETS));
+
+/** Пресет вида: встроенный или пришедший из модуля провайдера до первого экрана. */
+export function registerProviderPreset(kind: string, preset: ProviderPreset): void {
+  presets.set(kind, preset);
+}
+
+/**
+ * Built-in kinds keep their order in the settings list even when their preset arrives from a
+ * separate module; an unknown kind is still editable with the plain preset.
+ */
+export const BUILTIN_PROVIDER_KINDS: readonly BuiltinProviderKind[] = [
+  "deepseek",
+  "openrouter",
+  "qwencloud",
+  "local",
+  "custom",
+];
 
 /** A plugin kind gets a plain OpenAI-compatible preset with the URL the plugin named. */
 export function providerPreset(kind: ProviderKind, info?: ProviderKindInfo): ProviderPreset {
-  const preset = PROVIDER_PRESETS[kind as BuiltinProviderKind];
+  const preset = presets.get(kind);
   if (preset) return preset;
   return {
     label: info?.title ?? kind,

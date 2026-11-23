@@ -9,7 +9,7 @@ import {
   saveProviders,
   setActiveProvider,
 } from "../api/client.ts";
-import { BUILTIN_PROVIDER_KINDS, providerPreset, PROVIDER_PRESETS } from "./presets.ts";
+import { BUILTIN_PROVIDER_KINDS, providerPreset } from "./presets.ts";
 import type {
   ModelPrice,
   OpenAIProviderPublic,
@@ -56,13 +56,16 @@ export function useProviders() {
   const ready = computed(() => Boolean(activeProvider.value?.url));
   const balanceKinds = computed(() => state.balanceKinds);
   const kindOptions = computed<ProviderKindInfo[]>(() => [
-    ...BUILTIN_PROVIDER_KINDS.map((kind) => ({
-      kind,
-      title: PROVIDER_PRESETS[kind].label,
-      ...(PROVIDER_PRESETS[kind].hint ? { description: PROVIDER_PRESETS[kind].hint } : {}),
-      ...(PROVIDER_PRESETS[kind].url ? { url: PROVIDER_PRESETS[kind].url } : {}),
-      ...(PROVIDER_PRESETS[kind].model ? { model: PROVIDER_PRESETS[kind].model } : {}),
-    })),
+    ...BUILTIN_PROVIDER_KINDS.map((kind) => {
+      const preset = providerPreset(kind);
+      return {
+        kind,
+        title: preset.label,
+        ...(preset.hint ? { description: preset.hint } : {}),
+        ...(preset.url ? { url: preset.url } : {}),
+        ...(preset.model ? { model: preset.model } : {}),
+      };
+    }),
     ...state.balanceKinds,
   ]);
   const kindInfoOf = (kind: string): ProviderKindInfo | undefined =>
@@ -224,6 +227,7 @@ export function useProviders() {
       state.remoteModels[id] = await fetchProviderModels({
         id,
         url: item.url,
+        kind: item.kind,
         apiKey: state.keyDrafts[id],
       });
     } catch (err) {

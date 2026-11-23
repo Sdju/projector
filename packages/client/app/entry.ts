@@ -3,6 +3,7 @@ import App from "./App.vue";
 import { router } from "./router.ts";
 import { registerBuiltinWidgets } from "./widgets.ts";
 import { registerBuiltinClientAgents } from "./agents.ts";
+import { registerBuiltinProviderExtras } from "./providers.ts";
 import { refreshClientAgents } from "../modules/agents-integration/catalog/index.ts";
 import { disposePluginRuntime, initPluginRuntime } from "../modules/plugin-runtime/index.ts";
 import { deviceRoute } from "../common/utilities/device-url.ts";
@@ -24,6 +25,7 @@ setInboxNotificationNavigator((href) => {
 const disposeViewport = initAppViewport();
 registerBuiltinWidgets();
 registerBuiltinClientAgents();
+registerBuiltinProviderExtras();
 initPwa();
 void initAppUpdate();
 

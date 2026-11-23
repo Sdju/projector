@@ -26,10 +26,11 @@ export function envProvider(fallback: EnvOpenAIFallback): StoredOpenAIProvider |
 function qwenSeed(): StoredOpenAIProvider {
   return {
     id: QWEN_PROVIDER_ID,
-    name: "Qwen / DashScope",
+    name: "Qwen Cloud",
     kind: "qwencloud",
     thinkingStyle: "qwen",
-    url: "https://dashscope-intl.aliyuncs.com/compatible-mode/v1",
+    // No region is chosen for the user: the endpoint and key are regional.
+    url: "",
     enabled: true,
     models: sanitizeModels(null, DEFAULT_MODEL),
     apiKey: "",

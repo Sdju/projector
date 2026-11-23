@@ -24,6 +24,7 @@ export async function quietChatModel(selection?: Record<string, string>): Promis
   const provider = createQwenOpenAI({
     openaiUrl: resolved.url,
     openaiApiKey: resolved.apiKey,
+    kind: resolved.kind,
   });
   const style = resolved.thinking === false ? "none" : resolved.thinkingStyle;
   const quiet = quietThinkingBody(style);

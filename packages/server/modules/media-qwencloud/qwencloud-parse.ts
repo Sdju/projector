@@ -1,3 +1,4 @@
+import { qwenCloudEndpoint } from "@ai-projector/core/modules/providers/index.ts";
 import type { MediaArtifactSource } from "../media/index.ts";
 
 type Dict = Record<string, unknown>;
@@ -30,7 +31,7 @@ export function normalizeQwenCloudOrigin(url: string): string {
 }
 
 export function qwenApiBase(url: string): string {
-  return `${normalizeQwenCloudOrigin(url)}/api/v1`;
+  return qwenCloudEndpoint(url).apiBase;
 }
 
 /** Ошибка провайдера в одном сообщении: код, текст и request_id для поддержки. */
