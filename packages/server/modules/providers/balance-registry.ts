@@ -38,7 +38,11 @@ const resolvers = new Map<string, ProviderBalanceResolver>();
 
 /** Registers a reader for a kind; disposed when the owning plugin is disabled or reloaded. */
 export function registerBalanceResolver(resolver: ProviderBalanceResolver): () => void {
-  if (resolvers.has(resolver.kind)) throw new Error(`Вид провайдера уже занят: ${resolver.kind}`);
+  const registered = resolvers.get(resolver.kind);
+  // A hot reload evaluates a built-in reader again while this registry survives: the newest
+  // definition is the same built-in, so it replaces the old one. Only two owners are a conflict.
+  if (registered && (registered.plugin || resolver.plugin))
+    throw new Error(`Вид провайдера уже занят: ${resolver.kind}`);
   resolvers.set(resolver.kind, resolver);
   return () => {
     if (resolvers.get(resolver.kind) === resolver) resolvers.delete(resolver.kind);

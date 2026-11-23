@@ -8,7 +8,11 @@ export { assertKeyStore, useProviderVault } from "./provider-store.ts";
 
 export { listProviderModels } from "./model-list.ts";
 export { pickModel } from "./models.ts";
-export { pluginBalanceKinds, registerBalanceResolver } from "./balance-registry.ts";
+export {
+  balanceResolver,
+  pluginBalanceKinds,
+  registerBalanceResolver,
+} from "./balance-registry.ts";
 export type {
   ProviderBalanceContext,
   ProviderBalanceReading,
