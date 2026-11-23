@@ -16,10 +16,7 @@ useField(props.name, model, props.initial ?? props.min ?? 0);
 
 <template>
   <label class="slider">
-    <span class="head"
-      ><span>{{ label }}</span
-      ><output>{{ model }}{{ unit ?? "" }}</output></span
-    >
+    <span class="head"><span>{{ label }}</span><output>{{ model }}{{ unit ?? "" }}</output></span>
     <input
       v-model.number="model"
       type="range"

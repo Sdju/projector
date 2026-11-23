@@ -174,9 +174,7 @@ onMounted(() => void load().catch(() => undefined));
       @save="(value) => saveChatRole(role, value)"
       @remove="removeChatRole(role)"
     />
-    <UiHint>
-      Служебные роли не меняют модель чатов. Файл настроек: <code>{{ file }}</code>
-    </UiHint>
+    <UiHint> Служебные роли не меняют модель чатов. Файл настроек: <code>{{ file }}</code> </UiHint>
   </UiSettingsSection>
 </template>
 

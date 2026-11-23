@@ -5,10 +5,7 @@ defineProps<{ title: string; description?: string }>();
 <template>
   <label class="choice-row">
     <slot />
-    <span
-      ><strong>{{ title }}</strong
-      ><small v-if="description">{{ description }}</small></span
-    >
+    <span><strong>{{ title }}</strong><small v-if="description">{{ description }}</small></span>
   </label>
 </template>
 

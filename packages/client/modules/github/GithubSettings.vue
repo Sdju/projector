@@ -251,8 +251,7 @@ commands.scope.registerCommand({
     <details class="storage">
       <summary>Хранение настроек и авторизации</summary>
       <p class="muted">
-        Настройки и авторизация хранятся в файле <code>{{ file || "integrations.json" }}</code
-        >.
+        Настройки и авторизация хранятся в файле <code>{{ file || "integrations.json" }}</code>.
         <template v-if="secretStorage.backend === 'keyring'">
           Токены и ключи — в системном хранилище секретов (Secret Service), в файле их нет.
         </template>

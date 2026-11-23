@@ -49,9 +49,8 @@ const originsId = useId();
     </UiChoiceGroup>
     <template v-if="enabled">
       <UiHint class="hint">
-        Базовый адрес: <code>{{ url }}</code
-        >. Запросы тратят квоту провайдеров; страницы других сайтов он не принимает, если их origin
-        не в списке ниже.
+        Базовый адрес: <code>{{ url }}</code>. Запросы тратят квоту провайдеров; страницы других
+        сайтов он не принимает, если их origin не в списке ниже.
       </UiHint>
       <UiLabel size="sm" tone="secondary" :space-before="4" :space-after="2" :for="keyId"
         >Ключ доступа (необязательно)</UiLabel

@@ -26,9 +26,7 @@ withDefaults(
     aria-live="polite"
   >
     <UiSpinner class="spinner" />
-    <span class="label"
-      ><slot>{{ label }}</slot></span
-    >
+    <span class="label"><slot>{{ label }}</slot></span>
   </span>
 </template>
 

@@ -39,8 +39,7 @@ watch(
     </p>
     <ul v-if="session.activity?.processes.length">
       <li v-for="process in session.activity.processes" :key="process.pid">
-        <span>{{ process.name }}</span
-        ><span class="process-pid">PID {{ process.pid }}</span>
+        <span>{{ process.name }}</span><span class="process-pid">PID {{ process.pid }}</span>
       </li>
     </ul>
     <UiDialogActions>
