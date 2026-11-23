@@ -196,7 +196,9 @@ export function activateWindow(id: number | bigint): void {
 export async function activateSurface(surface: object): Promise<void> {
   try {
     const { default: GdkX11 } = await import("gi:GdkX11-4.0");
-    if (surface instanceof GdkX11.X11Surface) activateWindow(surface.getXid());
+    const X11Surface = (GdkX11 as { X11Surface?: abstract new () => object }).X11Surface;
+    if (!X11Surface || !(surface instanceof X11Surface)) return;
+    activateWindow((surface as { getXid(): number | bigint }).getXid());
   } catch {
     /* The surface is not an X11 window. */
   }
