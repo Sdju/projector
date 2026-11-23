@@ -1,3 +1,4 @@
+import { trimDriveSlash } from "@ai-projector/core/modules/workspace/index.ts";
 import { fileUrlPath, isLocalPath } from "../../../common/utilities/file-path.ts";
 
 /** A link in an agent answer: a web address opens in a browser tab, a file opens in the editor. */
@@ -75,6 +76,6 @@ export function parseChatLink(href: string): ChatLink {
   const { path: source, ...range } = splitRange(value);
   const raw = (source.split(/[?#]/)[0] ?? "").replace(/^\.\//, "");
   if (!raw) return { href, kind: "anchor" };
-  const path = decode(raw);
+  const path = trimDriveSlash(decode(raw));
   return { href, kind: "file", path, external: isLocalPath(path), ...range };
 }

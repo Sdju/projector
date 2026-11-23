@@ -720,6 +720,16 @@ test("workspace HTTP routes resolve catalog projects and serve external and proj
       path: imagePath,
       content: "<svg xmlns='http://www.w3.org/2000/svg'/>",
     });
+    // Agents write a Windows path in URL form (`/C:/…`): it is the same file on disk.
+    if (!posix) {
+      const urlForm = `/${externalPath.replaceAll("\\", "/")}`;
+      const rooted = await fetch(`${route}/external?path=${encodeURIComponent(urlForm)}`);
+      expect(rooted.status).toBe(200);
+      expect(await rooted.json()).toStrictEqual({
+        path: urlForm.slice(1),
+        content: "External file contents\n",
+      });
+    }
     const image = await fetch(`${route}/external-asset?path=${encodeURIComponent(imagePath)}`);
     expect(image.headers.get("content-type")).toBe("image/svg+xml");
     expect(image.headers.get("x-content-type-options")).toBe("nosniff");

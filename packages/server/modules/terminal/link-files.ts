@@ -1,5 +1,6 @@
 import { realpath, stat } from "node:fs/promises";
 import { os } from "@ai-projector/core/modules/os/index.ts";
+import { trimDriveSlash } from "@ai-projector/core/modules/workspace/index.ts";
 import { isAbsolute, join, normalize, relative, resolve, sep } from "node:path";
 import { HttpError } from "../http/index.ts";
 
@@ -10,7 +11,8 @@ export async function resolveTerminalPath(
 ) {
   if (!path || path.length > 4096 || /[\x00-\x1f\x7f]/.test(path))
     throw new HttpError(400, "Некорректный путь к файлу");
-  const expanded = path.startsWith("~/") ? resolve(os.homeDirectory(), path.slice(2)) : path;
+  const value = trimDriveSlash(path);
+  const expanded = value.startsWith("~/") ? resolve(os.homeDirectory(), value.slice(2)) : value;
   const candidates = isAbsolute(expanded)
     ? [expanded]
     : [

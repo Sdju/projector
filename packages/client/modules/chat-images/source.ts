@@ -1,3 +1,4 @@
+import { trimDriveSlash } from "@ai-projector/core/modules/workspace/index.ts";
 import { deviceUrl } from "../../common/utilities/device-url.ts";
 import { fileUrlPath } from "../../common/utilities/file-path.ts";
 import { markdownPath } from "../../common/utilities/markdown-path.ts";
@@ -31,7 +32,7 @@ function localPath(src: string): string | undefined {
  * Markdown pictures and the `Image` widget share this, so a path means the same in both.
  */
 export function chatImageSource(src: string, projectId: string): string | undefined {
-  const value = src.trim();
+  const value = trimDriveSlash(src.trim());
   if (!value) return;
   if (/^https?:\/\//i.test(value)) return value;
   if (/^data:image\//i.test(value)) return value;

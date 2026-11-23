@@ -77,6 +77,11 @@ test("terminal file resolution uses cwd, project fallback and canonical external
     path: outside,
     external: true,
   });
+  // A Windows path printed in URL form (`/C:/…`) points to the same file on disk.
+  if (process.platform === "win32")
+    expect(
+      await resolveTerminalPath(`/${outside.replaceAll("\\", "/")}`, project, cwd),
+    ).toStrictEqual({ path: outside, external: true });
   await expect(resolveTerminalPath("missing.ts", project, cwd)).rejects.toThrow(/не найден/);
   await expect(resolveTerminalPath(cwd, project, cwd)).rejects.toThrow(/не найден/);
   await expect(resolveTerminalPath("bad\0.ts", project, cwd)).rejects.toThrow(/Некорректный/);

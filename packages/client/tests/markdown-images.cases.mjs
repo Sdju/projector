@@ -26,6 +26,9 @@ test("a chat image resolves to a safe workspace endpoint", () => {
   expect(endpoint(chatImageSource("C:/shots/a.png", project), "external-asset")).toBe(
     "C:/shots/a.png",
   );
+  expect(endpoint(chatImageSource("/C:/shots/a.png", project), "external-asset")).toBe(
+    "C:/shots/a.png",
+  );
 });
 
 test("a project-relative image goes through the asset endpoint", () => {

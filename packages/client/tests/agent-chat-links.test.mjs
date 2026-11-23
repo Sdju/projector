@@ -65,6 +65,17 @@ test("absolute paths and file URLs are file links outside the project", () => {
     path: "C:/work/report.html",
     external: true,
   });
+  // An agent may write a Windows path in URL form: `/C:/…` is the same file as `C:/…`.
+  expect(parseChatLink("/C:/work/report.html")).toMatchObject({
+    kind: "file",
+    path: "C:/work/report.html",
+    external: true,
+  });
+  expect(parseChatLink("file:///C:/work/report.html")).toMatchObject({
+    kind: "file",
+    path: "C:/work/report.html",
+    external: true,
+  });
 });
 
 test("project paths become absolute without touching local paths", () => {
@@ -75,6 +86,9 @@ test("project paths become absolute without touching local paths", () => {
   expect(absoluteLocalPath("", "a.ts")).toBe("a.ts");
   expect(fileUrlPath("file:///tmp/a%20b.txt")).toBe("/tmp/a b.txt");
   expect(fileUrlPath("file://localhost/tmp/a.txt")).toBe("/tmp/a.txt");
+  expect(fileUrlPath("file:///C:/work/a.txt")).toBe("C:/work/a.txt");
+  expect(absoluteLocalPath("C:/work/app", "src/a.ts")).toBe("C:/work/app/src/a.ts");
+  expect(absoluteLocalPath("C:/work/app", "/C:/work/app/src/a.ts")).toBe("C:/work/app/src/a.ts");
 });
 
 test("a chat file link is marked for the click handler and keeps its new-tab fallback", () => {
@@ -123,7 +137,18 @@ test("an absolute Windows link inside the project opens as a project file", asyn
       path: "C:/work/app/docs/report.html",
       external: true,
     });
+    await actions.openFile({
+      href: "/C:/work/app/docs/report.html",
+      kind: "file",
+      path: "C:/work/app/docs/report.html",
+      external: true,
+    });
     expect(calls).toStrictEqual([
+      [
+        "ide.editor.path.open",
+        { path: "docs/report.html" },
+        { scope: "editor:chat-links-project" },
+      ],
       [
         "ide.editor.path.open",
         { path: "docs/report.html" },
