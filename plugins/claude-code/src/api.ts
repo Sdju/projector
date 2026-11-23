@@ -28,7 +28,7 @@ export type {
   UsageTokens,
 } from "../../../packages/server/modules/plugin-api/index.ts";
 
-export type { AgentTask, AgentTaskPatch } from "@ai-projector/core/modules/agent-task/index.ts";
+export type { AgentTask, AgentTaskPatch } from "../../../packages/core/modules/agent-task/index.ts";
 
 import type * as ClaudeAgentSdk from "@anthropic-ai/claude-agent-sdk";
 
