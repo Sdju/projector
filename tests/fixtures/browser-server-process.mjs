@@ -79,7 +79,16 @@ const server = await createServer({
     dedupe: [...new Set([...(loaded.config.resolve?.dedupe ?? []), ...entryPackages])],
   },
   optimizeDeps: { ...loaded.config.optimizeDeps, entries },
-  server: { host: "127.0.0.1", port: 0, strictPort: false },
+  server: {
+    ...loaded.config.server,
+    host: "127.0.0.1",
+    port: 0,
+    strictPort: false,
+    // Pages come from memory and responses are static: this server never needs a watcher.
+    // Watching the checkout instead cost thousands of inotify watches per fixture (the gitignored
+    // `.samples` clones alone take ~9k directories) and exhausted max_user_watches during a run.
+    watch: null,
+  },
   logLevel: "error",
 });
 await server.listen();

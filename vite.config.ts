@@ -124,8 +124,9 @@ export default defineConfig({
     ],
     setupFiles: ["tests/setup.mjs"],
     pool: "forks",
-    // Browser tests also start Vite and Chromium processes; leave room for the desktop.
-    maxWorkers: 2,
+    // Browser tests also start Vite and Chromium processes: a four-core CI runner hosts two
+    // workers, a workstation four, which measured 2m50s against 1m40s on 24 cores.
+    maxWorkers: process.env.CI ? 2 : 4,
     // Each browser test owns a Vite server and a Chromium: cap their overlap per worker so a
     // four-core CI runner is not asked to host ten browsers at once.
     maxConcurrency: process.env.CI ? 2 : 5,
