@@ -13,14 +13,13 @@ export const routes: RouteDefinition[] = [
     handler: async ({ req, res }) => {
       const body = await readBody(req);
       res.setHeader("Cache-Control", "no-store");
-      json(res, 200, {
-        models: await listProviderModels({
-          id: asString(body.id),
-          url: asString(body.url),
-          kind: asString(body.kind),
-          apiKey: asString(body.apiKey),
-        }),
+      const list = await listProviderModels({
+        id: asString(body.id),
+        url: asString(body.url),
+        kind: asString(body.kind),
+        apiKey: asString(body.apiKey),
       });
+      json(res, 200, { models: list.models, details: list.details });
     },
   },
 ];

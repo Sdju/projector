@@ -49,7 +49,7 @@ export function registerRoleCommands(
     undefined,
     {
       description:
-        "Возвращает chat-роли, которые можно открыть командой ide.agent.role.open или править ide.agent.role.edit: id, название, агент, настройки и source (global или project). Служебные роли (Доктор, Lens, Судья) сюда не входят — они не открывают чат.",
+        "Возвращает chat-роли, которые можно открыть командой ide.agent.role.open или править ide.agent.role.edit: id, название, агент, настройки и source (global или project). Служебные роли (Доктор, Lens, Судья, Listener) сюда не входят — они не открывают чат.",
     },
   );
   register(

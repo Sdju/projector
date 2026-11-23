@@ -46,24 +46,55 @@ function openAiBase(url: string): string {
   return `${parsed.protocol}//${parsed.host}${path || "/v1"}`;
 }
 
+/** The rate card these prices were copied from; shown next to them in the settings. */
+const PRICE_SOURCE = "https://platform.openai.com/docs/pricing";
+const CHECKED_AT = "2026-11-23";
+
+/**
+ * The OpenAI-compatible catalog: only what this adapter knows how to call and what the official
+ * rate card states. `gpt-image-1` and `dall-e-3` are kept for existing setups but have no price
+ * line on the current card, so they honestly carry none.
+ */
 function models(): MediaAdapterModel[] {
   return [
     {
       id: "gpt-image-1",
       capability: "image.generate",
       title: "GPT Image 1",
+      description:
+        "Генерация и правка изображений по тексту: держит композицию и надписи лучше DALL·E. Тарифа на текущей странице цен нет.",
+      input: ["text", "image"],
+      output: ["image"],
+      docs: "https://platform.openai.com/docs/guides/image-generation",
       options: { sizes: ["1024x1024", "1536x1024", "1024x1536"], defaults: { n: 1 } },
     },
     {
       id: "dall-e-3",
       capability: "image.generate",
       title: "DALL·E 3",
+      description:
+        "Генерация одного изображения по подробному описанию. Проще в композиции, чем GPT Image; цены на текущей странице нет.",
+      input: ["text"],
+      output: ["image"],
+      docs: "https://platform.openai.com/docs/guides/image-generation",
       options: { sizes: ["1024x1024", "1792x1024", "1024x1792"], defaults: { n: 1 } },
     },
     {
       id: "gpt-4o-mini-tts",
       capability: "speech.synthesize",
       title: "GPT-4o mini TTS",
+      description:
+        "Синтез речи с управлением голосом и стилем; тариф по токенам, поэтому длинная фраза стоит дороже короткой.",
+      input: ["text"],
+      output: ["audio"],
+      languages: ["multi"],
+      prices: [
+        { amount: 12, currency: "USD", unit: "1m-tokens", appliesTo: "audio-output" },
+        { amount: 0.6, currency: "USD", unit: "1m-tokens", appliesTo: "input" },
+      ],
+      priceSource: PRICE_SOURCE,
+      priceCheckedAt: CHECKED_AT,
+      docs: "https://platform.openai.com/docs/guides/text-to-speech",
       options: {
         voices: [
           "alloy",
@@ -84,6 +115,15 @@ function models(): MediaAdapterModel[] {
       id: "tts-1",
       capability: "speech.synthesize",
       title: "OpenAI TTS 1",
+      description:
+        "Базовый синтез речи с предсказуемой ценой за символ; подходит для озвучки ответов и подкастов.",
+      input: ["text"],
+      output: ["audio"],
+      languages: ["multi"],
+      prices: [{ amount: 15, currency: "USD", unit: "1m-characters" }],
+      priceSource: PRICE_SOURCE,
+      priceCheckedAt: CHECKED_AT,
+      docs: "https://platform.openai.com/docs/guides/text-to-speech",
       options: {
         voices: ["alloy", "echo", "fable", "onyx", "nova", "shimmer"],
         defaults: { voice: "alloy" },
@@ -93,12 +133,30 @@ function models(): MediaAdapterModel[] {
       id: "whisper-1",
       capability: "speech.transcribe",
       title: "Whisper 1",
+      description:
+        "Распознавание речи и перевод на английский; устойчив к шуму, но медленнее новых моделей.",
+      input: ["audio"],
+      output: ["text"],
+      languages: ["multi"],
+      prices: [{ amount: 0.006, currency: "USD", unit: "minute" }],
+      priceSource: PRICE_SOURCE,
+      priceCheckedAt: CHECKED_AT,
+      docs: "https://platform.openai.com/docs/guides/speech-to-text",
       options: { formats: ["mp3", "wav", "m4a", "webm", "ogg"] },
     },
     {
       id: "gpt-4o-mini-transcribe",
       capability: "speech.transcribe",
       title: "GPT-4o mini Transcribe",
+      description:
+        "Быстрое распознавание без перевода; дешевле Whisper и лучше держит пунктуацию. Цена — оценка провайдера за минуту.",
+      input: ["audio"],
+      output: ["text"],
+      languages: ["multi"],
+      prices: [{ amount: 0.003, currency: "USD", unit: "minute", estimated: true }],
+      priceSource: PRICE_SOURCE,
+      priceCheckedAt: CHECKED_AT,
+      docs: "https://platform.openai.com/docs/guides/speech-to-text",
       options: { formats: ["mp3", "wav", "m4a", "webm", "ogg"] },
     },
   ];
@@ -259,6 +317,11 @@ async function submitTranscribe(
   form.append("file", new Blob([new Uint8Array(bytes)], { type: mime }), "audio");
   if (typeof request.options?.language === "string")
     form.append("language", request.options.language);
+  // A hint of names and terms, not instructions: OpenAI-compatible endpoints accept free text.
+  if (typeof request.options?.prompt === "string") {
+    const prompt = request.options.prompt.trim().slice(0, 900);
+    if (prompt) form.append("prompt", prompt);
+  }
   let response: Response;
   try {
     response = await fetch(`${openAiBase(context.url)}/audio/transcriptions`, {
@@ -291,6 +354,7 @@ async function submitTranscribe(
 export const openAiMediaAdapter: MediaAdapter = {
   kind: "custom",
   capabilities: ["image.generate", "speech.synthesize", "speech.transcribe"],
+  transcriptionPrompt: true,
   listModels: () => models(),
   submit(context, request) {
     switch (request.capability) {

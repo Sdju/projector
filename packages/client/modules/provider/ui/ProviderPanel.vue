@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ProjectorIcon from "../../../common/icons/ProjectorIcon.vue";
 import UiMessage from "../../../common/ui/UiMessage.vue";
 import UiControl from "../../../common/ui/UiControl.vue";
 import UiStack from "../../../common/ui/UiStack.vue";
@@ -16,7 +17,23 @@ import { providerKindExtra } from "../model/kind-extra.ts";
 import { useProviders } from "../model/store.ts";
 import { THINKING_STYLES } from "../model/presets.ts";
 import { combineBalances, formatAmount, formatBalance } from "../model/format-balance.ts";
-import type { ModelPrice, ProviderKind, ThinkingStyle } from "../model/types.ts";
+import {
+  formatContextWindow,
+  formatProviderModelPrice,
+  providerModelCapabilityTitle,
+  providerModelKindOf,
+  providerModelKindTitle,
+  providerModelModalityTitle,
+} from "@ai-projector/core/modules/providers/index.ts";
+import type {
+  ModelPrice,
+  ProviderKind,
+  ProviderModelCapability,
+  ProviderModelInfo,
+  ProviderModelKind,
+  ProviderModelModality,
+  ThinkingStyle,
+} from "../model/types.ts";
 
 /** The provider whose page the navigation opened. Without one, the section is the overview. */
 const props = defineProps<{ providerId?: string }>();
@@ -51,6 +68,8 @@ const {
   setModelContext,
   setModelPrice,
   setModelThinking,
+  applyCatalogMetadata,
+  modelInfo,
   remoteModels,
   fetchingModels,
   modelsError,
@@ -103,22 +122,125 @@ interface ModelRow {
   price?: ModelPrice;
   thinking?: boolean;
   on: boolean;
+  /** What the provider catalog says about this id; absent for unknown custom models. */
+  info?: ProviderModelInfo;
+  /** The same in the shape the list renders: kind, modalities, window, tariff, abilities. */
+  facts?: ModelFacts;
+}
+
+/** Pictograms for the facts line; the text lives in the tooltip and the accessible name. */
+const CAPABILITY_ICONS: Record<ProviderModelCapability, string> = {
+  tools: "wrench",
+  reasoning: "brain",
+  json: "braces",
+  vision: "eye",
+  "audio-input": "audio-lines",
+  "video-input": "video",
+};
+const MODALITY_ICONS: Record<ProviderModelModality, string> = {
+  text: "type",
+  image: "image",
+  audio: "audio-lines",
+  video: "video",
+  vector: "binary",
+};
+const KIND_ICONS: Record<ProviderModelKind, string> = {
+  chat: "message-square",
+  image: "image",
+  speech: "volume-2",
+  transcription: "mic",
+  video: "video",
+  embedding: "boxes",
+  rerank: "list-ordered",
+  other: "circle-help",
+};
+const capabilityIcon = (item: ProviderModelCapability) => CAPABILITY_ICONS[item];
+const CAPABILITY_LEGEND = Object.keys(CAPABILITY_ICONS) as ProviderModelCapability[];
+const modalityIcon = (item: ProviderModelModality) => MODALITY_ICONS[item];
+const kindIcon = (item: ProviderModelKind) => KIND_ICONS[item];
+
+interface ModelFacts {
+  kind: ProviderModelKind;
+  input: ProviderModelModality[];
+  output: ProviderModelModality[];
+  context?: string;
+  price?: string;
+  priceNote?: string;
+  capabilities: ProviderModelCapability[];
+}
+
+/** Everything the list shows about a model, ready for pictograms and one compact line. */
+function modelFacts(info: ProviderModelInfo | undefined): ModelFacts | undefined {
+  if (!info) return undefined;
+  return {
+    kind: providerModelKindOf(info),
+    input: info.input ?? [],
+    output: info.output ?? [],
+    ...(info.contextTokens ? { context: formatContextWindow(info.contextTokens) } : {}),
+    ...(info.price
+      ? { price: formatProviderModelPrice(info.price, info.currency) }
+      : info.priceNote
+        ? { priceNote: info.priceNote }
+        : {}),
+    capabilities: info.capabilities ?? [],
+  };
+}
+
+/** A tooltip for the input and output of a model: «вход: текст + изображение». */
+function modalityTitle(side: "вход" | "выход", item: ProviderModelModality): string {
+  return `${side}: ${providerModelModalityTitle(item)}`;
+}
+
+/** Chat models first: media and embeddings are visible but do not drown the list. */
+const KIND_ORDER = {
+  chat: 0,
+  image: 1,
+  transcription: 2,
+  speech: 3,
+  video: 4,
+  embedding: 5,
+  rerank: 6,
+  other: 7,
+} as const;
+function kindRank(info: ProviderModelInfo | undefined): number {
+  return info ? KIND_ORDER[providerModelKindOf(info)] : KIND_ORDER.other;
+}
+
+/** Fills the editable fields from the catalog again after a manual change. */
+function applyCatalog(id: string): void {
+  if (selected.value) applyCatalogMetadata(selected.value.id, id);
 }
 const filter = ref("");
+const chatOnly = ref(false);
 // Registered models first, then the rest of what the provider offers upstream.
 const rows = computed<ModelRow[]>(() => {
   const item = selected.value;
   if (!item) return [];
-  const registered = item.models.map((row) => ({ ...row, on: true }));
+  const registered = item.models.map((row) => ({
+    ...row,
+    on: true,
+    info: modelInfo(item.id, row.id),
+    facts: modelFacts(modelInfo(item.id, row.id)),
+  }));
   const known = new Set(item.models.map((row) => row.id));
   const rest = (remoteModels.value[item.id] ?? [])
     .filter((id) => !known.has(id))
-    .map((id) => ({ id, alias: id, on: false }));
+    .map((id) => {
+      const info = modelInfo(item.id, id);
+      return { id, alias: id, on: false, info, facts: modelFacts(info) };
+    });
   const needle = filter.value.trim().toLowerCase();
-  return [...registered, ...rest].filter(
-    (row) =>
-      !needle || row.id.toLowerCase().includes(needle) || row.alias.toLowerCase().includes(needle),
-  );
+  return [...registered, ...rest]
+    .filter((row) => !chatOnly.value || !row.info || providerModelKindOf(row.info) === "chat")
+    .filter(
+      (row) =>
+        !needle ||
+        row.id.toLowerCase().includes(needle) ||
+        row.alias.toLowerCase().includes(needle) ||
+        row.info?.description?.toLowerCase().includes(needle) ||
+        row.info?.capabilities?.some((item) => providerModelCapabilityTitle(item).includes(needle)),
+    )
+    .sort((left, right) => kindRank(left.info) - kindRank(right.info));
 });
 const fetching = computed(() => Boolean(selected.value && fetchingModels.value[selected.value.id]));
 const duplicates = computed(() => {
@@ -136,6 +258,13 @@ const offered = computed(() => {
     item.models.length + (remoteModels.value[item.id] ?? []).filter((id) => !known.has(id)).length
   );
 });
+/** Registered models that cannot answer in chat: the list must say so instead of hiding it. */
+const nonChatRegistered = computed(() =>
+  (selected.value?.models ?? []).filter((row) => {
+    const info = modelInfo(selected.value!.id, row.id);
+    return info ? providerModelKindOf(info) !== "chat" : false;
+  }),
+);
 const manual = ref("");
 
 function setPrice(id: string, field: keyof ModelPrice, value: string): void {
@@ -198,7 +327,7 @@ commands.scope.registerCommand({
   id: "ide.providers.models.refresh",
   title: "Загрузить список моделей провайдера",
   description:
-    "Запрашивает у выбранного провайдера список моделей (GET /models по схеме OpenAI) и показывает их в карточке; затем модели регистрируются командой ide.providers.models.register.",
+    "Запрашивает у выбранного провайдера список моделей (GET /models по схеме OpenAI) и показывает их в карточке вместе с паспортом: окно контекста, тариф, возможности и описание. Модели регистрируются командой ide.providers.models.register.",
   enabled: () => Boolean(selected.value?.url),
   run: async () => {
     if (selected.value) await fetchModels(selected.value.id);
@@ -208,7 +337,7 @@ commands.scope.registerCommand({
   id: "ide.providers.models.register",
   title: "Зарегистрировать модель провайдера",
   description:
-    "Добавляет модель выбранного провайдера: model — id у провайдера, alias — имя, под которым её увидят агент и шлюз (по умолчанию тот же id). Затем «сохранить».",
+    "Добавляет модель выбранного провайдера: model — id у провайдера, alias — имя, под которым её увидят агент и шлюз (по умолчанию тот же id). Если модель есть в паспорте провайдера, окно контекста и цена за 1 млн токенов заполняются сразу. Затем «сохранить».",
   arguments: { model: "id модели у провайдера", alias: "имя (необязательно)" },
   enabled: () => Boolean(selected.value),
   run: (value) => {
@@ -417,69 +546,191 @@ function balanceKeyDraft(): string {
         <UiMessage v-if="duplicates" tone="danger" size="xs" flush>
           Имена моделей должны различаться: повторное имя при сохранении отбросится.
         </UiMessage>
-        <UiControl
-          v-if="rows.length > 8 || filter"
-          v-model="filter"
-          aria-label="Фильтр моделей"
-          placeholder="фильтр"
-          spellcheck="false"
-        />
-        <UiScrollArea v-if="rows.length" class="list">
-          <label v-for="row in rows" :key="row.id" class="row" :class="{ off: !row.on }">
-            <UiControl
-              type="checkbox"
-              :aria-label="`Зарегистрировать ${row.id}`"
-              :model-value="row.on"
-              @update:model-value="toggle(row, Boolean($event))"
-            />
-            <span class="mid">{{ row.id }}</span>
-            <UiControl
-              v-if="row.on"
-              class="alias"
-              mono
-              :aria-label="`Имя модели ${row.id}`"
-              :value="row.alias"
-              :placeholder="row.id"
-              spellcheck="false"
-              @input="renameModel(selected.id, row.id, ($event.target as HTMLInputElement).value)"
-            />
-            <UiControl
-              v-if="row.on"
-              class="ctx"
-              mono
-              type="number"
-              min="1000"
-              step="1000"
-              :aria-label="`Окно контекста ${row.id}, токенов`"
-              :value="row.contextTokens"
-              placeholder="окно, токенов"
-              @input="setContext(row.id, ($event.target as HTMLInputElement).value)"
-            />
-            <UiControl
-              v-if="row.on"
-              class="think"
-              type="checkbox"
-              title="Модель умеет размышлять: над строкой ввода агента появится переключатель"
-              :aria-label="`Размышление ${row.id}`"
-              :model-value="row.thinking !== false"
-              @update:model-value="setModelThinking(selected.id, row.id, Boolean($event))"
-            />
-            <span v-if="row.on" class="price">
-              <span v-for="[field, label] in PRICE_FIELDS" :key="field" class="price-field">
-                <span class="price-label">{{ label }}</span>
-                <UiControl
-                  mono
-                  type="number"
-                  min="0"
-                  step="any"
-                  :aria-label="`Цена ${label} ${row.id}, за 1 млн токенов`"
-                  :value="row.price?.[field]"
-                  placeholder="—"
-                  @input="setPrice(row.id, field, ($event.target as HTMLInputElement).value)"
-                />
-              </span>
-            </span>
+        <UiMessage v-if="nonChatRegistered.length" tone="warning" size="xs" flush>
+          В чате не работают: {{ nonChatRegistered.map((row) => row.alias).join(", ") }}. Это модели
+          изображений, речи, видео или эмбеддингов — им место во вкладке «Медиа».
+        </UiMessage>
+        <UiInline v-if="rows.length > 8 || filter" wrap :gap="3">
+          <UiControl
+            v-model="filter"
+            grow
+            aria-label="Фильтр моделей"
+            placeholder="фильтр"
+            spellcheck="false"
+          />
+          <label class="chat-only">
+            <UiControl v-model="chatOnly" type="checkbox" />
+            только для чата
           </label>
+        </UiInline>
+        <UiScrollArea v-if="rows.length" class="list">
+          <div v-for="row in rows" :key="row.id" class="model-entry">
+            <label class="row" :class="{ off: !row.on }">
+              <UiControl
+                type="checkbox"
+                :aria-label="`Зарегистрировать ${row.id}`"
+                :model-value="row.on"
+                @update:model-value="toggle(row, Boolean($event))"
+              />
+              <span class="mid" :title="row.info?.description">{{ row.id }}</span>
+              <UiControl
+                v-if="row.on"
+                class="alias"
+                mono
+                :aria-label="`Имя модели ${row.id}`"
+                :value="row.alias"
+                :placeholder="row.id"
+                spellcheck="false"
+                @input="renameModel(selected.id, row.id, ($event.target as HTMLInputElement).value)"
+              />
+              <UiControl
+                v-if="row.on"
+                class="ctx"
+                mono
+                type="number"
+                min="1000"
+                step="1000"
+                :aria-label="`Окно контекста ${row.id}, токенов`"
+                :value="row.contextTokens"
+                placeholder="окно, токенов"
+                @input="setContext(row.id, ($event.target as HTMLInputElement).value)"
+              />
+              <UiControl
+                v-if="row.on"
+                class="think"
+                type="checkbox"
+                title="Модель умеет размышлять: над строкой ввода агента появится переключатель"
+                :aria-label="`Размышление ${row.id}`"
+                :model-value="row.thinking !== false"
+                @update:model-value="setModelThinking(selected.id, row.id, Boolean($event))"
+              />
+              <span v-if="row.on" class="price">
+                <span v-for="[field, label] in PRICE_FIELDS" :key="field" class="price-field">
+                  <span class="price-label">{{ label }}</span>
+                  <UiControl
+                    mono
+                    type="number"
+                    min="0"
+                    step="any"
+                    :aria-label="`Цена ${label} ${row.id}, за 1 млн токенов`"
+                    :value="row.price?.[field]"
+                    placeholder="—"
+                    @input="setPrice(row.id, field, ($event.target as HTMLInputElement).value)"
+                  />
+                </span>
+              </span>
+              <UiInline v-if="row.facts" class="model-facts" wrap :gap="2">
+                <span
+                  v-if="row.facts.kind !== 'chat'"
+                  class="model-kind"
+                  :title="providerModelKindTitle(row.facts.kind)"
+                  :aria-label="providerModelKindTitle(row.facts.kind)"
+                  role="img"
+                >
+                  <ProjectorIcon :name="kindIcon(row.facts.kind)" />
+                  {{ providerModelKindTitle(row.facts.kind) }}
+                </span>
+                <span v-if="row.facts.input.length || row.facts.output.length" class="model-flow">
+                  <span
+                    v-for="item in row.facts.input"
+                    :key="`in-${item}`"
+                    class="fact-icon"
+                    :title="modalityTitle('вход', item)"
+                    :aria-label="modalityTitle('вход', item)"
+                    role="img"
+                  >
+                    <ProjectorIcon :name="modalityIcon(item)" />
+                  </span>
+                  <ProjectorIcon
+                    v-if="row.facts.input.length && row.facts.output.length"
+                    name="arrow-right"
+                    class="flow-arrow"
+                    aria-hidden="true"
+                  />
+                  <span
+                    v-for="item in row.facts.output"
+                    :key="`out-${item}`"
+                    class="fact-icon"
+                    :title="modalityTitle('выход', item)"
+                    :aria-label="modalityTitle('выход', item)"
+                    role="img"
+                  >
+                    <ProjectorIcon :name="modalityIcon(item)" />
+                  </span>
+                </span>
+                <span v-if="row.facts.context" class="fact-text">{{ row.facts.context }}</span>
+                <span v-if="row.facts.price" class="fact-text">{{ row.facts.price }}</span>
+                <span v-if="row.facts.priceNote" class="fact-text fact-note">{{
+                  row.facts.priceNote
+                }}</span>
+                <span
+                  v-for="item in row.facts.capabilities"
+                  :key="item"
+                  class="fact-icon"
+                  :title="providerModelCapabilityTitle(item)"
+                  :aria-label="providerModelCapabilityTitle(item)"
+                  role="img"
+                >
+                  <ProjectorIcon :name="capabilityIcon(item)" />
+                </span>
+              </UiInline>
+            </label>
+            <div
+              v-if="row.on && row.info && (row.info.description || row.info.priceNote)"
+              class="catalog"
+            >
+              <p class="catalog-shape">
+                <span class="catalog-kind">
+                  <ProjectorIcon
+                    :name="kindIcon(providerModelKindOf(row.info))"
+                    aria-hidden="true"
+                  />
+                  {{ providerModelKindTitle(providerModelKindOf(row.info)) }}
+                </span>
+                <span
+                  v-for="item in row.info.input ?? []"
+                  :key="`cin-${item}`"
+                  class="fact-icon"
+                  :title="modalityTitle('вход', item)"
+                  :aria-label="modalityTitle('вход', item)"
+                  role="img"
+                >
+                  <ProjectorIcon :name="modalityIcon(item)" />
+                </span>
+                <ProjectorIcon
+                  v-if="(row.info.input ?? []).length && (row.info.output ?? []).length"
+                  name="arrow-right"
+                  class="flow-arrow"
+                  aria-hidden="true"
+                />
+                <span
+                  v-for="item in row.info.output ?? []"
+                  :key="`cout-${item}`"
+                  class="fact-icon"
+                  :title="modalityTitle('выход', item)"
+                  :aria-label="modalityTitle('выход', item)"
+                  role="img"
+                >
+                  <ProjectorIcon :name="modalityIcon(item)" />
+                </span>
+              </p>
+              <p v-if="row.info.description" class="catalog-description">
+                {{ row.info.description }}
+              </p>
+              <p v-if="row.info.priceNote" class="catalog-note">{{ row.info.priceNote }}</p>
+              <p v-if="row.info.source" class="catalog-source">
+                <a :href="row.info.source" target="_blank" rel="noreferrer">каталог провайдера</a>
+                <template v-if="row.info.checkedAt"> · проверено {{ row.info.checkedAt }}</template>
+                <template v-if="row.info.deprecated"> · модель устарела</template>
+                <template v-if="row.on && (row.info.price || row.info.contextTokens)">
+                  ·
+                  <button type="button" class="catalog-fill" @click="applyCatalog(row.id)">
+                    заполнить поля
+                  </button>
+                </template>
+              </p>
+            </div>
+          </div>
         </UiScrollArea>
         <UiHint v-else-if="!selected.models.length">
           Моделей нет: загрузите список у провайдера или добавьте id вручную.
@@ -494,6 +745,15 @@ function balanceKeyDraft(): string {
             @keydown.enter.prevent="addManual"
           />
           <UiButton :disabled="!manual.trim()" @click="addManual">+</UiButton>
+        </UiInline>
+        <UiInline v-if="selected.models.length" class="model-legend" wrap :gap="2">
+          <span class="legend-label">возможности:</span>
+          <span v-for="item in CAPABILITY_LEGEND" :key="item" class="legend-item">
+            <span class="fact-icon fact-cap">
+              <ProjectorIcon :name="capabilityIcon(item)" aria-hidden="true" />
+            </span>
+            {{ providerModelCapabilityTitle(item) }}
+          </span>
         </UiInline>
         <UiHint>
           Имя — под которым модель видна агенту и шлюзу; по умолчанию совпадает с id. Окно контекста
@@ -686,6 +946,133 @@ function balanceKeyDraft(): string {
   flex-direction: column;
   gap: var(--sp-1);
   min-width: 0;
+}
+.model-entry {
+  display: grid;
+}
+.model-facts {
+  grid-column: 2 / -1;
+  color: var(--faint);
+  font-size: var(--fs-xs);
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+.model-facts,
+.catalog-shape {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+}
+.model-kind,
+.catalog-kind {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 6px;
+  border-radius: var(--r-sm);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  color: var(--text-2);
+  font-weight: 600;
+}
+.model-flow {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+.fact-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  color: var(--text-2);
+}
+.fact-cap {
+  width: 22px;
+  height: 22px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  background: var(--bg-2);
+  color: var(--text-2);
+}
+.fact-icon .projector-icon,
+.model-kind .projector-icon,
+.catalog-kind .projector-icon {
+  width: 15px;
+  height: 15px;
+}
+.fact-cap .projector-icon {
+  width: 16px;
+  height: 16px;
+}
+.flow-arrow {
+  width: 15px;
+  height: 15px;
+  color: var(--faint);
+}
+.fact-text {
+  color: var(--faint);
+  font-variant-numeric: tabular-nums;
+}
+.model-legend {
+  align-items: center;
+  color: var(--faint);
+  font-size: var(--fs-xs);
+}
+.legend-label {
+  font-weight: 600;
+}
+.legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.fact-note {
+  max-width: 100%;
+}
+.catalog {
+  display: grid;
+  gap: 2px;
+  padding: 0 0 var(--sp-2) var(--sp-5);
+}
+.catalog-description,
+.catalog-note,
+.catalog-source {
+  margin: 0;
+  font-size: var(--fs-xs);
+  line-height: 1.45;
+}
+.catalog-description {
+  color: var(--muted);
+}
+.catalog-note,
+.catalog-source {
+  color: var(--faint);
+}
+.chat-only {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  color: var(--muted);
+  font-size: var(--fs-xs);
+  white-space: nowrap;
+}
+.catalog-shape {
+  margin: 0;
+  color: var(--text-2);
+  font-size: var(--fs-xs);
+  line-height: 1.45;
+}
+.catalog-source a,
+.catalog-fill {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
 }
 
 .price-label {

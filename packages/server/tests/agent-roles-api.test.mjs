@@ -36,8 +36,11 @@ test("roles API reads, saves and resets a service role", async () => {
     expect(initial.status).toBe(200);
     expect(initial.headers.get("cache-control")).toBe("no-store");
     const first = await initial.json();
-    expect(first.roles.map((role) => role.id)).toEqual(["doctor", "lens", "judge"]);
+    expect(first.roles.map((role) => role.id)).toEqual(["doctor", "lens", "judge", "listener"]);
     expect(first.roles.every((role) => role.inherited)).toBe(true);
+    expect(first.roles.find((role) => role.id === "listener").media).toEqual({
+      capability: "speech.transcribe",
+    });
 
     const denied = await fetch(`${origin}/api/agent/roles/lens`, {
       method: "PUT",
@@ -71,6 +74,48 @@ test("roles API reads, saves and resets a service role", async () => {
     expect(resetResponse.status).toBe(200);
     const reset = await resetResponse.json();
     expect(reset.roles.find((role) => role.id === "lens").inherited).toBe(true);
+
+    const listenerResponse = await fetch(`${origin}/api/agent/roles/listener`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json", Origin: origin },
+      body: JSON.stringify({
+        selection: { provider: "test:whisper-1" },
+        prompt: "Projector, TypeScript, Sdju",
+      }),
+    });
+    expect(listenerResponse.status).toBe(200);
+    const listener = (await listenerResponse.json()).roles.find((role) => role.id === "listener");
+    expect(listener).toMatchObject({
+      selection: { provider: "test:whisper-1" },
+      prompt: "Projector, TypeScript, Sdju",
+      inherited: false,
+      media: { capability: "speech.transcribe" },
+    });
+    const listenerRead = (await (await fetch(`${origin}/api/agent/roles`)).json()).roles.find(
+      (role) => role.id === "listener",
+    );
+    expect(listenerRead.prompt).toBe("Projector, TypeScript, Sdju");
+
+    // Chat-model service roles keep their own fixed prompts: a stray context is not stored.
+    const doctor = await fetch(`${origin}/api/agent/roles/doctor`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json", Origin: origin },
+      body: JSON.stringify({ selection: { provider: "test:model" }, prompt: "чужой контекст" }),
+    });
+    expect(doctor.status).toBe(200);
+    expect((await doctor.json()).roles.find((role) => role.id === "doctor").prompt).toBeUndefined();
+
+    const listenerReset = await fetch(`${origin}/api/agent/roles/listener/reset`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Origin: origin },
+      body: "{}",
+    });
+    expect(listenerReset.status).toBe(200);
+    const listenerCleared = (await listenerReset.json()).roles.find(
+      (role) => role.id === "listener",
+    );
+    expect(listenerCleared.inherited).toBe(true);
+    expect(listenerCleared.prompt).toBeUndefined();
 
     const bad = await fetch(`${origin}/api/agent/roles/unknown`, {
       method: "PUT",

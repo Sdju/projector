@@ -16,6 +16,8 @@ import type {
   ProviderBalance,
   ProviderKind,
   ProviderKindInfo,
+  ProviderModelCatalog,
+  ProviderModelInfo,
   ProviderUsage,
 } from "./types.ts";
 
@@ -32,6 +34,8 @@ const state = reactive({
   usageBusy: {} as Record<string, boolean | undefined>,
   /** Ids the provider offers upstream, per provider; not saved, only offered for registering. */
   remoteModels: {} as Record<string, string[] | undefined>,
+  /** What Projector knows about those ids: window, tariff, abilities and description. */
+  remoteDetails: {} as Record<string, ProviderModelCatalog | undefined>,
   fetchingModels: {} as Record<string, boolean | undefined>,
   modelsError: {} as Record<string, string | undefined>,
   /** Bumped when providers or keys are applied from the server; balance views refetch on it. */
@@ -224,17 +228,24 @@ export function useProviders() {
     state.fetchingModels[id] = true;
     state.modelsError[id] = undefined;
     try {
-      state.remoteModels[id] = await fetchProviderModels({
+      const listed = await fetchProviderModels({
         id,
         url: item.url,
         kind: item.kind,
         apiKey: state.keyDrafts[id],
       });
+      state.remoteModels[id] = listed.models;
+      state.remoteDetails[id] = listed.details;
     } catch (err) {
       state.modelsError[id] = err instanceof Error ? err.message : "Не удалось получить список";
     } finally {
       state.fetchingModels[id] = false;
     }
+  }
+
+  /** The catalog entry for one model of a provider, when the last list request brought one. */
+  function modelInfo(providerId: string, id: string): ProviderModelInfo | undefined {
+    return state.remoteDetails[providerId]?.[id];
   }
 
   /** Registers an upstream model under a name; the name stays unique within the provider. */
@@ -245,7 +256,22 @@ export function useProviders() {
     const taken = new Set(item.models.map((row) => row.alias));
     let name = alias.trim() || modelId;
     for (let n = 2; taken.has(name); n++) name = `${alias.trim() || modelId}-${n}`;
-    item.models.push({ id: modelId, alias: name });
+    const info = modelInfo(providerId, modelId);
+    item.models.push({
+      id: modelId,
+      alias: name,
+      ...(info?.contextTokens ? { contextTokens: info.contextTokens } : {}),
+      ...(info?.price ? { price: { ...info.price } } : {}),
+    });
+  }
+
+  /** Fills the editable window and price from the catalog again, after a manual change. */
+  function applyCatalogMetadata(providerId: string, id: string): void {
+    const row = state.providers.find((p) => p.id === providerId)?.models.find((m) => m.id === id);
+    const info = modelInfo(providerId, id);
+    if (!row || !info) return;
+    if (info.contextTokens) row.contextTokens = info.contextTokens;
+    if (info.price) row.price = { ...info.price };
   }
 
   function unregisterModel(providerId: string, id: string): void {
@@ -284,10 +310,13 @@ export function useProviders() {
     setModelThinking,
     setModelContext,
     setModelPrice,
+    applyCatalogMetadata,
+    modelInfo,
     registerModel,
     unregisterModel,
     renameModel,
     remoteModels: computed(() => state.remoteModels),
+    remoteDetails: computed(() => state.remoteDetails),
     fetchingModels: computed(() => state.fetchingModels),
     modelsError: computed(() => state.modelsError),
     providers,

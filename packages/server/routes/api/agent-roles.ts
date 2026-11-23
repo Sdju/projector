@@ -70,7 +70,7 @@ export const routes: RouteDefinition[] = [
             body.selection && typeof body.selection === "object" && !Array.isArray(body.selection)
               ? body.selection
               : {};
-          json(res, 200, await saveServiceRole(id, selection));
+          json(res, 200, await saveServiceRole(id, selection, body.prompt));
         } else {
           json(res, 200, await saveChatRole(id, chatRoleFrom(body)));
         }

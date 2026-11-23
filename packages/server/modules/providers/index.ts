@@ -6,7 +6,8 @@ export { resolveOpenAIProvider } from "./provider-store.ts";
 export { loadStoredProviders } from "./provider-store.ts";
 export { assertKeyStore, useProviderVault } from "./provider-store.ts";
 
-export { listProviderModels } from "./model-list.ts";
+export { listProviderModels, type ProviderModelList } from "./model-list.ts";
+export { preloadProviderModelCatalog, providerModelCatalog } from "./model-catalog.ts";
 export { pickModel } from "./models.ts";
 export {
   balanceResolver,

@@ -28,10 +28,11 @@ export function readAgentRoles(): Promise<AgentRoleSettings> {
 export function writeServiceRole(
   role: string,
   selection: AgentRoleSelection,
+  prompt?: string,
 ): Promise<AgentRoleSettings> {
   return call<AgentRoleSettings>(`/api/agent/roles/${encodeURIComponent(role)}`, {
     method: "PUT",
-    body: JSON.stringify({ selection }),
+    body: JSON.stringify({ selection, ...(prompt === undefined ? {} : { prompt }) }),
   });
 }
 
@@ -40,6 +41,23 @@ export function resetServiceRole(role: string): Promise<AgentRoleSettings> {
     method: "POST",
     body: JSON.stringify({}),
   });
+}
+
+/** What Listener resolves to now: the chosen recognition model or the first available one. */
+export interface ListenerState {
+  configured: boolean;
+  providerId?: string;
+  providerName?: string;
+  model?: string;
+  capability?: "speech.transcribe";
+  /** No model is chosen: the first available recognition model will be used. */
+  auto?: boolean;
+  /** The context the role sends with each recording. */
+  context: string;
+}
+
+export function readListenerState(): Promise<ListenerState> {
+  return call<ListenerState>("/api/agent/listener");
 }
 
 /** A new chat role; the server gives it an id and returns it in `created`. */

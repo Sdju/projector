@@ -9,6 +9,15 @@ export {
   type ChatRoleListItem,
   type ChatRoleSource,
 } from "./model/roles.ts";
+export {
+  listener,
+  loadListener,
+  loadRoleMediaModels,
+  mediaModelOf,
+  mediaOptionsFor,
+  type RoleMediaOption,
+} from "./model/role-media.ts";
+export type { ListenerState } from "./api/roles.ts";
 export { focusedRoleId } from "./model/nav.ts";
 export { useProjectRoleSettings } from "./model/project-roles.ts";
 export {

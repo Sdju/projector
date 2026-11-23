@@ -175,9 +175,10 @@ export const settingsSections: SettingsSection[] = [
     id: "agent-roles",
     title: "Роли агентов",
     group: "Агент",
-    description: "Служебные роли и пресеты чатов: агент, модель и настройки.",
+    description:
+      "Служебные роли, Listener и пресеты чатов: агент, модель, контекст распознавания и настройки.",
     keywords:
-      "роли agent roles doctor lens judge доктор линза судья модель служебные внутренние вызовы chat роль чата пресет preset",
+      "роли agent roles doctor lens judge listener доктор линза судья модель служебные внутренние вызовы chat роль чата пресет preset распознавание речь диктовка медиа speech transcribe контекст словарь",
     component: AgentRoleSettings,
   },
   {

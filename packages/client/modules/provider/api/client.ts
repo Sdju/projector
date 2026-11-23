@@ -2,6 +2,7 @@ import type {
   OpenAIProviderPublic,
   OpenAIProvidersPublicState,
   ProviderBalance,
+  ProviderModelCatalog,
   ProviderUsage,
 } from "../model/types.ts";
 
@@ -47,16 +48,19 @@ export function fetchProviderBalances(): Promise<{
   return request("/api/providers/balances");
 }
 
-/** Model ids the provider offers; a draft passes its own address and key. */
+/** Model ids the provider offers and what Projector knows about them; a draft passes its own key. */
 export async function fetchProviderModels(draft: {
   id: string;
   url: string;
   kind?: string;
   apiKey?: string;
-}): Promise<string[]> {
-  const { models } = await request<{ models: string[] }>("/api/providers/models", {
+}): Promise<{ models: string[]; details: ProviderModelCatalog }> {
+  const { models, details } = await request<{
+    models: string[];
+    details: ProviderModelCatalog;
+  }>("/api/providers/models", {
     method: "POST",
     body: JSON.stringify(draft),
   });
-  return models;
+  return { models, details: details ?? {} };
 }

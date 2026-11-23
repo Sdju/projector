@@ -1,3 +1,12 @@
+export type {
+  ProviderModelCapability,
+  ProviderModelCatalog,
+  ProviderModelInfo,
+  ProviderModelKind,
+  ProviderModelModality,
+  ProviderModelPrice,
+} from "@ai-projector/core/modules/providers/index.ts";
+
 export type BuiltinProviderKind = "custom" | "local" | "deepseek" | "openrouter" | "qwencloud";
 
 /** Built-in presets plus kinds contributed by trusted balance plugins. */

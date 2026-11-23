@@ -20,17 +20,10 @@ import {
   updateMediaJob,
   type MediaJobRecord,
 } from "./jobs.ts";
+import { POLL_TIMEOUT_MS, providerContext, resolveMediaProvider } from "./provider.ts";
 import { mediaAdapter, mediaAdapters } from "./registry.ts";
 import { parseRequest } from "./request.ts";
-import type {
-  MediaAdapter,
-  MediaArtifactSource,
-  MediaProviderContext,
-  MediaSubmission,
-} from "./types.ts";
-
-const SUBMIT_TIMEOUT_MS = 10 * 60 * 1000;
-const POLL_TIMEOUT_MS = 2 * 60 * 1000;
+import type { MediaArtifactSource, MediaSubmission } from "./types.ts";
 
 interface MediaOperations {
   poll?: Promise<MediaJob>;
@@ -83,54 +76,17 @@ export async function listMediaModels(capability?: MediaCapability): Promise<Med
     for (const model of models) {
       if (capability && model.capability !== capability) continue;
       out.push({
+        ...model,
         id: model.id,
         alias: model.alias ?? model.id,
         capability: model.capability,
         providerId: provider.id,
         providerName: provider.name,
         adapter: adapter.kind,
-        ...(model.title ? { title: model.title } : {}),
-        ...(model.options ? { options: model.options } : {}),
       });
     }
   }
   return out;
-}
-
-function providerContext(
-  id: string,
-  name: string,
-  kind: string,
-  url: string,
-  apiKey: string,
-  signal?: AbortSignal,
-): MediaProviderContext {
-  return { id, name, kind, url, apiKey, signal: signal ?? AbortSignal.timeout(SUBMIT_TIMEOUT_MS) };
-}
-
-async function resolveMediaProvider(providerId?: string): Promise<{
-  adapter: MediaAdapter;
-  provider: Awaited<ReturnType<typeof resolveOpenAIProvider>>;
-}> {
-  const stored = await loadStoredProviders(envFallbackFromProcess());
-  const requested = providerId?.trim();
-  const found = requested
-    ? stored.providers.find((provider) => provider.id === requested)
-    : undefined;
-  if (requested && !found) throw new HttpError(404, "Провайдер не найден");
-  const selected =
-    found ??
-    stored.providers.find((provider) => provider.id === stored.activeProviderId) ??
-    stored.providers[0];
-  if (!selected) throw new HttpError(400, "Провайдер не настроен");
-  if (!selected.enabled) throw new HttpError(400, "Провайдер выключен");
-  const adapter = mediaAdapter(selected.kind);
-  if (!adapter) throw new HttpError(400, `Вид провайдера «${selected.kind}» не поддерживает медиа`);
-  const provider = await resolveOpenAIProvider({ providerId: selected.id });
-  if (!provider.url.trim()) throw new HttpError(400, "У провайдера не задан адрес");
-  if (adapter.requiresKey && !provider.apiKey)
-    throw new HttpError(400, `У провайдера «${provider.name}» нет ключа API`);
-  return { adapter, provider };
 }
 
 async function materialize(

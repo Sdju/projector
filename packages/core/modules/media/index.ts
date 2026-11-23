@@ -21,6 +21,111 @@ export function isMediaCapability(value: unknown): value is MediaCapability {
   return typeof value === "string" && (MEDIA_CAPABILITIES as readonly string[]).includes(value);
 }
 
+/** What a media model accepts or returns, besides its primary capability. */
+export type MediaModality = "text" | "image" | "audio" | "video";
+
+/** What a provider bills for. */
+export type MediaPriceUnit =
+  | "image"
+  | "second"
+  | "minute"
+  | "10k-characters"
+  | "1m-characters"
+  | "1m-tokens"
+  | "request";
+
+/** One published rate; the source and date live on the model, not on every line. */
+export interface MediaModelPrice {
+  amount: number;
+  /** ISO code, usually `USD`. */
+  currency: string;
+  unit: MediaPriceUnit;
+  /** Which part of the call this rate covers; absent means the whole call. */
+  appliesTo?: "call" | "input" | "output" | "audio-output";
+  /** Resolution or size tier, e.g. `720P`, `1K`. */
+  variant?: string;
+  /** The provider itself presents this figure as an estimate. */
+  estimated?: boolean;
+}
+
+/** Everything known about a media model besides its provider and its capability. */
+export interface MediaModelDetails {
+  /** One or two sentences: what the model does and where it fits. */
+  description?: string;
+  input?: MediaModality[];
+  output?: MediaModality[];
+  /** Languages for speech models: `ru`, `en`, `multi`. */
+  languages?: string[];
+  prices?: MediaModelPrice[];
+  /** The official rate card the prices were copied from. */
+  priceSource?: string;
+  /** ISO date the rate card was checked. */
+  priceCheckedAt?: string;
+  /** Provider documentation for this model. */
+  docs?: string;
+  /** The provider still serves it but no longer recommends it. */
+  deprecated?: boolean;
+}
+
+/** A unit for people: «изображение», «минута», «1 млн токенов». */
+export function mediaPriceUnitTitle(unit: MediaPriceUnit): string {
+  switch (unit) {
+    case "image":
+      return "изображение";
+    case "second":
+      return "секунда";
+    case "minute":
+      return "минута";
+    case "10k-characters":
+      return "10 тыс. символов";
+    case "1m-characters":
+      return "1 млн символов";
+    case "1m-tokens":
+      return "1 млн токенов";
+    case "request":
+      return "запрос";
+  }
+}
+
+/** A modality for chips: «текст», «изображение», «звук», «видео». */
+export function mediaModalityTitle(modality: MediaModality): string {
+  switch (modality) {
+    case "text":
+      return "текст";
+    case "image":
+      return "изображение";
+    case "audio":
+      return "звук";
+    case "video":
+      return "видео";
+  }
+}
+
+const CURRENCY_SIGNS: Record<string, string> = { USD: "$", EUR: "€", CNY: "¥", RUB: "₽" };
+
+/**
+ * A price as one line: `$0.006 / минута`, `$0.04 / изображение (1K)`,
+ * `$0.15 / 1 млн токенов (вход)`. The browser and the settings share this formatting.
+ */
+export function formatMediaPrice(price: MediaModelPrice, locale = "ru-RU"): string {
+  const amount = new Intl.NumberFormat(locale, {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 6,
+  }).format(price.amount);
+  const money = CURRENCY_SIGNS[price.currency]
+    ? `${CURRENCY_SIGNS[price.currency]}${amount}`
+    : `${amount} ${price.currency}`;
+  const unit = mediaPriceUnitTitle(price.unit);
+  const side =
+    price.appliesTo === "input"
+      ? " (вход)"
+      : price.appliesTo === "output" || price.appliesTo === "audio-output"
+        ? " (выход)"
+        : "";
+  const variant = price.variant ? ` (${price.variant})` : "";
+  return `${money} / ${unit}${variant}${side}${price.estimated ? " · оценка" : ""}`;
+}
+
 /** Что модель принимает и какие значения предлагает форма. */
 export interface MediaModelOptions {
   sizes?: string[];
@@ -34,7 +139,7 @@ export interface MediaModelOptions {
 }
 
 /** Модель, которую Projector показывает для одного провайдера. */
-export interface MediaModel {
+export interface MediaModel extends MediaModelDetails {
   id: string;
   alias: string;
   capability: MediaCapability;

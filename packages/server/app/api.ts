@@ -40,6 +40,7 @@ import { routes as agentFeaturesRoutes } from "../routes/api/agent-features.ts";
 import { routes as agentPresetsRoutes } from "../routes/api/agent-presets.ts";
 import { routes as agentJudgeRoutes } from "../routes/api/agent-judge.ts";
 import { routes as agentRolesRoutes } from "../routes/api/agent-roles.ts";
+import { routes as agentListenerRoutes } from "../routes/api/agent-listener.ts";
 import { routes as agentProjectRolesRoutes } from "../routes/api/agent-project-roles.ts";
 import { routes as agentProjectWidgetsRoutes } from "../routes/api/agent-project-widgets.ts";
 import { routes as agentWebRoutes } from "../routes/api/agent-web.ts";
@@ -127,6 +128,7 @@ const dispatch = createRouteDispatcher([
   ...agentPresetsRoutes,
   ...agentJudgeRoutes,
   ...agentRolesRoutes,
+  ...agentListenerRoutes,
   ...agentProjectRolesRoutes,
   ...agentProjectWidgetsRoutes,
   ...agentRoutes,

@@ -4,12 +4,22 @@
  * shared by the settings, the API and the server-side resolver, so the page and the server agree
  * on what a role means before anything is sent to an agent.
  */
+import type { MediaCapability } from "../media/index.ts";
+
 export type AgentRoleKind = "chat" | "service";
 
 /** The values chosen for an agent's controls, by control id (`provider`, `model`, `thinking`, …). */
 export type AgentRoleSelection = Record<string, string>;
 
 export type AgentRolePermissionMode = "default" | "auto" | "bypassPermissions";
+
+/**
+ * Where a media role takes its model from: media models of one capability, not the chat.
+ * The chosen value lives in `selection.provider` as `providerId:model`.
+ */
+export interface AgentRoleMediaSource {
+  capability: MediaCapability;
+}
 
 export interface AgentRole {
   /** Stable id; the built-in service ids are reserved. */
@@ -20,6 +30,11 @@ export interface AgentRole {
   /** Backend id; every service role runs on the built-in Projector backend. */
   agent: string;
   selection: AgentRoleSelection;
+  /**
+   * A media role: its model comes from media models with this capability, and its prompt is
+   * context for the call (`Listener` sends it to speech recognition as a hint), not instructions.
+   */
+  media?: AgentRoleMediaSource;
   permissionMode?: AgentRolePermissionMode;
   /** The default for background jobs: work in an isolated copy of the project. */
   isolate?: boolean;
@@ -49,7 +64,10 @@ export interface AgentRoleSnapshot {
 
 /** A role as the settings show it: whether its model comes from the chat. */
 export interface AgentRoleView extends AgentRole {
-  /** No model of its own: the role follows the chat or the active provider. */
+  /**
+   * No model of its own: a chat-model role follows the chat or the active provider, and a media
+   * role takes the first available model of its capability.
+   */
   inherited: boolean;
 }
 
@@ -69,7 +87,7 @@ export interface AgentProjectRoleState {
 
 export const SERVICE_AGENT = "projector";
 
-export const SERVICE_ROLE_IDS = ["doctor", "lens", "judge"] as const;
+export const SERVICE_ROLE_IDS = ["doctor", "lens", "judge", "listener"] as const;
 
 export type ServiceRoleId = (typeof SERVICE_ROLE_IDS)[number];
 
@@ -100,6 +118,17 @@ export const BUILTIN_SERVICE_ROLES: readonly AgentRole[] = [
     kind: "service",
     agent: SERVICE_AGENT,
     selection: {},
+    builtin: true,
+  },
+  {
+    id: "listener",
+    name: "Listener",
+    description:
+      "Слушает запись и превращает звук в текст. Контекст роли помогает с именами и терминами.",
+    kind: "service",
+    agent: SERVICE_AGENT,
+    selection: {},
+    media: { capability: "speech.transcribe" },
     builtin: true,
   },
 ];
@@ -262,6 +291,34 @@ export function resolveRoleSelection(
 /** A service role follows the chat when it names no Projector provider of its own. */
 export function serviceRoleInheritsModel(role: Pick<AgentRole, "selection">): boolean {
   return !role.selection.provider;
+}
+
+/** The media capability of a built-in role; absent for roles that call a chat model. */
+export function serviceRoleMedia(id: string): AgentRoleMediaSource | undefined {
+  return BUILTIN_SERVICE_ROLES.find((role) => role.id === id)?.media;
+}
+
+/** The longest context a media role sends with a call; recognition hints are short on purpose. */
+export const MEDIA_ROLE_CONTEXT_LIMIT = 1_000;
+
+/**
+ * The media model chosen for a role: `selection.provider` keeps `providerId:model`, the same shape
+ * chat roles use, so the settings, the store and the API need one key instead of two.
+ */
+export function mediaModelSelection(
+  selection: AgentRoleSelection,
+): { providerId: string; model: string } | undefined {
+  const value = selection.provider?.trim() ?? "";
+  const at = value.indexOf(":");
+  if (at <= 0 || at >= value.length - 1) return undefined;
+  const providerId = value.slice(0, at).trim();
+  const model = value.slice(at + 1).trim();
+  return providerId && model ? { providerId, model } : undefined;
+}
+
+/** The `selection.provider` value of one media model. */
+export function mediaModelSelectionValue(providerId: string, model: string): string {
+  return `${providerId.trim()}:${model.trim()}`;
 }
 
 /** The values a chat keeps from its role; the role id and name stay readable after deletion. */

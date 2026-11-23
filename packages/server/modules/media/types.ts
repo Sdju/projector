@@ -1,6 +1,7 @@
 import type {
   MediaCapability,
   MediaJob,
+  MediaModelDetails,
   MediaModelOptions,
   MediaRequest,
 } from "@ai-projector/core/modules/media/index.ts";
@@ -16,7 +17,7 @@ export interface MediaProviderContext {
 }
 
 /** Модель в терминах адаптера: providerId и adapter добавляет реестр. */
-export interface MediaAdapterModel {
+export interface MediaAdapterModel extends MediaModelDetails {
   id: string;
   alias?: string;
   capability: MediaCapability;
@@ -54,6 +55,8 @@ export interface MediaAdapter {
   capabilities: readonly MediaCapability[];
   /** Без ключа провайдера запрос заведомо не пройдёт. */
   requiresKey?: boolean;
+  /** Адаптер передаёт prompt как подсказку при распознавании речи. */
+  transcriptionPrompt?: boolean;
   /** Допустимые хосты скачиваемых результатов; без списка разрешены публичные HTTPS-хосты. */
   artifactHosts?: readonly string[];
   listModels(context: MediaProviderContext): MediaAdapterModel[] | Promise<MediaAdapterModel[]>;

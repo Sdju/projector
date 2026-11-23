@@ -1,5 +1,10 @@
 <script setup lang="ts">
 import type { MediaArtifact } from "@ai-projector/core/modules/media/index.ts";
+import {
+  formatMediaPrice,
+  mediaCapabilityTitle,
+  mediaModalityTitle,
+} from "@ai-projector/core/modules/media/index.ts";
 import { computed } from "vue";
 import UiButton from "../../../common/ui/UiButton.vue";
 import UiControl from "../../../common/ui/UiControl.vue";
@@ -51,6 +56,24 @@ const modelOptionsList = computed(() => selectedModel.value?.options);
 const progressLabel = computed(() =>
   job.value?.progress !== undefined ? `${Math.round((job.value.progress ?? 0) * 100)}%` : "",
 );
+
+/** What the model accepts and returns, as one readable line. */
+const modelModalities = computed(() => {
+  const model = selectedModel.value;
+  if (!model) return [];
+  const parts: string[] = [];
+  if (model.input?.length) parts.push(`вход: ${model.input.map(mediaModalityTitle).join(", ")}`);
+  if (model.output?.length) parts.push(`выход: ${model.output.map(mediaModalityTitle).join(", ")}`);
+  if (model.languages?.length) parts.push(`языки: ${model.languages.join(", ")}`);
+  return parts;
+});
+
+/** The date the rate card was checked, in the reader's locale. */
+function checkedAt(value: string | undefined): string {
+  if (!value) return "";
+  const date = new Date(`${value}T00:00:00`);
+  return Number.isNaN(date.getTime()) ? value : date.toLocaleDateString("ru-RU");
+}
 
 function setDuration(value: unknown): void {
   const number = typeof value === "string" && value ? Number(value) : Number.NaN;
@@ -139,6 +162,41 @@ function statusLabel(): string {
             </option>
           </UiControl>
         </label>
+      </div>
+
+      <div v-if="selectedModel" class="model-info">
+        <p v-if="selectedModel.description" class="model-description">
+          {{ selectedModel.description }}
+        </p>
+        <UiInline class="model-meta" justify="normal">
+          <span class="model-capability">{{ mediaCapabilityTitle(selectedModel.capability) }}</span>
+          <span v-for="part in modelModalities" :key="part" class="model-detail">{{ part }}</span>
+        </UiInline>
+        <ul v-if="selectedModel.prices?.length" class="model-prices">
+          <li v-for="(price, index) in selectedModel.prices" :key="index">
+            {{ formatMediaPrice(price) }}
+          </li>
+        </ul>
+        <p v-else-if="selectedModel.description" class="model-note">
+          Провайдер не публикует цену для этой модели.
+        </p>
+        <p v-else class="model-note">
+          О модели нет данных: провайдер не передаёт описание и тариф. Запрос всё равно уйдёт с её
+          id.
+        </p>
+        <p v-if="selectedModel.priceSource" class="model-source">
+          Тариф
+          <a :href="selectedModel.priceSource" target="_blank" rel="noreferrer">провайдера</a>
+          <template v-if="selectedModel.priceCheckedAt">
+            · проверено {{ checkedAt(selectedModel.priceCheckedAt) }}
+          </template>
+          <template v-if="selectedModel.docs">
+            · <a :href="selectedModel.docs" target="_blank" rel="noreferrer">документация</a>
+          </template>
+        </p>
+        <p v-if="selectedModel.deprecated" class="model-note">
+          Провайдер больше не рекомендует эту модель.
+        </p>
       </div>
 
       <label v-if="capability === 'speech.transcribe'" class="field">
@@ -302,6 +360,52 @@ function statusLabel(): string {
 }
 .media-grid.options {
   grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+}
+.model-info {
+  display: grid;
+  gap: var(--sp-1);
+  padding: var(--sp-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  background: var(--bg-2);
+  font-size: var(--fs-xs);
+}
+.model-description {
+  margin: 0;
+  color: var(--text-2);
+  line-height: 1.45;
+}
+.model-meta {
+  flex-wrap: wrap;
+  gap: var(--sp-1);
+}
+.model-capability {
+  padding: 1px 6px;
+  border-radius: var(--r-sm);
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  color: var(--text-2);
+  font-weight: 600;
+}
+.model-detail {
+  color: var(--faint);
+}
+.model-prices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-1) var(--sp-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+.model-note,
+.model-source {
+  margin: 0;
+  color: var(--faint);
+}
+.model-source a {
+  color: var(--accent);
 }
 .field {
   display: flex;

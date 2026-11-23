@@ -6,3 +6,20 @@ export {
   qwenCloudEndpointOrNull,
 } from "./qwencloud.ts";
 export type { QwenCloudEndpoint } from "./qwencloud.ts";
+export {
+  formatContextWindow,
+  formatProviderModelPrice,
+  providerModelCapabilityTitle,
+  providerModelKindOf,
+  providerModelKindTitle,
+  providerModelModalityTitle,
+  providerModelShape,
+} from "./catalog.ts";
+export type {
+  ProviderModelCapability,
+  ProviderModelCatalog,
+  ProviderModelInfo,
+  ProviderModelKind,
+  ProviderModelModality,
+  ProviderModelPrice,
+} from "./catalog.ts";

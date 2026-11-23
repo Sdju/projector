@@ -14,9 +14,26 @@ import type {
   AgentRoleView,
 } from "@ai-projector/core/modules/agent-role/index.ts";
 import { clientAgents } from "../../agents-integration/catalog/index.ts";
-import { commandArgs, useCommandScope } from "../../../common/utilities/commands.ts";
+import { useCommandScope } from "../../../common/utilities/commands.ts";
 import { readProjectRoles } from "../api/project-roles.ts";
+import { registerRoleSettingsCommands } from "./role-settings-commands.ts";
+import {
+  hasMediaRole,
+  listener,
+  loadListener,
+  loadRoleMediaModels,
+  mediaModelOf,
+  mediaOptionsFor,
+} from "./role-media.ts";
 import { firstProjectId, readControls, type RoleControl } from "./controls.ts";
+export type { RoleMediaOption } from "./role-media.ts";
+export {
+  listener,
+  loadListener,
+  loadRoleMediaModels,
+  mediaModelOf,
+  mediaOptionsFor,
+} from "./role-media.ts";
 export type { RoleControl, RoleControlOption } from "./controls.ts";
 
 /** Where a chat role in the launcher came from: user settings or the trusted project file. */
@@ -147,6 +164,12 @@ export function useAgentRoleSettings() {
         error.value =
           cause instanceof Error ? cause.message : "Не удалось получить модели провайдеров";
       });
+      if (hasMediaRole(data.roles)) {
+        await loadRoleMediaModels(true).catch((cause) => {
+          error.value = cause instanceof Error ? cause.message : "Не удалось получить медиа-модели";
+        });
+        await loadListener().catch(() => undefined);
+      }
       return data;
     } catch (cause) {
       error.value = cause instanceof Error ? cause.message : "Ошибка ролей агентов";
@@ -164,15 +187,24 @@ export function useAgentRoleSettings() {
     }
   }
 
-  async function setService(role: string, provider: string): Promise<AgentRoleSettings> {
+  async function setService(
+    role: string,
+    provider: string,
+    prompt?: string,
+  ): Promise<AgentRoleSettings> {
     const known = state.data.roles.find((item) => item.id === role && item.kind === "service");
     if (!known) throw new Error(`Неизвестная служебная роль: ${role}`);
     const selection: AgentRoleSelection = provider.trim() ? { provider: provider.trim() } : {};
     busy.value = role;
     try {
       return await perform(async () => {
-        const data = await writeServiceRole(role, selection);
+        const data = await writeServiceRole(
+          role,
+          selection,
+          known.media && prompt === undefined ? known.prompt : prompt,
+        );
         applyAgentRoles(data);
+        await loadListener().catch(() => undefined);
         return data;
       });
     } finally {
@@ -188,6 +220,7 @@ export function useAgentRoleSettings() {
       return await perform(async () => {
         const data = await resetServiceRole(role);
         applyAgentRoles(data);
+        await loadListener().catch(() => undefined);
         return data;
       });
     } finally {
@@ -245,135 +278,18 @@ export function useAgentRoleSettings() {
     }
   }
 
-  commands.scope.registerCommand({
-    id: "ide.agent.roles.list",
-    palette: false,
-    title: "Список ролей агентов",
-    description:
-      "Возвращает служебные роли (Доктор, Lens, Судья) и chat-роли: id, название, агента, выбранные настройки и наследуется ли модель. Служебные роли — внутренние вызовы без инструментов; chat-роль открывает обычный чат.",
-    run: async () => {
-      const data = await loadAgentRoles();
-      return {
-        file: data.file,
-        roles: data.roles.map((role) => ({
-          id: role.id,
-          name: role.name,
-          description: role.description,
-          kind: role.kind,
-          agent: role.agent,
-          selection: role.selection,
-          prompt: role.prompt,
-          template: role.template,
-          skills: role.skills,
-          mcp: role.mcp,
-          inherited: role.inherited,
-        })),
-      };
-    },
-  });
-  commands.scope.registerCommand({
-    id: "ide.agent.roles.set",
-    palette: false,
-    title: "Выбрать модель служебной роли",
-    description:
-      "Задаёт модель для служебной роли Projector. provider — значение из ide.agent.roles.list, например provider:model; пустая строка возвращает роль к модели чата. Это меняет только внутренние вызовы Доктора, Lens или Судьи: промпты, отсутствие инструментов и лимиты остаются прежними.",
-    arguments: {
-      role: "string: id служебной роли: doctor, lens или judge",
-      provider: "string: provider:model из настроек провайдеров; пустая строка — как в чате",
-    },
-    enabled: () => !busy.value,
-    run: (value) => {
-      const args = commandArgs(value);
-      if (typeof args.role !== "string" || !args.role)
-        throw new Error("role: id служебной роли: doctor, lens или judge");
-      if (typeof args.provider !== "string")
-        throw new Error("provider: строка provider:model или пустая строка");
-      return setService(args.role, args.provider);
-    },
-  });
-  commands.scope.registerCommand({
-    id: "ide.agent.roles.reset",
-    palette: false,
-    title: "Вернуть служебной роли модель чата",
-    description:
-      "Удаляет выбранную модель роли. Доктор, Lens или Судья снова используют модель текущего чата или активного провайдера.",
-    arguments: { role: "string: id служебной роли: doctor, lens или judge" },
-    enabled: () => !busy.value,
-    run: (value) => {
-      const args = commandArgs(value);
-      if (typeof args.role !== "string" || !args.role)
-        throw new Error("role: id служебной роли: doctor, lens или judge");
-      return resetService(args.role);
-    },
-  });
-  commands.scope.registerCommand({
-    id: "ide.agent.roles.create",
-    palette: false,
-    title: "Создать chat-роль",
-    description:
-      "Создаёт новую роль для чата с именем «Новая роль» и агентом Projector. Дальше её настройки меняет ide.agent.roles.save: название, агент и набор controls. Возвращает созданную роль.",
-    run: () => createChat(),
-  });
-  commands.scope.registerCommand({
-    id: "ide.agent.roles.save",
-    palette: false,
-    title: "Сохранить chat-роль",
-    description:
-      "Меняет название, описание, агента, выбранные настройки, промпт, шаблон контекста, навыки и MCP chat-роли. selection — объект control id → value; отсутствующее значение наследует умолчание агента. prompt добавляется к системному промпту; template: true превращает его в шаблон с {system}, {features}, {widgets}, {project}, {memory}, {skills}, {mcp}, {role} и {summary}. skills и mcp — имена, пустой массив выключает их. Не переданные поля сохраняются. Роль действует на новые чаты; уже начатые чаты сохраняют снимок.",
-    arguments: {
-      role: "string: id chat-роли",
-      name: "string: название роли",
-      agent: "string: id агента из каталога",
-      description: "string: описание (необязательно)",
-      selection: "object: control id → value (необязательно)",
-      prompt: "string: дополнительные инструкции роли (необязательно)",
-      template: "boolean: промпт роли — шаблон контекста (необязательно)",
-      skills: "array: имена навыков; пустой массив выключает (необязательно)",
-      mcp: "array: имена MCP-серверов; пустой массив выключает (необязательно)",
-    },
-    enabled: () => !busy.value,
-    run: (value) => {
-      const args = commandArgs(value);
-      if (typeof args.role !== "string" || !args.role) throw new Error("role: id chat-роли");
-      if (typeof args.name !== "string" || !args.name.trim())
-        throw new Error("name: название роли");
-      if (typeof args.agent !== "string" || !args.agent) throw new Error("agent: id агента");
-      const known = chatRoles.value.find((role) => role.id === args.role);
-      if (!known) throw new Error(`Неизвестная chat-роль: ${args.role}`);
-      const selection =
-        args.selection && typeof args.selection === "object" && !Array.isArray(args.selection)
-          ? (args.selection as AgentRoleSelection)
-          : known.selection;
-      const names = (input: unknown, fallback: string[] | undefined) =>
-        Array.isArray(input)
-          ? input.filter((item): item is string => typeof item === "string")
-          : fallback;
-      return saveChat(args.role, {
-        ...known,
-        name: args.name,
-        agent: args.agent,
-        description: typeof args.description === "string" ? args.description : known.description,
-        selection,
-        prompt: typeof args.prompt === "string" ? args.prompt : known.prompt,
-        template: typeof args.template === "boolean" ? args.template : known.template,
-        skills: names(args.skills, known.skills),
-        mcp: names(args.mcp, known.mcp),
-      });
-    },
-  });
-  commands.scope.registerCommand({
-    id: "ide.agent.roles.delete",
-    palette: false,
-    title: "Удалить chat-роль",
-    description:
-      "Удаляет chat-роль. Уже начатые чаты продолжают работать со своим снимком; роль перестаёт появляться в меню новой сессии.",
-    arguments: { role: "string: id chat-роли" },
-    enabled: () => !busy.value,
-    run: (value) => {
-      const args = commandArgs(value);
-      if (typeof args.role !== "string" || !args.role) throw new Error("role: id chat-роли");
-      return removeChat(args.role);
-    },
+  registerRoleSettingsCommands({
+    commands,
+    busy,
+    chatRoles,
+    listener,
+    loadRoles: loadAgentRoles,
+    loadListener,
+    setService,
+    resetService,
+    createChat,
+    saveChat,
+    removeChat,
   });
 
   return {
@@ -384,6 +300,10 @@ export function useAgentRoleSettings() {
     file,
     modelOptions,
     controlsFor: roleControls,
+    mediaOptionsFor,
+    mediaModelOf,
+    listener,
+    loadListener,
     busy,
     error: message,
     load: reload,

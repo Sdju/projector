@@ -4,7 +4,15 @@ import {
   envFallbackFromProcess,
 } from "./provider-store.ts";
 import type { ProviderKind } from "./types.ts";
+import { preloadProviderModelCatalog, providerModelCatalog } from "./model-catalog.ts";
 import { fetchRemoteModels } from "./models.ts";
+import type { ProviderModelCatalog } from "@ai-projector/core/modules/providers/index.ts";
+
+export interface ProviderModelList {
+  models: string[];
+  /** What Projector knows about the listed models: window, tariff, abilities and description. */
+  details: ProviderModelCatalog;
+}
 
 /**
  * Models a provider offers upstream. A draft may bring its own address and key; the stored key is
@@ -15,7 +23,7 @@ export async function listProviderModels(input: {
   url?: string;
   kind?: string;
   apiKey?: string;
-}): Promise<string[]> {
+}): Promise<ProviderModelList> {
   const fallback = envFallbackFromProcess();
   const stored = await loadStoredProviders(fallback);
   const known = stored.providers.find((item) => item.id === input.id);
@@ -25,5 +33,8 @@ export async function listProviderModels(input: {
   const apiKey =
     typed ||
     (known ? (await resolveOpenAIProvider({ providerId: known.id, fallback })).apiKey : "");
-  return fetchRemoteModels(url, apiKey, kind);
+  const shared = preloadProviderModelCatalog();
+  const models = await fetchRemoteModels(url, apiKey, kind);
+  const details = await providerModelCatalog({ ids: models, kind, shared });
+  return { models, details };
 }

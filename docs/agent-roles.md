@@ -4,23 +4,54 @@
 
 Есть два вида:
 
-- **Служебные роли** (`doctor`, `lens`, `judge`) — короткие внутренние вызовы Projector без инструментов и истории.
+- **Служебные роли** (`doctor`, `lens`, `judge`, `listener`) — короткие внутренние вызовы Projector без инструментов и истории.
 - **Chat-роли** — пользовательские пресеты, которые открывают обычный чат выбранного агента из меню «+», запускают фоновые задания и read-only субагента `task`.
 - **Роли проекта** — те же chat-роли, но из `.projector/roles.json`; работают только после явного доверия к файлу.
 
-Chat-роль может не только выбирать модель и controls, но и добавлять свой промпт, шаблонизировать контекст (`{system}`, `{widgets}` и другие подстановки), ограничивать навыки и MCP-серверы. Служебные роли остаются с фиксированным промптом и без инструментов.
+Chat-роль может не только выбирать модель и controls, но и добавлять свой промпт, шаблонизировать контекст (`{system}`, `{widgets}` и другие подстановки), ограничивать навыки и MCP-серверы. Служебные роли остаются с фиксированным промптом и без инструментов; исключение — media-роль `listener`, у которой промпт означает контекст распознавания.
 
 ## Служебные роли
 
-| Роль     | Где работает                         | Что делает                                     |
-| -------- | ------------------------------------ | ---------------------------------------------- |
-| `doctor` | `form-doctor.ts`, `answer-doctor.ts` | Чинит Vue-разметку формы или готового ответа   |
-| `lens`   | `agent-lens.ts`                      | Пишет короткую подпись о текущей работе агента |
-| `judge`  | `judge/verdict.ts`                   | Оценивает риск действия перед подтверждением   |
+| Роль       | Где работает                                     | Что делает                                     |
+| ---------- | ------------------------------------------------ | ---------------------------------------------- |
+| `doctor`   | `form-doctor.ts`, `answer-doctor.ts`             | Чинит Vue-разметку формы или готового ответа   |
+| `lens`     | `agent-lens.ts`                                  | Пишет короткую подпись о текущей работе агента |
+| `judge`    | `judge/verdict.ts`                               | Оценивает риск действия перед подтверждением   |
+| `listener` | `agent-roles/listener.ts`, `/api/agent/listener` | Распознаёт речь выбранной медиа-моделью        |
 
-Все три роли выполняются на встроенном бэкенде `projector`: фиксированный промпт, один запрос, без инструментов, без записи истории и без доступа к файлам. Роль меняет только модель; thinking для этих вызовов намеренно погашен через `quietChatModel`. Политика Судьи (`show`, `auto`, `maxRisk`, `confidence`) остаётся в разделе «Судья Projector» и не входит в роль.
+Служебные роли выполняются на встроенном бэкенде `projector`: фиксированный промпт, один запрос, без инструментов, без записи истории и без доступа к файлам. Роль меняет только модель; thinking для этих вызовов намеренно погашен через `quietChatModel`. Политика Судьи (`show`, `auto`, `maxRisk`, `confidence`) остаётся в разделе «Судья Projector» и не входит в роль.
 
-Если у роли не выбрана модель, она наследует модель вызывающего чата, а при её отсутствии — активного провайдера. Поэтому до первой настройки поведение прежнее.
+Если у роли не выбрана модель, она наследует модель вызывающего чата, а при её отсутствии — активного провайдера. Поэтому до первой настройки поведение прежнее. У media-роли наследование означает другое: берётся первая доступная модель её возможности.
+
+### Media-роли
+
+Роль может брать модель не из чата, а из медиа-моделей одной возможности:
+
+```ts
+interface AgentRole {
+  // …
+  media?: {
+    capability: "image.generate" | "speech.synthesize" | "speech.transcribe" | "video.generate";
+  };
+}
+```
+
+Сейчас такая роль одна — `listener`, возможность `speech.transcribe`. Выбор хранится в том же поле `selection.provider`, что и у остальных ролей, значением `providerId:model`, поэтому хранилище, API и настройки не заводят второй ключ. В интерфейсе список моделей строится только из этой возможности и группируется по провайдеру — модели изображений и видео в выбор Listener не попадают.
+
+Контекст Listener — это не инструкции агенту, а подсказка распознаванию: имена, термины, названия проектов. Он хранится в `prompt` роли (до 1000 знаков), уходит провайдеру вместе со звуком и поддерживается только теми адаптерами, которые принимают `prompt` (OpenAI-совместимый `/audio/transcriptions`). У остальных служебных ролей `prompt` игнорируется: их промпты фиксированы в коде.
+
+```json
+{
+  "builtins": {
+    "listener": {
+      "selection": { "provider": "qwen:qwen-audio-3.1-asr-flash" },
+      "prompt": "Projector, Sdju, TypeScript"
+    }
+  }
+}
+```
+
+`listenerTarget()` возвращает выбранную модель или первую доступную; `listenerTranscribe()` читает запись через адаптер и не создаёт медиа-задачу и артефакт. Запись живёт только в памяти запроса. Ошибки провайдера приходят как обычные `HttpError`: нет модели — `409`, отказ провайдера — `502`. Карточка роли показывает паспорт выбранной модели — описание и цену из каталога медиа-моделей ([media](media.md#паспорт-модели)).
 
 ## Chat-роли
 
@@ -165,21 +196,26 @@ API: `GET /api/agent/project-roles?projectId=`, `POST /api/agent/project-roles`,
 
 ## API
 
-- `GET /api/agent/roles` — `{ roles, file }`; у каждой роли `id`, `name`, `description`, `kind`, `agent`, `selection`, `prompt`, `template`, `skills`, `mcp`, `builtin` и `inherited`.
+- `GET /api/agent/roles` — `{ roles, file }`; у каждой роли `id`, `name`, `description`, `kind`, `agent`, `selection`, `media`, `prompt`, `template`, `skills`, `mcp`, `builtin` и `inherited`.
 - `POST /api/agent/roles` — `{ role: { name, agent, selection, description?, prompt?, template?, skills?, mcp? } }`; создаёт chat-роль и возвращает `created`.
-- `PUT /api/agent/roles/:id` — для служебной роли `{ selection: { provider } }`; для chat-роли `{ role: { name, agent, selection, description?, prompt?, template?, skills?, mcp? } }`.
+- `PUT /api/agent/roles/:id` — для служебной роли `{ selection: { provider }, prompt? }`; для chat-роли `{ role: { name, agent, selection, description?, prompt?, template?, skills?, mcp? } }`. `prompt` сохраняется только у media-роли, у остальных игнорируется.
 - `DELETE /api/agent/roles/:id` — удаляет chat-роль; служебную удалить нельзя.
-- `POST /api/agent/roles/:id/reset` — удаляет сохранённую модель служебной роли.
+- `POST /api/agent/roles/:id/reset` — удаляет сохранённую модель и контекст служебной роли.
 
 Чтение доступно странице Projector; изменение требует совпадающего `Origin`. Неизвестная роль и некорректный id дают `400`.
+
+Listener:
+
+- `GET /api/agent/listener` — `{ configured, providerId?, providerName?, model?, auto?, context }`: во что роль разрешается сейчас.
+- `POST /api/agent/listener/transcribe` — `{ audio: { base64, mime }, language?, hints? }`; отвечает `{ text, providerId, providerName, model, contextSent, ms }`. Тело до 22 МБ base64 (16 МБ звука), только `audio/*`, страница и `Origin`; аудио никуда не сохраняется.
 
 ## Команды
 
 Настройки:
 
-- `ide.agent.roles.list` — все роли и путь к файлу.
-- `ide.agent.roles.set` `{ role, provider }` — выбрать модель служебной роли; пустая строка — как в чате.
-- `ide.agent.roles.reset` `{ role }` — вернуть наследование.
+- `ide.agent.roles.list` — все роли и путь к файлу; у media-роли видны `media` и контекст, отдельно — разрешённый `listener`.
+- `ide.agent.roles.set` `{ role, provider, prompt? }` — выбрать модель служебной роли; пустая строка — как в чате, а для Listener — автоматически. `prompt` задаёт контекст только media-роли.
+- `ide.agent.roles.reset` `{ role }` — вернуть наследование и удалить контекст.
 - `ide.agent.roles.create` — создать chat-роль.
 - `ide.agent.roles.save` `{ role, name, agent, description?, selection?, prompt?, template?, skills?, mcp? }` — сохранить chat-роль; не переданные поля остаются как были, пустые `skills`/`mcp` выключают набор, `template: true` включает подстановки контекста.
 - `ide.agent.roles.delete` `{ role }` — удалить chat-роль.
@@ -196,14 +232,18 @@ API: `GET /api/agent/project-roles?projectId=`, `POST /api/agent/project-roles`,
 | -------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
 | `packages/core/modules/agent-role`                             | Контракт `AgentRole`, `AgentRoleSnapshot`, reserved ids, нормализация и `resolveRoleSelection` |
 | `packages/server/modules/agent-roles`                          | `roles.json`, chat-роли, слияние встроенных ролей, `serviceRoleSelection`                      |
+| `packages/server/modules/agent-roles/listener.ts`              | Разрешение модели Listener, контекст и вызов распознавания                                     |
+| `packages/server/modules/media/transcribe.ts`                  | Один вызов распознавания без медиа-задачи и артефакта                                          |
 | `packages/server/modules/agent-roles/runtime.ts`               | `rolePromptText`, `roleTemplateTitle`, `roleContext` и фильтр имён для промпта, навыков и MCP  |
 | `packages/server/modules/agents/projector/projector-system.ts` | Сборка системного промпта Projector и подстановки шаблона роли                                 |
 | `packages/server/modules/agent-mcp`                            | Общий разбор `agent/mcp.json` и `.mcp.json`, выбор серверов роли и форматы Claude/ACP          |
 | `packages/server/modules/agent/role-store.ts`                  | Снимок роли в `chats.role`                                                                     |
 | `packages/server/routes/api/agent-roles.ts`                    | HTTP API                                                                                       |
+| `packages/server/routes/api/agent-listener.ts`                 | Состояние Listener и вызов распознавания                                                       |
 | `packages/server/modules/agents/projector/*`                   | Доктор и Lens получают выбор роли перед `quietChatModel`                                       |
 | `packages/server/modules/judge/verdict.ts`                     | Судья получает выбор роли перед `quietChatModel`                                               |
 | `packages/client/modules/agent-roles`                          | API, каталог ролей, настройки и редактор chat-роли                                             |
+| `packages/client/modules/agent-roles/model/role-media.ts`      | Медиа-модели по возможностям и состояние Listener для настроек                                 |
 | `packages/client/modules/agent-core/model/role-apply.ts`       | Применение снимка к состоянию чата                                                             |
 | `packages/client/modules/agent/model/role-commands.ts`         | `ide.agent.role.open`, `ide.agent.role.edit` и `ide.agent.roles.chat.list`                     |
 | `packages/client/modules/workspace/ui/NewSessionMenu.vue`      | Секция «Роли» в меню «+»: открытие чата и переход к редактору                                  |
@@ -227,6 +267,9 @@ API: `GET /api/agent/project-roles?projectId=`, `POST /api/agent/project-roles`,
 - `tests/agent-roles.test.mjs` — контракт, нормализация, хранилище, chat-роли, снимок в истории, промпт и контекст навыков, конкурентная запись, повреждённый файл.
 - `tests/agent-roles-api.test.mjs` — API служебных и chat-ролей, история со снимком, доступ по `Origin`.
 - `tests/agent-roles-service.test.mjs` — Lens использует модель роли, а после сброса — модель чата.
+- `tests/agent-listener.test.mjs` — модель по умолчанию, выбранная модель, контекст в подсказке, отказ без `Origin`, отсутствие артефактов.
+- `tests/agent-role-media.test.mjs` — медиа-модели по возможностям, формат `provider:model` и состояние Listener в клиенте.
+- `tests/agent-role-listener-browser.test.mjs` — карточка Listener в браузере: только модели распознавания и сохранение контекста.
 - `tests/agent-project-roles.test.mjs` — доверие к `.projector/roles.json`, хеш, отзыв, промпт/навыки/MCP в роли, повреждённый файл и симлинк наружу.
 - `tests/agent-project-roles-api.test.mjs` — API проектных ролей и доверия.
 - `tests/agent-mcp.test.mjs` — выбор серверов роли и явный список Projector.

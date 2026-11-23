@@ -52,10 +52,15 @@ afterEach(async () => {
 const roleOf = (settings, id) => settings.roles.find((role) => role.id === id);
 
 describe("agent roles", () => {
-  it("starts with the three service roles inheriting the chat's model", async () => {
+  it("starts with the built-in service roles inheriting their model", async () => {
     const settings = await roleSettings();
     expect(settings.roles.map((role) => role.id)).toEqual([...SERVICE_ROLE_IDS]);
-    expect(settings.roles.map((role) => role.name)).toEqual(["Доктор", "Lens", "Судья"]);
+    expect(settings.roles.map((role) => role.name)).toEqual([
+      "Доктор",
+      "Lens",
+      "Судья",
+      "Listener",
+    ]);
     expect(
       settings.roles.every(
         (role) =>
@@ -67,7 +72,7 @@ describe("agent roles", () => {
       ),
     ).toBe(true);
     expect(settings.file).toBe(rolesFile());
-    expect(BUILTIN_SERVICE_ROLES).toHaveLength(3);
+    expect(BUILTIN_SERVICE_ROLES).toHaveLength(4);
   });
 
   it("stores one role's model and returns it to the chat when cleared", async () => {
