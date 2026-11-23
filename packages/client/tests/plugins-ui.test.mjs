@@ -80,7 +80,7 @@ let app;
  input.value='/tmp/manual-plugin';input.dispatchEvent(new Event('input',{bubbles:true}));await nextTick();
  button('Установить').click();
  await wait(()=>posts.some(item=>item.action==='install'&&item.path==='/tmp/manual-plugin'),'manual install');
- check(input.value==='','install path cleared');
+ await wait(()=>input.value==='','install path cleared');
  button('Установить из папки').click();
  await wait(()=>posts.some(item=>item.action==='install'&&item.path==='/tmp/picked-plugin'),'folder picker install');
  check(failures.length===0,'commands succeed: '+failures.join(','));

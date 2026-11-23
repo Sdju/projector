@@ -847,11 +847,12 @@ test(
       await expect
         .poll(() => browser.evaluate("window.fixture.saved()"))
         .toMatchObject({ seed: "#ff6600" });
-      const customAccent = await browser.evaluate(
-        "document.documentElement.style.getPropertyValue('--accent')",
-      );
-      expect(customAccent).not.toBe("#a4e1ff");
-      expect(customAccent).not.toBe("#ccd8fa");
+      // Saving the seed and repainting --accent are two steps: under load the variable can still
+      // hold the previous seed right after the save reaches the fixture.
+      const accent = () =>
+        browser.evaluate("document.documentElement.style.getPropertyValue('--accent')");
+      await expect.poll(accent).not.toBe("#ccd8fa");
+      expect(await accent()).not.toBe("#a4e1ff");
       await expect
         .poll(() => browser.evaluate(`document.querySelector(${JSON.stringify(range)}).disabled`))
         .toBe(false);
