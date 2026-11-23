@@ -107,6 +107,8 @@ export type AnswerSnapshot = {
   tools: AgentTurn["tools"];
   parts?: AgentPart[];
   tasks?: AgentTurn["tasks"];
+  failure?: string;
+  failureInfo?: AgentTurn["failureInfo"];
 };
 
 export function snapshotAnswer(assistant: AgentTurn): AnswerSnapshot {
@@ -115,6 +117,8 @@ export function snapshotAnswer(assistant: AgentTurn): AnswerSnapshot {
     tools: assistant.tools.map((tool) => ({ ...tool })),
     ...(assistant.parts ? { parts: assistant.parts.map((part) => ({ ...part })) } : {}),
     ...(assistant.tasks ? { tasks: assistant.tasks.map((task) => ({ ...task })) } : {}),
+    ...(assistant.failure !== undefined ? { failure: assistant.failure } : {}),
+    ...(assistant.failureInfo !== undefined ? { failureInfo: assistant.failureInfo } : {}),
   };
 }
 
@@ -123,6 +127,8 @@ export function restoreAnswer(assistant: AgentTurn, snapshot: AnswerSnapshot): v
   assistant.tools.splice(0, assistant.tools.length, ...snapshot.tools);
   assistant.parts = snapshot.parts;
   if (snapshot.tasks) assistant.tasks = snapshot.tasks;
+  assistant.failure = snapshot.failure;
+  assistant.failureInfo = snapshot.failureInfo;
 }
 
 /** Keeps the times of the calls already seen, then empties the answer for its replay. */
@@ -137,6 +143,8 @@ export function resetAnswer(assistant: AgentTurn) {
   assistant.text = "";
   assistant.tools.splice(0);
   assistant.parts = [];
+  assistant.failure = undefined;
+  assistant.failureInfo = undefined;
 }
 
 export function appendText(turn: AgentTurn, text: string) {

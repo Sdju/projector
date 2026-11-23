@@ -204,3 +204,82 @@ test("a session that cannot be loaded keeps the placeholder", async () => {
   expect(saved).toBe(0);
   expect(turns[1].text).toBe(INTERRUPTED);
 });
+
+test("an empty transport-failed turn without its own session recovers from the previous session", async () => {
+  const turns = [
+    user("первый"),
+    answer("готово", { session: { backend: "cursor", id: "ses_cur" } }),
+    user("да перенести"),
+    { id: "a2", role: "assistant", text: "", tools: [], failure: "Hub connection failed" },
+  ];
+  let saved = 0;
+  let loadedId = "";
+  const done = await recoverTurn(
+    turns,
+    turns[3],
+    async (id) => {
+      loadedId = id;
+      return [
+        user("первый"),
+        answer("готово"),
+        user("да перенести"),
+        answer("Перенесено в отдельный модуль."),
+      ];
+    },
+    () => saved++,
+  );
+  expect(loadedId).toBe("ses_cur");
+  expect(done).toBe(true);
+  expect(saved).toBe(1);
+  expect(turns[3].text).toBe("Перенесено в отдельный модуль.");
+  expect(turns[3].failure).toBeUndefined();
+  expect(turns[3].session).toEqual({ backend: "cursor", id: "ses_cur" });
+});
+
+test("a repeated prompt that failed before reaching the agent does not reuse an earlier answer", async () => {
+  const turns = [
+    user("да перенести"),
+    answer("Перенесено.", { session: { backend: "cursor", id: "ses_cur" } }),
+    user("да перенести"),
+    { id: "a2", role: "assistant", text: "", tools: [], failure: "Hub connection failed" },
+  ];
+  let saved = 0;
+  const done = await recoverTurn(
+    turns,
+    turns[3],
+    async () => [user("да перенести"), answer("Перенесено.")],
+    () => saved++,
+  );
+  expect(done).toBe(false);
+  expect(saved).toBe(0);
+  expect(turns[3].text).toBe("");
+  expect(turns[3].failure).toBe("Hub connection failed");
+});
+
+test("a structured failure is never overwritten via previousSession fallback", async () => {
+  const turns = [
+    user("первый"),
+    answer("готово", { session: { backend: "cursor", id: "ses_cur" } }),
+    user("второй"),
+    {
+      id: "a2",
+      role: "assistant",
+      text: "",
+      tools: [],
+      failure: "Достигнут лимит",
+      failureInfo: { class: "usage_limit", message: "Достигнут лимит", retryable: true },
+    },
+  ];
+  let loaded = 0;
+  const done = await recoverTurn(
+    turns,
+    turns[3],
+    async () => {
+      loaded++;
+      return [user("первый"), answer("готово"), user("второй"), answer("ответ")];
+    },
+    () => {},
+  );
+  expect(done).toBe(false);
+  expect(loaded).toBe(0);
+});

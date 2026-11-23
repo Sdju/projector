@@ -70,6 +70,10 @@ export function attachSse(req: IncomingMessage, res: ServerResponse): void {
     Connection: "keep-alive",
   });
   res.write(":\n\n");
+  const keepalive = setInterval(() => {
+    if (!res.writableEnded) res.write(":\n\n");
+  }, 25_000);
+  keepalive.unref();
   const client: SseClient = {
     res,
     id: new URL(req.url ?? "/", "http://localhost").searchParams.get("client") ?? "",
@@ -77,6 +81,7 @@ export function attachSse(req: IncomingMessage, res: ServerResponse): void {
   };
   sseClients.add(client);
   req.on("close", () => {
+    clearInterval(keepalive);
     sseClients.delete(client);
     for (const id of [client.id, ...(client.pages ?? [])])
       if (id) for (const listener of closeListeners) listener(id);

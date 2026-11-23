@@ -2,7 +2,6 @@ import { newId } from "../../../common/utilities/new-id.ts";
 import { computed, reactive } from "vue";
 import { useProjects } from "../../project/index.ts";
 import {
-  AgentRunGone,
   answerPermission,
   answerQuestion,
   answerSecret,
@@ -10,7 +9,6 @@ import {
   loadSessionTurns,
   streamAgent,
 } from "../api/client.ts";
-import { findRejoinRun } from "../api/runs.ts";
 import { addVersion } from "./branches.ts";
 import { chatHistory } from "./chat-state.ts";
 import { chatKeyOf } from "./chat-key.ts";
@@ -24,15 +22,15 @@ import {
   requestNotifications,
 } from "../lib/notify.ts";
 import { chatPresence, createState, loads, queued, releases, sessions } from "./chat-state.ts";
-import { INTERRUPTED, loadHistory } from "./load-history.ts";
+import { loadHistory } from "./load-history.ts";
 import { recoverTurn } from "./lost-answer.ts";
 import { isBuiltinAgent } from "./modes.ts";
-import { streamAnswer } from "./run-turn.ts";
+import { resolveRejoinRun, streamOrRecoverAnswer } from "./run-turn.ts";
 import { createStreamSaver } from "./stream-save.ts";
 import { watchChat } from "./chat-sync.ts";
 import { saveChat } from "./save-chat.ts";
 import { useExternalAgent } from "./external.ts";
-import { answerLooksOpen, applyAgentEvent, closeAnswer, markAnswerFailed } from "./turn-events.ts";
+import { applyAgentEvent, closeAnswer } from "./turn-events.ts";
 import { hasChips, messageText, normalizeParts } from "../lib/message-parts.ts";
 import { announceAgentTurnEnd } from "../lib/turn-end.ts";
 import { restoreFormSnapshot } from "./form-reply.ts";
@@ -94,23 +92,7 @@ export function useAgent(
   const { draftParts, draft, busy, loading, error, phase, permissions, questions, secrets } =
     useChatView(state);
 
-  const {
-    controls,
-    selection,
-    sessions: sessionList,
-    loadControls,
-    loadCommands,
-    setControl,
-    loadSessions,
-    loadRecent,
-    recent,
-    recentLoading,
-    recentError,
-    changeSession,
-    resumeSession,
-    removeSession,
-    clear,
-  } = useExternalAgent(state, { backend, projectId, ready, persist, key });
+  const external = useExternalAgent(state, { backend, projectId, ready, persist, key });
   async function decide(id: string, allow: boolean, always = false): Promise<void> {
     state.permissions = state.permissions.filter((item) => item.id !== id);
     try {
@@ -170,12 +152,17 @@ export function useAgent(
       if (["status", "controls", "tool-result"].includes(event.event)) void actions.deliverQueue();
     };
     try {
-      await streamAnswer(assistant, start, onEvent, signal, firstAttach);
-    } catch (err) {
-      if (err instanceof AgentRunGone) {
-        assistant.run = undefined;
-        if (!(await recover(assistant)) && !assistant.text.trim()) assistant.text = INTERRUPTED;
-      } else if (!signal.aborted) markAnswerFailed(state, assistant, err);
+      await streamOrRecoverAnswer({
+        state,
+        assistant,
+        key,
+        backend,
+        start,
+        onEvent,
+        signal,
+        firstAttach,
+        recover,
+      });
     } finally {
       streamSave.stop();
       const stopped = signal.aborted;
@@ -285,8 +272,8 @@ export function useAgent(
     await ready;
     const assistant = state.turns.at(-1);
     if (state.busy || assistant?.role !== "assistant") return;
-    if (!assistant.run && answerLooksOpen(assistant) && !rejoined.has(assistant)) {
-      const run = await findRejoinRun(key, backend, assistant.at, assistant.session?.id);
+    if (!assistant.run && !rejoined.has(assistant)) {
+      const run = await resolveRejoinRun(state.turns, assistant, key, backend);
       if (run) {
         assistant.run = run;
         rejoined.add(assistant);
@@ -348,26 +335,13 @@ export function useAgent(
     permissions,
     questions,
     secrets,
-    controls,
-    selection,
+    ...external,
     roleSnapshot: computed(() => state.roleSnapshot),
     capabilities: computed(() => state.capabilities),
     controlsError: computed(() => state.controlsError),
-    sessions: sessionList,
     sessionsLoading: computed(() => state.sessionsLoading),
     sessionsError: computed(() => state.sessionsError),
-    recent,
-    recentLoading,
-    recentError,
-    loadControls,
-    loadCommands,
     commands: computed(() => state.commands),
-    setControl,
-    loadSessions,
-    loadRecent,
-    changeSession,
-    resumeSession,
-    removeSession,
     send,
     queue: computed(() => state.queue),
     sendQueuedNow: actions.sendQueuedNow,
@@ -387,7 +361,6 @@ export function useAgent(
     worktreeInfo: actions.worktreeInfo,
     mergeCopy: actions.mergeCopy,
     discardCopy: actions.discardCopy,
-    clear,
     stop,
     attach,
     release,
