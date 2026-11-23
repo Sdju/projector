@@ -141,6 +141,12 @@ export default defineConfig({
     "*": "vp fmt --no-error-on-unmatched-pattern",
   },
   lint: {
+    // The Claude Code plugin is a self-contained package outside the pnpm workspace: Projector
+    // installs its Agent SDK dependency later, into the plugin's own `node_modules`, and the
+    // plugin loads it through `api.require`. Root type checking therefore cannot resolve the SDK
+    // and only reports missing modules and the implicit anys they cause, so its sources are not
+    // linted here; the plugin's tests still are.
+    ignorePatterns: ["plugins/claude-code/src/**"],
     jsPlugins: [
       { name: "vite-plus", specifier: "vite-plus/oxlint-plugin" },
       { name: "projector", specifier: "./scripts/lint/projector-plugin.mjs" },
