@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import type { ShellLaunch } from "../../contract.ts";
+import { quotePosixArg } from "../../../os-posix/index.ts";
 
 const execute = promisify(execFile);
 export { xdgDataHome as dataHome, configHome } from "../../../os-posix/index.ts";
@@ -13,7 +14,8 @@ export function shell() {
 export function shellLaunch(spec: ShellLaunch) {
   const file = shell();
   if (spec.kind === "command") return { file, args: ["-c", spec.command] };
-  if (spec.kind === "program") return { file, args: ["-i", "-c", `exec ${spec.executable}`] };
+  if (spec.kind === "program")
+    return { file, args: ["-i", "-c", `exec ${quotePosixArg(spec.executable)}`] };
   return { file, args: ["-i"] };
 }
 export function desktopPaths() {

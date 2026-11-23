@@ -71,6 +71,7 @@ export interface AgentBackendSummary {
   plan?: { tools: string[] };
   program?: string;
   terminal?: AgentTerminal;
+  launch?: boolean;
   builtin?: boolean;
   defaultFeatures?: readonly string[];
   capabilities?: AgentCapabilities;
@@ -90,6 +91,7 @@ export function listAgentBackends(): AgentBackendSummary[] {
       plan,
       program,
       terminal,
+      launch,
       builtin,
       defaultFeatures,
       capabilities,
@@ -104,6 +106,7 @@ export function listAgentBackends(): AgentBackendSummary[] {
       ...(plan?.tools.length ? { plan } : {}),
       ...(program ? { program } : {}),
       ...(terminal ? { terminal } : {}),
+      ...(launch ? { launch } : {}),
       ...(builtin ? { builtin } : {}),
       ...(defaultFeatures?.length ? { defaultFeatures } : {}),
       ...(capabilities ? { capabilities } : {}),

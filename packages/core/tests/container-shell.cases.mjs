@@ -24,6 +24,28 @@ test("container Bash does not inherit the host's PowerShell arguments", () => {
       "-c",
       "exec agent",
     ]);
+    expect(
+      bashShellLaunch({ kind: "program", executable: "/Users/me/My Tools/agent" }).args,
+    ).toStrictEqual(["-i", "-c", "exec '/Users/me/My Tools/agent'"]);
+    expect(
+      createOs("linux").shellLaunch({ kind: "program", executable: "/opt/my agent/bin" }).args,
+    ).toStrictEqual(["-i", "-c", "exec '/opt/my agent/bin'"]);
+    expect(
+      createOs("darwin").shellLaunch({ kind: "program", executable: "/Applications/My Agent" })
+        .args,
+    ).toStrictEqual(["-i", "-c", "exec '/Applications/My Agent'"]);
+    const winProgram = createOs("win32").shellLaunch({
+      kind: "program",
+      executable: "C:\\Program Files\\Agent\\agent.exe",
+    });
+    if (/powershell|pwsh/i.test(winProgram.file))
+      expect(winProgram.args).toContain("& 'C:\\Program Files\\Agent\\agent.exe'");
+    else
+      expect(winProgram.args).toStrictEqual([
+        "-i",
+        "-c",
+        "exec 'C:\\Program Files\\Agent\\agent.exe'",
+      ]);
   } finally {
     if (previous === undefined) delete process.env.SHELL;
     else process.env.SHELL = previous;

@@ -26,6 +26,8 @@ export interface ClientAgent {
   icon: IconName;
   /** The built-in Projector agent: it has a chat but no terminal program. */
   builtin?: boolean;
+  /** The server starts this agent over ACP, so its command can be overridden on this machine. */
+  launch?: boolean;
   /** A local descriptor for a backend a plugin provides; it disappears when the server drops it. */
   plugin?: boolean;
   /** The limits indicator of the agent, if it has one. */
@@ -140,6 +142,7 @@ interface RemoteAgent {
   iconSvg?: unknown;
   plan?: unknown;
   program?: unknown;
+  launch?: unknown;
   usageUrl?: unknown;
   usageWindows?: unknown;
 }
@@ -212,6 +215,16 @@ function withRemoteUsage(
   return { ...agent, usageUrl: usageProps.usageUrl as string, usageProps };
 }
 
+/** The server is the only one that knows whether an agent starts over ACP. */
+function withRemoteLaunch(agent: ClientAgent, item: RemoteAgent): ClientAgent {
+  const launch = item.launch === true;
+  if (!!agent.launch === launch) return agent;
+  const next = { ...agent };
+  if (launch) next.launch = true;
+  else delete next.launch;
+  return next;
+}
+
 /**
  * Merges the server's agent catalog into the client one. Local descriptors win: the built-in
  * agents keep their icons, plans and limits; only agents the client has never seen get a
@@ -240,7 +253,7 @@ export async function refreshClientAgents(): Promise<void> {
     if (local) {
       // The backend was absent on an earlier refresh; restore the rich local descriptor instead
       // of a fallback icon/caption when the plugin is enabled later.
-      const next = withRemoteUsage(local, item, local.title, local.icon);
+      const next = withRemoteLaunch(withRemoteUsage(local, item, local.title, local.icon), item);
       if (agents.get(item.id) !== next) {
         agents.set(item.id, next);
         revision.value++;
@@ -250,7 +263,10 @@ export async function refreshClientAgents(): Promise<void> {
     }
     if (existing && !remote.has(item.id)) {
       // Local descriptors keep their icon and plan; the server only fills in missing limits.
-      const next = withRemoteUsage(existing, item, existing.title, existing.icon);
+      const next = withRemoteLaunch(
+        withRemoteUsage(existing, item, existing.title, existing.icon),
+        item,
+      );
       if (next !== existing) {
         agents.set(item.id, next);
         revision.value++;
@@ -272,6 +288,7 @@ export async function refreshClientAgents(): Promise<void> {
           : `Запустит агента ${label}`,
       icon,
       ...(plan ? { plan } : {}),
+      ...(item.launch === true ? { launch: true } : {}),
       ...(usageProps ? { usageUrl: usageProps.usageUrl as string, usageProps } : {}),
     });
   }

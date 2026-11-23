@@ -8,6 +8,7 @@ import { computed } from "vue";
 import { clientAgents } from "../../../../agents-integration/catalog/index.ts";
 import { AgentFeatureDefaults } from "../../../../agent-features/index.ts";
 import AgentIntegrationsSettings from "./AgentIntegrationsSettings.vue";
+import AgentLaunchSettings from "./AgentLaunchSettings.vue";
 import AgentModeSettings from "./AgentModeSettings.vue";
 
 /** One page per agent; the navigation opens it with the backend id. */
@@ -52,6 +53,11 @@ const agent = computed(() => clientAgents().find((item) => item.backend === prop
       <section v-else class="group">
         <h4>интеграция</h4>
         <AgentIntegrationsSettings :agent-id="agent.backend" />
+      </section>
+
+      <section v-if="!agent.builtin && agent.launch" class="group">
+        <h4>запуск</h4>
+        <AgentLaunchSettings :key="agent.backend" :agent-id="agent.backend" />
       </section>
 
       <section v-if="!agent.builtin" class="group">

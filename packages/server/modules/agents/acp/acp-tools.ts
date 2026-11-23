@@ -12,11 +12,21 @@ import { controlsFromSession } from "./acp-controls.ts";
 import { availableCommands, createAcpReplayCollector } from "./acp-events.ts";
 import { initializeAcp, startAcp, type AcpInitResult } from "./acp-process.ts";
 import { reserveAcpSession } from "./acp-session-owner.ts";
+import { acpLaunchRevision } from "./acp-launch.ts";
 import { acpProgram } from "./acp-programs.ts";
 
 /** How long an agent's controls are reused: spawning an agent just to list models is not free. */
 const CONTROLS_TTL_MS = 5 * 60_000;
 const controlsCache = new Map<string, { at: number; controls: Promise<AgentControl[]> }>();
+let cachedLaunchRevision = "";
+
+function syncLaunchCache(): void {
+  const current = acpLaunchRevision();
+  if (current === cachedLaunchRevision) return;
+  cachedLaunchRevision = current;
+  controlsCache.clear();
+  commandsCache.clear();
+}
 
 /**
  * Runs `work` against a short-lived agent process that is not tied to a chat turn. Permission
@@ -64,6 +74,7 @@ async function discard(connection: AcpConnection, sessionId: string) {
 
 /** Models, effort levels and modes the agent offers in `cwd`, cached for a few minutes. */
 export function acpControls(id: AgentBackendId, cwd: string): Promise<AgentControl[]> {
+  syncLaunchCache();
   const key = `${id}\n${cwd}`;
   const cached = controlsCache.get(key);
   if (cached && Date.now() - cached.at < CONTROLS_TTL_MS) return cached.controls;
@@ -108,6 +119,7 @@ export function acpCommands(
   cwd: string,
   waitMs = COMMANDS_WAIT_MS,
 ): Promise<AgentCommand[]> {
+  syncLaunchCache();
   const key = `${id}\n${cwd}`;
   const cached = commandsCache.get(key);
   if (cached && Date.now() - cached.at < COMMANDS_TTL_MS) return cached.commands;

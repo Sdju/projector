@@ -33,6 +33,11 @@ export function commandPath(
 export function commandExists(bin: string, env?: Record<string, string | undefined>): boolean {
   return commandPath(bin, env) !== undefined;
 }
+/** Quotes an argument for POSIX sh/bash when it contains whitespace or shell metacharacters. */
+export function quotePosixArg(value: string): string {
+  if (/^[A-Za-z0-9_./:-]+$/.test(value)) return value;
+  return `'${value.replace(/'/g, "'\\''")}'`;
+}
 /** Argument-vector Docker transport; never invoke a shell or inherit a host override. */
 export function runDocker(
   args: string[],

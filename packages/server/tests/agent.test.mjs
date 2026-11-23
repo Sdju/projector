@@ -617,6 +617,40 @@ test("ACP client frames JSON-RPC over a real child process", async () => {
   await connection.close();
 });
 
+test("ACP client reports a non-JSON stdout instead of waiting for the handshake", async () => {
+  const { spawn } = await import("node:child_process");
+  const { createAcpConnection } = await import("../modules/agents/acp/acp-client.ts");
+  const script = `
+    process.stdout.write("workspace trust required\\n");
+    setInterval(() => {}, 1000);
+  `;
+  const child = spawn(process.execPath, ["-e", script], { stdio: ["pipe", "pipe", "pipe"] });
+  const connection = createAcpConnection(child, { onNotification() {}, onRequest: () => ({}) });
+  try {
+    await expect(connection.request("initialize", {})).rejects.toThrow(/не отвечает по ACP/);
+  } finally {
+    await connection.close();
+  }
+}, 10_000);
+
+test("ACP client reports a non-JSON prompt without trailing newline", async () => {
+  const { spawn } = await import("node:child_process");
+  const { createAcpConnection } = await import("../modules/agents/acp/acp-client.ts");
+  const script = `
+    process.stdout.write("Password: ");
+    setInterval(() => {}, 1000);
+  `;
+  const child = spawn(process.execPath, ["-e", script], { stdio: ["pipe", "pipe", "pipe"] });
+  const connection = createAcpConnection(child, { onNotification() {}, onRequest: () => ({}) });
+  try {
+    await expect(connection.request("initialize", {})).rejects.toThrow(
+      /не отвечает по ACP: Password:/,
+    );
+  } finally {
+    await connection.close();
+  }
+}, 10_000);
+
 test("stopping an agent kills its whole process tree", async () => {
   if (process.platform === "win32") return;
   const { os } = await import("../../core/modules/os/index.ts");

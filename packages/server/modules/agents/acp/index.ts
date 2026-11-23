@@ -1,6 +1,8 @@
 export { createAcpBackend } from "./acp-backend.ts";
 export { acpSessions, type SessionDecorator } from "./acp-tools.ts";
 export {
+  acpPrograms,
+  hasAcpProgram,
   registerAcpProgram,
   type AcpFormAdapter,
   type AcpFormField,
@@ -10,6 +12,21 @@ export {
   type AcpFollowUpOptions,
   type AcpFollowUpResult,
 } from "./acp-programs.ts";
+export {
+  acpCommandExists,
+  acpLaunchAvailable,
+  acpLaunchFile,
+  acpLaunchRevision,
+  acpLaunchSettings,
+  acpTerminalExecutable,
+  defaultArgsForCommand,
+  isNpxCommand,
+  launchOverride,
+  mergeLaunchEnv,
+  resetAcpLaunchOverride,
+  resolveAcpLaunch,
+  setAcpLaunchOverride,
+} from "./acp-launch.ts";
 export { usageReportOf } from "./acp-usage.ts";
 export {
   createPlainDialect,

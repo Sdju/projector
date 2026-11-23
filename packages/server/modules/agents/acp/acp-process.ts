@@ -7,6 +7,13 @@ import {
   type AcpConnectionHandlers,
 } from "./acp-client.ts";
 import { acpProgram, type AcpProgram } from "./acp-programs.ts";
+import {
+  acpCommandExists,
+  isNpxCommand,
+  launchOverride,
+  mergeLaunchEnv,
+  resolveAcpLaunch,
+} from "./acp-launch.ts";
 
 /** Agent Client Protocol revision this client speaks. */
 const PROTOCOL_VERSION = 1;
@@ -31,18 +38,22 @@ export interface AcpInitResult {
  */
 async function resolveLaunch(program: AcpProgram, cwd: string) {
   // Resolve programs the way a terminal session does, not through the server's own PATH.
-  const env = await os.tools.agentEnv(agentEnv());
+  const baseEnv = await os.tools.agentEnv(agentEnv());
   const executable = program.executableEnv;
-  if (executable && !env[executable.name]) {
+  if (executable && !baseEnv[executable.name]) {
     // Resolve before npx prepends bundled executables to PATH.
-    const path = os.tools.commandPath(executable.command, env);
-    if (path) env[executable.name] = path;
+    const path = os.tools.commandPath(executable.command, baseEnv);
+    if (path) baseEnv[executable.name] = path;
   }
-  if (program.binary && os.tools.commandExists(program.binary, env))
-    return { command: program.binary, args: program.binaryArgs ?? [], cwd, env };
-  if (program.command === "npx")
-    return { command: program.command, args: program.args, cwd: os.dataHome(), env };
-  return { command: program.command, args: program.args, cwd, env };
+  const override = launchOverride(program.id);
+  const env = mergeLaunchEnv(baseEnv, override?.env);
+  const launch = resolveAcpLaunch(program, override, (command) => acpCommandExists(command, env));
+  return {
+    command: launch.command,
+    args: launch.args,
+    cwd: isNpxCommand(launch.command) ? os.dataHome() : cwd,
+    env,
+  };
 }
 
 /**

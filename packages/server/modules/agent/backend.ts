@@ -171,7 +171,7 @@ export interface AgentUsageCommandProvider {
 export interface AgentUsageFunctionProvider {
   kind: "function";
   /** Returns the same JSON a command provider would print; errors become an unavailable answer. */
-  read(checkedAt: number): unknown | Promise<unknown>;
+  read(checkedAt: number): unknown;
   timeoutMs?: number;
 }
 
@@ -202,6 +202,8 @@ export interface AgentBackend {
   program?: string;
   /** How the agent opens as a terminal; the built-in Projector agent has no terminal. */
   terminal?: AgentTerminal;
+  /** The chat process is started by ACP, so its command can be overridden on this machine. */
+  launch?: boolean;
   /** The server's own agent: always on, never listed as an external integration. */
   builtin?: true;
   /** Feature ids this agent should have on until the user changes them. */

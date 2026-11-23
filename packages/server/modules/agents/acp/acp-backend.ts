@@ -1,4 +1,5 @@
 import { acpProgram, type AcpProgram, registerAcpProgram } from "./acp-programs.ts";
+import { acpLaunchAvailable, acpTerminalExecutable } from "./acp-launch.ts";
 import {
   attachedImages,
   failureFromAcp,
@@ -35,7 +36,6 @@ import {
 } from "./acp-tools.ts";
 import { promptBlocks } from "./acp-prompt.ts";
 import { reserveAcpSession } from "./acp-session-owner.ts";
-import { os } from "@ai-projector/core/modules/os/index.ts";
 
 import { decidePermission } from "./acp-permission.ts";
 export { decidePermission, toolCallDetail } from "./acp-permission.ts";
@@ -43,17 +43,26 @@ export { decidePermission, toolCallDetail } from "./acp-permission.ts";
 export function createAcpBackend(program: AcpProgram): AgentBackend {
   registerAcpProgram(program);
   const id = program.id;
-  const terminal = {
+  const terminalDefaults = {
     program: id,
     executable: id,
     title: program.label,
     ...program.terminal,
+  };
+  // The executable follows a machine-local override without re-registering the backend.
+  const terminal = {
+    program: terminalDefaults.program,
+    title: terminalDefaults.title,
+    get executable() {
+      return acpTerminalExecutable(id, terminalDefaults.executable);
+    },
   };
   return {
     id,
     label: program.label,
     program: terminal.program,
     terminal,
+    launch: true,
     capabilities: {
       hosted: true,
       get deleteSessions() {
@@ -61,9 +70,7 @@ export function createAcpBackend(program: AcpProgram): AgentBackend {
       },
     },
     run: (options) => run(options, id),
-    available: () =>
-      !!(program.binary && os.tools.commandExists(program.binary)) ||
-      os.tools.commandExists(program.command),
+    available: () => acpLaunchAvailable(id),
     controls: (cwd) => acpControls(id, cwd),
     commands: (cwd) => acpCommands(id, cwd),
     sessions: (cwd) => acpSessions(id, cwd),
@@ -99,7 +106,7 @@ async function run(options: AgentRunOptions, id: AgentBackendId): Promise<void> 
           if (replaying) return;
           if (method === "session/update") {
             const update = (params.update ?? {}) as Record<string, unknown>;
-            const sourceSession = String(params.sessionId ?? "");
+            const sourceSession = typeof params.sessionId === "string" ? params.sessionId : "";
             if (settling && followUp && !followUp.acceptsUpdates(sourceSession, update)) return;
             mapper.handleUpdate(sourceSession, update);
             return;
@@ -299,7 +306,7 @@ export async function openSession(
 
 /** The requested native session is gone; a fresh one is the only way to continue. */
 function isMissingSession(error: unknown): boolean {
-  const message = error instanceof Error ? error.message : String(error ?? "");
+  const message = error instanceof Error ? error.message : typeof error === "string" ? error : "";
   return /no such session|unknown session|session .*not found|failed to load session/i.test(
     message,
   );

@@ -28,6 +28,7 @@ import { routes as providersBalanceRoutes } from "../routes/api/providers/balanc
 import { routes as providersModelsRoutes } from "../routes/api/providers/models.ts";
 import { routes as providersUsageRoutes } from "../routes/api/providers/usage.ts";
 import { routes as agentRoutes } from "../routes/api/agent.ts";
+import { routes as agentLaunchRoutes } from "../routes/api/agent-launch.ts";
 import { routes as agentUsageRoutes } from "../routes/api/agent-usage.ts";
 import { routes as agentFormRepairRoutes } from "../routes/api/agent-form-repair.ts";
 import { routes as agentAnswerRepairRoutes } from "../routes/api/agent-answer-repair.ts";
@@ -129,6 +130,7 @@ const dispatch = createRouteDispatcher([
   ...agentProjectRolesRoutes,
   ...agentProjectWidgetsRoutes,
   ...agentRoutes,
+  ...agentLaunchRoutes,
   ...agentUsageRoutes,
   ...agentFormRepairRoutes,
   ...agentAnswerRepairRoutes,

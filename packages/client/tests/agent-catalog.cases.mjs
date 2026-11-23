@@ -51,6 +51,28 @@ test("plugin agents join the client catalog and disappear when the server drops 
   expect(clientAgents().some((item) => item.backend === "plugin-catalog-test")).toBe(false);
 });
 
+test("an ACP agent is marked as launch-configurable from the server catalog", async () => {
+  const original = globalThis.fetch;
+  onTestFinished(() => {
+    globalThis.fetch = original;
+  });
+  serve([
+    {
+      id: "plugin-launch-test",
+      label: "Launch Agent",
+      program: "launch-chat",
+      launch: true,
+    },
+  ]);
+  await refreshClientAgents();
+  const agent = clientAgents().find((item) => item.backend === "plugin-launch-test");
+  expect(agent.launch).toBe(true);
+
+  serve([]);
+  await refreshClientAgents();
+  expect(clientAgents().some((item) => item.backend === "plugin-launch-test")).toBe(false);
+});
+
 test("a plugin SVG icon and plan tools hydrate into the client catalog", async () => {
   const original = globalThis.fetch;
   onTestFinished(() => {

@@ -4,6 +4,7 @@ import { registerBranchCommands } from "./branch-commands.ts";
 import { chatsOf, resolveChat, type ChatRef } from "../../agent-core/index.ts";
 import { registerJobCommands } from "./job-commands.ts";
 import { registerRoleCommands } from "./role-commands.ts";
+import { registerLaunchCommands } from "./launch-commands.ts";
 import { registerPresetCommands } from "../../agent-presets/index.ts";
 import { isBuiltinAgent } from "../../agent-core/index.ts";
 import type { RegisterCommand } from "../../agent-core/index.ts";
@@ -28,6 +29,7 @@ export function registerAgentCommands(register: RegisterCommand, projectId: stri
   registerTaskCommands(register, projectId);
   registerJobCommands(register, projectId);
   registerRoleCommands(register, projectId);
+  registerLaunchCommands(register);
   registerPresetCommands(register, projectId);
   registerSessionCommands(register, projectId);
   registerBranchCommands(register, projectId);

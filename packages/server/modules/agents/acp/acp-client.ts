@@ -16,7 +16,7 @@ export interface AcpConnectionHandlers {
   /** Notifications from the agent that need no response (`session/update`, ...). */
   onNotification(method: string, params: Record<string, unknown>): void;
   /** Requests from the agent that must be answered (`session/request_permission`, ...). */
-  onRequest(method: string, params: Record<string, unknown>): unknown | Promise<unknown>;
+  onRequest(method: string, params: Record<string, unknown>): unknown;
   /** Program name for error messages; defaults to "Агент". */
   label?: string;
 }
@@ -33,6 +33,8 @@ export type AcpConnection = ReturnType<typeof createAcpConnection>;
 
 /** How much of the child's stderr to keep for the failure message. */
 const STDERR_LIMIT = 4000;
+/** A process that writes human text to stdout before any JSON-RPC is not an ACP server. */
+const FOREIGN_STDOUT_GRACE_MS = 5_000;
 
 /**
  * The client half of the Agent Client Protocol: JSON-RPC 2.0 over newline-delimited JSON on a
@@ -45,6 +47,9 @@ export function createAcpConnection(child: AcpProcess, handlers: AcpConnectionHa
   const label = handlers.label ?? "Агент";
   let buffer = "";
   let stderr = "";
+  let stdoutText = "";
+  let sawJson = false;
+  let foreignTimer: ReturnType<typeof setTimeout> | undefined;
   let nextId = 1;
   let closed = false;
   let incomingRequests = 0;
@@ -58,10 +63,39 @@ export function createAcpConnection(child: AcpProcess, handlers: AcpConnectionHa
   const fail = (error: Error) => {
     if (closed) return;
     closed = true;
+    if (foreignTimer) {
+      clearTimeout(foreignTimer);
+      foreignTimer = undefined;
+    }
     (error as AcpError).fatal = true;
     for (const waiter of pending.values()) waiter.reject(error);
     pending.clear();
     disconnected.abort(error);
+  };
+  /**
+   * ACP owns stdout: logs go to stderr, every stdout line is JSON-RPC. A command that prints human
+   * text before any JSON is usually the wrong executable (or a missing `acp` argument); fail soon
+   * instead of waiting for the two-minute handshake timeout with no visible reason.
+   */
+  const armForeignTimer = () => {
+    if (sawJson || closed || foreignTimer) return;
+    foreignTimer = setTimeout(() => {
+      foreignTimer = undefined;
+      if (sawJson || closed) return;
+      const tail = [stdoutText.trim(), buffer.trim()].filter(Boolean).join("\n").slice(-1000);
+      fail(new Error(`${label} не отвечает по ACP${tail ? `: ${tail}` : ""}`));
+    }, FOREIGN_STDOUT_GRACE_MS);
+  };
+  const noteForeignStdout = (line: string) => {
+    stdoutText = `${stdoutText ? `${stdoutText}\n` : ""}${line}`.slice(-STDERR_LIMIT);
+    armForeignTimer();
+  };
+  const markJson = () => {
+    sawJson = true;
+    if (foreignTimer) {
+      clearTimeout(foreignTimer);
+      foreignTimer = undefined;
+    }
   };
   const write = (message: RpcMessage) => {
     if (!closed) child.stdin.write(JSON.stringify(message) + "\n");
@@ -123,10 +157,14 @@ export function createAcpConnection(child: AcpProcess, handlers: AcpConnectionHa
       try {
         message = JSON.parse(line) as RpcMessage;
       } catch {
+        noteForeignStdout(line);
         continue;
       }
+      markJson();
       void dispatch(message);
     }
+    const partial = buffer.trimStart();
+    if (!sawJson && partial && !partial.startsWith("{")) armForeignTimer();
   });
   // Drain stderr so a chatty agent cannot block on a full pipe, and keep the tail for errors.
   child.stderr.setEncoding("utf8");
@@ -138,7 +176,10 @@ export function createAcpConnection(child: AcpProcess, handlers: AcpConnectionHa
     else fail(new Error(`${label} недоступен: ${error.message}`));
   });
   child.on("close", () => {
-    const tail = stderr.trim();
+    const tail = [stderr.trim(), stdoutText.trim(), buffer.trim()]
+      .filter(Boolean)
+      .join("\n")
+      .slice(-STDERR_LIMIT);
     fail(
       new Error(tail ? `${label} завершился до ответа: ${tail}` : `${label} завершился до ответа`),
     );

@@ -3,6 +3,7 @@ import { existsSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import type { ShellLaunch } from "../../contract.ts";
+import { quotePosixArg } from "../../../os-posix/index.ts";
 import { runPowerShell } from "./ps.ts";
 
 export function dataHome() {
@@ -79,17 +80,26 @@ function bashStyle(file: string) {
   return !/powershell|pwsh|cmd(?:\.exe)?$/i.test(file);
 }
 
+function quotePowerShellCommand(executable: string): string {
+  if (/^[A-Za-z0-9_./:\\-]+$/.test(executable)) return executable;
+  return `& '${executable.replace(/'/g, "''")}'`;
+}
+
 export function shellLaunch(spec: ShellLaunch) {
   const file = shell();
   if (!bashStyle(file)) {
     if (spec.kind === "command")
       return { file, args: ["-NoLogo", "-NoProfile", "-Command", spec.command] };
     if (spec.kind === "program")
-      return { file, args: ["-NoLogo", "-NoProfile", "-Command", spec.executable] };
+      return {
+        file,
+        args: ["-NoLogo", "-NoProfile", "-Command", quotePowerShellCommand(spec.executable)],
+      };
     return { file, args: ["-NoLogo"] };
   }
   if (spec.kind === "command") return { file, args: ["-c", spec.command] };
-  if (spec.kind === "program") return { file, args: ["-i", "-c", `exec ${spec.executable}`] };
+  if (spec.kind === "program")
+    return { file, args: ["-i", "-c", `exec ${quotePosixArg(spec.executable)}`] };
   return { file, args: ["-i"] };
 }
 

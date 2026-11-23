@@ -119,3 +119,13 @@ export function acpProgram(id: AgentBackendId): AcpProgram {
   if (!program) throw new Error(`Неизвестный ACP-агент: ${id}`);
   return program;
 }
+
+/** Whether an id belongs to an ACP program, without throwing for other backends. */
+export function hasAcpProgram(id: AgentBackendId): boolean {
+  return programs.has(id);
+}
+
+/** Every registered ACP program, in registration order. */
+export function acpPrograms(): AcpProgram[] {
+  return [...programs.values()];
+}
