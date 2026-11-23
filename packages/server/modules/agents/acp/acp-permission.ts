@@ -52,6 +52,8 @@ function diffText(block: {
 export async function decidePermission(
   options: AgentRunOptions,
   params: Record<string, unknown>,
+  /** Agent-specific command source; absent reads `rawInput.command`. */
+  shellCommand?: (toolCall: Record<string, unknown>) => string,
 ): Promise<unknown> {
   const toolCall = (params.toolCall ?? {}) as Record<string, unknown>;
   const list = Array.isArray(params.options) ? (params.options as PermissionOption[]) : [];
@@ -59,24 +61,34 @@ export async function decidePermission(
   const allowAlways = list.find((item) => item.kind === "allow_always");
   const allow = allowOnce ?? allowAlways;
   if (!options.approve || !allow) return { outcome: { outcome: "cancelled" } };
-  const kind = String(toolCall.kind ?? "").toLowerCase();
-  // The ACP title of a shell call is the command itself. Using it as the tool name repeats the
-  // same line three times in the card (title, tool label and preview), so keep the kind instead.
+  const kind = typeof toolCall.kind === "string" ? toolCall.kind.toLowerCase() : "";
+  // Keep the kind as the tool name: the title would repeat the command in the card.
   const tool = kind === "execute" ? "bash" : kind === "edit" ? "edit" : kind || "tool";
   const input = (toolCall.rawInput ?? {}) as Record<string, unknown>;
-  const command = typeof input.command === "string" ? input.command : "";
-  const title =
-    kind === "execute"
-      ? "Выполнить команду в оболочке"
-      : typeof toolCall.title === "string"
-        ? toolCall.title
-        : undefined;
+  const rawTitle = typeof toolCall.title === "string" ? toolCall.title : "";
+  // The adapter may name the command; otherwise the shared path reads `rawInput.command`.
+  const fromAdapter = kind === "execute" && shellCommand ? shellCommand(toolCall) : "";
+  const adapterCommand = typeof fromAdapter === "string" ? fromAdapter.trim() : "";
+  const rawCommand = typeof input.command === "string" && input.command.trim() ? input.command : "";
+  const command = adapterCommand || rawCommand;
+  const preview = toolCallDetail(toolCall);
+  const commandLine = `$ ${command}`;
+  // Command first (an allowlist note alone says nothing), without repeating the command itself.
+  const note =
+    command && (preview?.trim() === commandLine || preview?.trim() === command.trim())
+      ? ""
+      : preview;
+  const detail =
+    kind === "execute" && command
+      ? [commandLine, note].filter(Boolean).join("\n\n").slice(0, DETAIL_LIMIT)
+      : (preview ?? (command ? commandLine : undefined));
+  const title = kind === "execute" ? "Выполнить команду в оболочке" : rawTitle || undefined;
   const answer = await options
     .approve({
       tool,
-      input,
+      input: command && input.command !== command ? { ...input, command } : input,
       ...(title ? { title } : {}),
-      detail: toolCallDetail(toolCall) ?? (command ? `$ ${command}` : undefined),
+      detail,
       persistent: !!allowAlways,
     })
     .catch(() => false);

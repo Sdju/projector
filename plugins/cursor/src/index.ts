@@ -1,6 +1,7 @@
 import type { AcpProgram, AgentBackend, PluginCodeApi } from "./api.ts";
 import { createCursorDialect } from "./dialect.ts";
 import { showCursorImage } from "./images.ts";
+import { cursorShellCommand } from "./permission.ts";
 import { createCursorPlan } from "./plan.ts";
 import { askCursorQuestions } from "./questions.ts";
 import { normalizeCursorSelection } from "./selection.ts";
@@ -18,6 +19,7 @@ export function cursorProgram(api: PluginCodeApi): AcpProgram {
     args: ["acp"],
     terminal: { executable: "agent" },
     dialect: () => createCursorDialect(api),
+    shellCommand: cursorShellCommand,
     clientCapabilities: {
       subagents: {},
       _meta: { parameterizedModelPicker: true },

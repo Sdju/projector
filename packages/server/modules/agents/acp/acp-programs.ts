@@ -57,6 +57,8 @@ export interface AcpProgram {
   terminal?: Partial<AgentTerminal>;
   /** What the agent adds to ACP (subagents, background commands); plain when absent. */
   dialect?: () => AcpDialect;
+  /** The shell command when the agent keeps it outside `rawInput.command`. */
+  shellCommand?: (toolCall: Record<string, unknown>) => string;
   /** A native session has one owner, including while its background work runs. */
   exclusiveSession?: boolean;
   /** Stream the answer immediately, but send the final done after background tasks finish. */

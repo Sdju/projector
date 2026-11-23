@@ -120,7 +120,7 @@ async function run(options: AgentRunOptions, id: AgentBackendId): Promise<void> 
             return elicitForm(options, params, acpProgram(id).forms);
           if (method !== "session/request_permission")
             throw new Error(`Клиент не поддерживает ${method}`);
-          return decidePermission(options, params);
+          return decidePermission(options, params, acpProgram(id).shellCommand);
         },
       },
       options.run,

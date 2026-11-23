@@ -2,6 +2,8 @@ import { expect, test } from "vite-plus/test";
 import { createCursorDialect } from "../src/dialect.ts";
 import { showCursorImage } from "../src/images.ts";
 import { createAgents, cursorProgram } from "../src/index.ts";
+import { cursorShellCommand } from "../src/permission.ts";
+import { decidePermission } from "../../../packages/server/modules/agents/acp/acp-permission.ts";
 import { createCursorPlan } from "../src/plan.ts";
 import { normalizeCursorSelection } from "../src/selection.ts";
 import { reportCursorTask } from "../src/task.ts";
@@ -237,4 +239,40 @@ test("Cursor's dialect starts a task from a task tool call", () => {
     }),
   ).toEqual({ name: "Read", parent: "t1" });
   expect(dialect.inner({ parentToolCallId: "t1" })).toBe(true);
+});
+
+test("Cursor's adapter reads the shell command from its backtick title", async () => {
+  expect(cursorShellCommand({ title: "`docker ps -a`" })).toBe("docker ps -a");
+  expect(cursorShellCommand({ title: "Bash" })).toBe("");
+  expect(cursorShellCommand({ title: "`" })).toBe("");
+  expect(cursorShellCommand({})).toBe("");
+
+  const program = cursorProgram(testApi());
+  let request;
+  const result = await decidePermission(
+    {
+      approve: async (value) => {
+        request = value;
+        return true;
+      },
+    },
+    {
+      toolCall: {
+        kind: "execute",
+        title: "`docker ps -a`",
+        content: [
+          { type: "content", content: { type: "text", text: "Not in allowlist: docker ps" } },
+        ],
+      },
+      options: [{ optionId: "allow", kind: "allow_once" }],
+    },
+    program.shellCommand,
+  );
+  expect(result).toStrictEqual({ outcome: { outcome: "selected", optionId: "allow" } });
+  expect(request).toMatchObject({
+    tool: "bash",
+    title: "Выполнить команду в оболочке",
+    input: { command: "docker ps -a" },
+    detail: "$ docker ps -a\n\nNot in allowlist: docker ps",
+  });
 });

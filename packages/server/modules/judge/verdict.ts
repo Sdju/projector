@@ -84,13 +84,29 @@ const CACHE_MS = 10 * 60_000;
 const CACHE_LIMIT = 100;
 const cache = new Map<string, { at: number; verdict: JudgeVerdict }>();
 
+function inputText(input: unknown): string {
+  if (input === undefined) return "";
+  try {
+    return (JSON.stringify(input, null, 2) ?? "").slice(0, JUDGE_LIMITS.input);
+  } catch {
+    return typeof input === "string" ? input.slice(0, JUDGE_LIMITS.input) : "не удалось прочитать";
+  }
+}
+
+function actionText(action: JudgeAction): string {
+  const detail = (action.detail ?? "").trim().slice(0, JUDGE_LIMITS.action);
+  return detail || inputText(action.input);
+}
+
 function cacheKey(action: JudgeAction): string {
   return [
     action.backend ?? "",
     action.cwd ?? "",
     action.tool,
     action.title ?? "",
-    (action.detail ?? "").trim().slice(0, JUDGE_LIMITS.action),
+    actionText(action),
+    // The preview may name only the tool; `input` carries the arguments.
+    inputText(action.input),
   ].join("\n");
 }
 
@@ -115,19 +131,6 @@ function remember(key: string, verdict: JudgeVerdict): void {
     if (oldest !== undefined) cache.delete(oldest);
   }
   cache.set(key, { at: Date.now(), verdict });
-}
-
-function actionText(action: JudgeAction): string {
-  const detail = (action.detail ?? "").trim().slice(0, JUDGE_LIMITS.action);
-  if (detail) return detail;
-  if (action.input === undefined) return "";
-  try {
-    return JSON.stringify(action.input, null, 2).slice(0, JUDGE_LIMITS.input);
-  } catch {
-    return typeof action.input === "string"
-      ? action.input.slice(0, JUDGE_LIMITS.input)
-      : "не удалось прочитать";
-  }
 }
 
 /** One cheap model call about a concrete action; the verdict is cached for identical requests. */
@@ -161,7 +164,13 @@ export async function judgeAction(action: JudgeAction): Promise<JudgeVerdict> {
     const verdict = parseJudgeVerdict(result.text);
     if (verdict.confidence !== "low" || verdict.score < 4) remember(key, verdict);
     return verdict;
-  } catch {
+  } catch (error) {
+    // Keep the reason in the log: otherwise a timeout looks like a strict verdict.
+    if (!action.signal?.aborted)
+      console.warn(
+        `Судья: ${action.tool}: оценка не выполнена:`,
+        error instanceof Error ? error.message : error,
+      );
     return judgeFallback();
   }
 }

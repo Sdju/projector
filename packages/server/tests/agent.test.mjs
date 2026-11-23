@@ -727,6 +727,76 @@ test("ACP permission prefers one-time options and previews the change", async ()
     detail: "$ cd /tmp && pwd",
   });
 
+  // The adapter supplies the command; the shared path never reads the title itself.
+  const cursor = capture(true);
+  await decidePermission(
+    cursor.options,
+    {
+      toolCall: {
+        kind: "execute",
+        title: "`docker events --since 6m --until 0s 2>&1 | tail -n 20`",
+        content: [
+          {
+            type: "content",
+            content: { type: "text", text: "Not in allowlist: docker events, tail" },
+          },
+        ],
+      },
+      options,
+    },
+    () => "docker events --since 6m --until 0s 2>&1 | tail -n 20",
+  );
+  expect(cursor.state.request).toMatchObject({
+    tool: "bash",
+    title: "Выполнить команду в оболочке",
+    input: { command: "docker events --since 6m --until 0s 2>&1 | tail -n 20" },
+    detail:
+      "$ docker events --since 6m --until 0s 2>&1 | tail -n 20\n\nNot in allowlist: docker events, tail",
+  });
+
+  // rawInput.command wins over a label title; the note follows the command.
+  const opencode = capture(true);
+  await decidePermission(opencode.options, {
+    toolCall: {
+      kind: "execute",
+      title: "shell",
+      rawInput: { command: "cat a.ts" },
+      content: [{ type: "content", content: { type: "text", text: "Approval requested" } }],
+    },
+    options,
+  });
+  expect(opencode.state.request).toMatchObject({
+    tool: "bash",
+    title: "Выполнить команду в оболочке",
+    input: { command: "cat a.ts" },
+    detail: "$ cat a.ts\n\nApproval requested",
+  });
+
+  // A label title is not a command, even without rawInput.command.
+  const labelled = capture(true);
+  await decidePermission(labelled.options, {
+    toolCall: {
+      kind: "execute",
+      title: "Bash",
+      rawInput: {},
+      content: [{ type: "content", content: { type: "text", text: "Approval requested" } }],
+    },
+    options,
+  });
+  expect(labelled.state.request).toMatchObject({
+    tool: "bash",
+    title: "Выполнить команду в оболочке",
+    input: {},
+    detail: "Approval requested",
+  });
+
+  const silent = capture(true);
+  await decidePermission(silent.options, {
+    toolCall: { kind: "execute", title: "shell", rawInput: {} },
+    options,
+  });
+  expect(silent.state.request.detail).toBeUndefined();
+
   const detail = toolCallDetail({
     content: [
       { type: "diff", path: "src/a.ts", oldText: "old", newText: "new" },
