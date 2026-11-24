@@ -56,6 +56,7 @@ describe("agent features", () => {
       "codex",
       "opencode",
       "kimi",
+      "antigravity",
     ]);
     expect(agentOf(settings, "projector").enabled).toBe(true);
     expect(agentOf(settings, "codex").enabled).toBe(false);
