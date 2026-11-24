@@ -69,16 +69,62 @@ interface RecorderEvents {
   limit: () => void;
 }
 
+interface RecorderSession {
+  /** The start this session belongs to; a newer start or a cancel makes it stale. */
+  token: number;
+  context: AudioContext;
+  stream: MediaStream;
+  source: MediaStreamAudioSourceNode;
+  node: AudioWorkletNode;
+  sink: GainNode;
+  chunks: Float32Array[];
+  length: number;
+  startedAt: number;
+  timer?: ReturnType<typeof setInterval>;
+}
+
+function aborted(): DOMException {
+  return new DOMException("Запись отменена", "AbortError");
+}
+
+/** Stops and closes one session; every step is guarded so a half-built session still closes. */
+async function releaseSession(session: RecorderSession): Promise<void> {
+  if (session.timer) clearInterval(session.timer);
+  session.node.port.onmessage = null;
+  try {
+    session.source.disconnect();
+  } catch {
+    // The node may already be detached.
+  }
+  try {
+    session.node.disconnect();
+  } catch {
+    // The node may already be detached.
+  }
+  try {
+    session.sink.disconnect();
+  } catch {
+    // The node may already be detached.
+  }
+  for (const track of session.stream.getTracks()) {
+    try {
+      track.stop();
+    } catch {
+      // A stopped track is already fine.
+    }
+  }
+  if (session.context.state !== "closed") await session.context.close().catch(() => undefined);
+}
+
+/**
+ * One microphone recording. Starts and cancels may overlap: each start has a token, and only
+ * the newest token may keep its session. This is what stops a cancelled start from leaving an
+ * `AudioContext` behind while the UI already thinks recording is idle.
+ */
 export class DictationRecorder {
-  private context?: AudioContext;
-  private stream?: MediaStream;
-  private source?: MediaStreamAudioSourceNode;
-  private node?: AudioWorkletNode;
-  private sink?: GainNode;
-  private chunks: Float32Array[] = [];
-  private length = 0;
-  private startedAt = 0;
-  private timer?: ReturnType<typeof setInterval>;
+  private session?: RecorderSession;
+  private starting?: Promise<void>;
+  private token = 0;
   private stopping?: Promise<ArrayBuffer>;
 
   private events: RecorderEvents;
@@ -87,88 +133,142 @@ export class DictationRecorder {
     this.events = events;
   }
 
-  async start(): Promise<void> {
-    if (this.context) throw new Error("Запись уже идёт");
+  start(): Promise<void> {
+    if (this.session) return Promise.reject(new Error("Запись уже идёт"));
+    const token = ++this.token;
+    const starting = this.begin(token);
+    this.starting = starting;
+    return starting.finally(() => {
+      if (this.starting === starting) this.starting = undefined;
+    });
+  }
+
+  private async begin(token: number): Promise<void> {
     const stream = await navigator.mediaDevices.getUserMedia({
       audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true },
     });
-    this.stream = stream;
+    let context: AudioContext | undefined;
+    let source: MediaStreamAudioSourceNode | undefined;
+    let node: AudioWorkletNode | undefined;
+    let sink: GainNode | undefined;
     try {
-      const context = new AudioContext();
-      this.context = context;
+      if (token !== this.token) throw aborted();
+      context = new AudioContext();
       await context.audioWorklet.addModule(workletUrl);
+      if (token !== this.token) throw aborted();
       await context.resume();
-      this.chunks = [];
-      this.length = 0;
-      this.source = context.createMediaStreamSource(stream);
-      this.node = new AudioWorkletNode(context, "projector-pcm", {
+      if (token !== this.token) throw aborted();
+      source = context.createMediaStreamSource(stream);
+      node = new AudioWorkletNode(context, "projector-pcm", {
         numberOfInputs: 1,
         numberOfOutputs: 1,
         channelCount: 1,
       });
-      this.node.port.onmessage = (event: MessageEvent<Float32Array>) => {
+      sink = context.createGain();
+      sink.gain.value = 0;
+      source.connect(node).connect(sink).connect(context.destination);
+      if (token !== this.token) throw aborted();
+      const session: RecorderSession = {
+        token,
+        context,
+        stream,
+        source,
+        node,
+        sink,
+        chunks: [],
+        length: 0,
+        startedAt: Date.now(),
+      };
+      node.port.onmessage = (event: MessageEvent<Float32Array>) => {
+        if (this.session !== session) return;
         const chunk = event.data;
-        this.chunks.push(chunk);
-        this.length += chunk.length;
+        session.chunks.push(chunk);
+        session.length += chunk.length;
         let peak = 0;
         for (let index = 0; index < chunk.length; index += 16)
           peak = Math.max(peak, Math.abs(chunk[index] ?? 0));
         this.events.level(Math.min(1, peak * 3));
       };
-      this.sink = context.createGain();
-      this.sink.gain.value = 0;
-      this.source.connect(this.node).connect(this.sink).connect(context.destination);
-      this.startedAt = Date.now();
-      this.events.elapsed(0);
-      this.timer = setInterval(() => {
-        const seconds = Math.min(DICTATION_MAX_SECONDS, (Date.now() - this.startedAt) / 1000);
+      session.timer = setInterval(() => {
+        if (this.session !== session) return;
+        const seconds = Math.min(DICTATION_MAX_SECONDS, (Date.now() - session.startedAt) / 1000);
         this.events.elapsed(seconds);
         if (seconds >= DICTATION_MAX_SECONDS) this.events.limit();
       }, 250);
+      this.events.elapsed(0);
+      this.session = session;
     } catch (error) {
-      await this.release();
+      if (node) node.port.onmessage = null;
+      try {
+        source?.disconnect();
+      } catch {
+        // The node may already be detached.
+      }
+      try {
+        node?.disconnect();
+      } catch {
+        // The node may already be detached.
+      }
+      try {
+        sink?.disconnect();
+      } catch {
+        // The node may already be detached.
+      }
+      for (const track of stream.getTracks()) {
+        try {
+          track.stop();
+        } catch {
+          // A stopped track is already fine.
+        }
+      }
+      if (context && context.state !== "closed") await context.close().catch(() => undefined);
       throw error;
     }
   }
 
   stop(): Promise<ArrayBuffer> {
     if (this.stopping) return this.stopping;
-    const context = this.context;
-    if (!context) return Promise.reject(new Error("Запись не начата"));
-    this.stopping = (async () => {
-      const chunks = this.chunks;
-      const length = this.length;
-      const sampleRate = context.sampleRate;
-      await this.release();
-      if (!length) throw new Error("Микрофон не вернул звук");
-      return encodeWav(downsamplePcm(concatPcm(chunks, length), sampleRate));
-    })();
-    return this.stopping;
+    const token = this.token;
+    const promise = this.finish(token);
+    this.stopping = promise;
+    void promise
+      .finally(() => {
+        if (this.stopping === promise) this.stopping = undefined;
+      })
+      .catch(() => undefined);
+    void promise.catch(() => undefined);
+    return promise;
+  }
+
+  private async finish(token: number): Promise<ArrayBuffer> {
+    // Stop pressed while the microphone was still being opened: wait for that start, then stop
+    // the session it produced. A cancelled or superseded start simply leaves nothing to stop.
+    let failure: unknown;
+    if (this.starting) await this.starting.catch((error) => (failure = error));
+    const session = this.session;
+    if (!session || session.token !== token) {
+      if (failure instanceof DOMException && failure.name === "NotAllowedError")
+        throw new Error("Разрешите доступ к микрофону в браузере");
+      if (failure instanceof DOMException && failure.name === "AbortError")
+        throw new Error("Запись отменена");
+      throw failure instanceof Error ? failure : new Error("Запись не начата");
+    }
+    this.session = undefined;
+    const { chunks, length, context } = session;
+    const sampleRate = context.sampleRate;
+    await releaseSession(session);
+    if (!length) throw new Error("Микрофон не вернул звук");
+    return encodeWav(downsamplePcm(concatPcm(chunks, length), sampleRate));
   }
 
   async cancel(): Promise<void> {
-    await this.release();
-  }
-
-  private async release(): Promise<void> {
-    if (this.timer) clearInterval(this.timer);
-    this.timer = undefined;
-    if (this.node) this.node.port.onmessage = null;
-    this.source?.disconnect();
-    this.node?.disconnect();
-    this.sink?.disconnect();
-    this.stream?.getTracks().forEach((track) => track.stop());
-    const context = this.context;
-    this.context = undefined;
-    this.stream = undefined;
-    this.source = undefined;
-    this.node = undefined;
-    this.sink = undefined;
+    this.token++;
+    this.starting = undefined;
     this.stopping = undefined;
-    this.chunks = [];
-    this.length = 0;
+    const session = this.session;
+    this.session = undefined;
     this.events.level(0);
-    if (context && context.state !== "closed") await context.close();
+    if (session) await releaseSession(session);
   }
 }
 

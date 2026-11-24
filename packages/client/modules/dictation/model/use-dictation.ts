@@ -1,4 +1,4 @@
-import { computed, onBeforeUnmount, ref } from "vue";
+import { computed, onScopeDispose, ref } from "vue";
 import { DictationRecorder, dictationAvailable } from "./recorder.ts";
 
 export type DictationPhase = "idle" | "recording" | "transcribing" | "error";
@@ -44,7 +44,20 @@ async function transcribe(
   };
 }
 
-export function useDictation(options: { insert: (text: string) => void }) {
+/** Recordings that outlive their component: hot replacement must release the microphone too. */
+const activeDictations = new Set<{ cancel: () => Promise<void> }>();
+
+if (import.meta.hot)
+  import.meta.hot.dispose(() => {
+    for (const dictation of activeDictations) void dictation.cancel();
+    activeDictations.clear();
+  });
+
+export function useDictation(options: {
+  /** Saves the insertion point before every fresh recording, including one restarted from an error. */
+  begin?: () => void;
+  insert: (text: string) => void;
+}) {
   const phase = ref<DictationPhase>("idle");
   const error = ref("");
   const elapsed = ref(0);
@@ -54,14 +67,22 @@ export function useDictation(options: { insert: (text: string) => void }) {
   let audio: ArrayBuffer | undefined;
   let controller: AbortController | undefined;
   let generation = 0;
+  let disposed = false;
   const recorder = new DictationRecorder({
     level: (value) => (level.value = value),
     elapsed: (value) => (elapsed.value = value),
     limit: () => void stop(),
   });
+  const activeEntry = { cancel: () => cancel() };
+  activeDictations.add(activeEntry);
 
   async function start(): Promise<void> {
-    if (phase.value !== "idle" && phase.value !== "error") return;
+    if (disposed || (phase.value !== "idle" && phase.value !== "error")) return;
+    try {
+      options.begin?.();
+    } catch {
+      // A composer that is already gone has nowhere to put the text.
+    }
     controller?.abort();
     audio = undefined;
     provider.value = "";
@@ -71,9 +92,11 @@ export function useDictation(options: { insert: (text: string) => void }) {
     const current = ++generation;
     try {
       await recorder.start();
-      if (current !== generation) await recorder.cancel();
-    } catch (cause) {
+      if (disposed) await recorder.cancel();
       if (current !== generation) return;
+    } catch (cause) {
+      if (current !== generation || disposed) return;
+      void recorder.cancel();
       phase.value = "error";
       error.value =
         cause instanceof DOMException && cause.name === "NotAllowedError"
@@ -85,6 +108,7 @@ export function useDictation(options: { insert: (text: string) => void }) {
   }
 
   async function recognize(value: ArrayBuffer): Promise<void> {
+    if (disposed) return;
     audio = value;
     phase.value = "transcribing";
     error.value = "";
@@ -92,14 +116,18 @@ export function useDictation(options: { insert: (text: string) => void }) {
     const current = ++generation;
     try {
       const result = await transcribe(value, controller.signal);
-      if (current !== generation) return;
+      if (current !== generation || disposed) return;
       options.insert(result.text);
       provider.value = [result.providerName, result.model].filter(Boolean).join(" · ");
       audio = undefined;
       phase.value = "idle";
       elapsed.value = 0;
     } catch (cause) {
-      if (current !== generation || (cause instanceof DOMException && cause.name === "AbortError"))
+      if (
+        current !== generation ||
+        disposed ||
+        (cause instanceof DOMException && cause.name === "AbortError")
+      )
         return;
       phase.value = "error";
       error.value = cause instanceof Error ? cause.message : "Не удалось распознать речь";
@@ -107,15 +135,16 @@ export function useDictation(options: { insert: (text: string) => void }) {
   }
 
   async function stop(): Promise<void> {
-    if (phase.value !== "recording") return;
+    if (phase.value !== "recording" || disposed) return;
     phase.value = "transcribing";
     const current = ++generation;
     try {
       const value = await recorder.stop();
-      if (current !== generation) return;
+      if (current !== generation || disposed) return;
       await recognize(value);
     } catch (cause) {
-      if (current !== generation) return;
+      if (current !== generation || disposed) return;
+      void recorder.cancel();
       phase.value = "error";
       error.value = cause instanceof Error ? cause.message : "Не удалось завершить запись";
     }
@@ -135,7 +164,11 @@ export function useDictation(options: { insert: (text: string) => void }) {
     error.value = "";
     elapsed.value = 0;
     phase.value = "idle";
-    await recorder.cancel();
+    try {
+      await recorder.cancel();
+    } catch {
+      // Idle is already the truth; a broken close must not keep the error on screen.
+    }
   }
 
   function toggle(): Promise<void> {
@@ -146,6 +179,12 @@ export function useDictation(options: { insert: (text: string) => void }) {
         : Promise.resolve();
   }
 
-  onBeforeUnmount(() => void cancel());
+  // Also runs when Vite replaces the component or hook module: a destroyed scope must not
+  // leave a microphone open or let its late answer paste text into the new composer.
+  onScopeDispose(() => {
+    disposed = true;
+    activeDictations.delete(activeEntry);
+    void cancel();
+  });
   return { phase, error, elapsed, level, provider, available, start, stop, retry, cancel, toggle };
 }

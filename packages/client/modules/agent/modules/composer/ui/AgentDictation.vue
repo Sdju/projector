@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, reactive, useId } from "vue";
+import { computed, nextTick, onBeforeUnmount, reactive, useId } from "vue";
 import ProjectorIcon from "../../../../../common/icons/ProjectorIcon.vue";
 import UiButton from "../../../../../common/ui/UiButton.vue";
 import { useCommandScope } from "../../../../../common/utilities/commands.ts";
@@ -14,7 +14,12 @@ const props = defineProps<{
     cancelDictation(): void;
   };
 }>();
-const dictation = reactive(useDictation({ insert: (text) => props.input?.insertDictation(text) }));
+const dictation = reactive(
+  useDictation({
+    begin: () => props.input?.beginDictation(),
+    insert: (text) => props.input?.insertDictation(text),
+  }),
+);
 const commands = useCommandScope(`dictation:${useId()}`, () => ({
   surface: "agent-chat",
   project: props.projectId ?? null,
@@ -27,13 +32,15 @@ const time = computed(() => {
 
 async function start() {
   await nextTick();
-  props.input?.beginDictation();
   await dictation.start();
 }
 async function cancel() {
   props.input?.cancelDictation();
   await dictation.cancel();
 }
+
+// The hook releases the microphone on unmount too; this wrapper also drops the saved range.
+onBeforeUnmount(() => void cancel());
 
 commands.scope.registerCommand({
   id: "ide.dictation.start",
