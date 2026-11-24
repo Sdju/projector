@@ -6,6 +6,8 @@ import type { AgentWorkItem } from "../../agent-core/index.ts";
 
 defineProps<{
   items: AgentWorkItem[];
+  /** The section that shows them scrolls as a whole: each thought stays bounded inside it. */
+  bounded?: boolean;
   /** The last thought of the group is still being written. */
   thinking?: boolean;
   root?: string;
@@ -19,6 +21,7 @@ const emit = defineEmits<{ open: [path: string] }>();
       v-if="item.type === 'thought'"
       :text="item.text"
       :streaming="thinking === true && item === items.at(-1)"
+      :bounded="bounded"
     />
     <AgentJudgeNote
       v-else-if="item.type === 'judge'"

@@ -180,7 +180,13 @@ const elapsed = computed(() => {
       <AgentLensPanel v-if="lens && lens.state.open" class="work-head-lens" :lens="lens" />
     </div>
     <div class="work-sheet-steps">
-      <AgentWorkBody :items="items" :thinking="thinking" :root="root" @open="openFromIsland" />
+      <AgentWorkBody
+        :items="items"
+        :thinking="thinking"
+        :bounded="true"
+        :root="root"
+        @open="openFromIsland"
+      />
     </div>
   </UiIsland>
   <!-- The sheet's shadow only paints the scrim: this catches the tap so nothing opens under it. -->
@@ -255,12 +261,12 @@ svg {
 .work-head {
   padding-top: var(--sp-1);
 }
+/* The body is part of the chat's flow, not a scroller of its own: the wheel over a long group
+   scrolls the chat instead of getting stuck at the edge of a nested box. The compact sheet is
+   bounded and scrolls as a whole (see UiIsland). */
 .work-body {
-  max-height: min(60vh, 520px);
   padding-top: var(--sp-1);
   border-top: 1px solid var(--line);
-  overflow-y: auto;
-  overscroll-behavior: contain;
 }
 /* The way out stays on screen while a long body scrolls under it. */
 @media (max-width: 700px), (max-width: 1050px) and (max-height: 500px) and (pointer: coarse) {

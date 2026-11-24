@@ -243,6 +243,12 @@ test.concurrent(
     expect(await browser.evaluate('document.querySelectorAll(".work .work-body").length')).toBe(0);
     expect(await browser.evaluate('document.querySelectorAll(".island .activity").length')).toBe(1);
     expect(await browser.evaluate('document.querySelectorAll(".island .thought").length')).toBe(1);
+    // The sheet is the only scroller; a thought keeps its own bounded box to follow the stream.
+    expect(
+      await browser.evaluate(
+        'getComputedStyle(document.querySelector(".island .thought-text")).overflowY',
+      ),
+    ).toBe("auto");
     expect(
       await browser.evaluate('document.activeElement.classList.contains("work-sheet-title")'),
     ).toBe(true);
@@ -320,5 +326,103 @@ test.concurrent(
     expect(desktop.lensBorder).toBe("0px");
     expect(desktop.divider).toBe("1px");
     expect(desktop.bodyBorderLeft).toBe("0px");
+  },
+);
+
+test.concurrent(
+  "a long work group scrolls with the chat instead of trapping the wheel",
+  { skip: !chromium, timeout: 90000, retry: 1 },
+  async ({ onTestFinished }) => {
+    const text = Array.from({ length: 60 }, (_, index) => `Строка рассуждений ${index + 1}.`).join(
+      "\\n",
+    );
+    const page = `<!doctype html>
+<link rel="icon" href="data:," />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<div id="fixture" style="height: 600px; display: flex; flex-direction: column">
+  <div id="log" style="height: 360px; overflow: auto">
+    <div style="height: 120px"></div>
+    <div id="turn"></div>
+    <div style="height: 900px"></div>
+  </div>
+</div>
+<script type="module">
+  import "/packages/client/app/styles.css";
+  import { createApp, h, reactive } from "vue";
+  import AgentTurn from "/packages/client/modules/agent-turns/ui/AgentTurn.vue";
+  const turn = reactive({
+    id: "turn-long-work",
+    role: "assistant",
+    text: "Готово.",
+    at: Date.now(),
+    tools: [],
+    parts: [
+      { type: "thought", text: ${JSON.stringify(text)} },
+      { type: "text", text: "Готово." },
+    ],
+  });
+  const app = createApp({
+    setup: () => () =>
+      h(AgentTurn, {
+        turn,
+        flags: { busy: false, last: true, copied: false },
+        root: "/projector",
+        onOpenFile: () => {},
+      }),
+  });
+  app.mount("#turn");
+  window.fixture = { ready: true };
+</script>`;
+    const fixture = await createBrowserFixture({ pages: { "/long-work": page } });
+    onTestFinished(() => fixture.close());
+    const browser = await createChromium(fixture.directory);
+    onTestFinished(() => browser.close());
+    await browser.open(fixture.url("/long-work"));
+    await browser.viewport(900, 1200);
+    const wait = async (expression, ms = 8000) => {
+      for (let waited = 0; waited < ms; waited += 50) {
+        if (await browser.evaluate(expression)) return;
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      }
+      expect(await browser.evaluate(expression)).toBeTruthy();
+    };
+
+    await wait('document.querySelector(".work summary") !== null');
+    await browser.click(".work summary");
+    await wait('document.querySelector(".work[open] .thought summary") !== null');
+    await browser.click(".thought summary");
+    await wait('document.querySelector(".thought[open] .thought-text") !== null');
+    const contract = await browser.evaluate(`(() => {
+      const body = document.querySelector(".work-body");
+      const thought = document.querySelector(".thought-text");
+      return {
+        bodyOverflow: getComputedStyle(body).overflowY,
+        bodyScrolls: body.scrollHeight > body.clientHeight + 1,
+        thoughtMaxHeight: getComputedStyle(thought).maxHeight,
+        thoughtScrolls: thought.scrollHeight > thought.clientHeight + 1,
+        thoughtRect: (() => {
+          const r = thought.getBoundingClientRect();
+          return { x: Math.round(r.x + 30), y: Math.round(r.y + 20) };
+        })(),
+      };
+    })()`);
+    // The chat is the only scroll container: the open group and its reasoning are plain flow.
+    expect(contract.bodyOverflow).toBe("visible");
+    expect(contract.bodyScrolls).toBe(false);
+    expect(contract.thoughtMaxHeight).toBe("none");
+    expect(contract.thoughtScrolls).toBe(false);
+
+    // A wheel over the reasoning moves the chat, not a nested box that stops at its edge.
+    for (let step = 0; step < 3; step++) {
+      await browser.call("Input.dispatchMouseEvent", {
+        type: "mouseWheel",
+        x: contract.thoughtRect.x + step,
+        y: contract.thoughtRect.y + step,
+        deltaX: 0,
+        deltaY: 120,
+      });
+      await new Promise((resolve) => setTimeout(resolve, 250));
+    }
+    expect(await browser.evaluate('document.querySelector("#log").scrollTop')).toBeGreaterThan(0);
   },
 );
