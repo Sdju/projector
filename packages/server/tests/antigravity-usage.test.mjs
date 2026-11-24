@@ -1,8 +1,10 @@
 import { expect, test } from "vite-plus/test";
 import { mkdirSync, rmSync } from "node:fs";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
+import { registerAgentFeature } from "../modules/agent-features/index.ts";
 import { acpTurnPrompt, openSession } from "../modules/agents/acp/acp-backend.ts";
 import { availableCommands } from "../modules/agents/acp/acp-events.ts";
 import { decidePermission } from "../modules/agents/acp/acp-permission.ts";
@@ -11,12 +13,22 @@ import {
   antigravityProgram,
   antigravityRateModel,
   antigravityShellCommand,
+  antigravitySkillState,
+  cachedAntigravityUsage,
   classifyAntigravityTurnFailure,
   createAntigravityDialect,
   handleAntigravityPermission,
+  installAntigravitySkill,
+  parseAntigravityCliUsage,
+  parseAntigravityResetTime,
   readAntigravityUsageFile,
+  refreshAntigravityUsage,
+  removeAntigravitySkill,
+  resetAntigravityUsageCache,
   watchAntigravityPromptOutcome,
 } from "../modules/agents/antigravity/index.ts";
+import { createRouteDispatcher } from "../modules/transport/index.ts";
+import { routes as antigravityRoutes } from "../routes/api/antigravity.ts";
 
 function protoNumber(field, value) {
   const varint = (number) => {
@@ -294,5 +306,189 @@ test("Antigravity usage log reads step protobuf tokens, trajectory fallback time
     expect(antigravityRateModel("gemini-3-flash-agent-a")).toBe("gemini-3.5-flash");
   } finally {
     rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test("Antigravity Projector skill installs, detects drift, removes cleanly, and serves HTTP API", async () => {
+  registerAgentFeature({
+    id: "widgets",
+    title: "Виджеты",
+    summary: "Виджеты",
+    instruction: () => "Тестовая справка по виджетам Projector.",
+  });
+  registerAgentFeature({
+    id: "ide",
+    title: "Команды IDE",
+    summary: "IDE",
+    instruction: () => "Тестовая справка по MCP projector-ide.",
+  });
+
+  const directory = await mkdtemp(join(tmpdir(), "projector-agy-skill-"));
+  const previousHome = process.env.HOME;
+  const previousProfile = process.env.USERPROFILE;
+  process.env.HOME = directory;
+  process.env.USERPROFILE = directory;
+  const file = join(directory, ".gemini", "config", "skills", "projector", "SKILL.md");
+  const dispatch = createRouteDispatcher(antigravityRoutes);
+  const callRoute = async (method) => {
+    const chunks = [];
+    const res = {
+      statusCode: 0,
+      headers: {},
+      setHeader(name, value) {
+        this.headers[name] = value;
+      },
+      writeHead(code) {
+        this.statusCode = code;
+      },
+      end(body) {
+        chunks.push(body);
+      },
+    };
+    const matched = await dispatch({ res, method, path: "/api/antigravity/skill" });
+    expect(matched).toBe(true);
+    return { status: res.statusCode, body: JSON.parse(chunks.join("")) };
+  };
+
+  try {
+    const initial = await callRoute("GET");
+    expect(initial.status).toBe(200);
+    expect(initial.body).toMatchObject({ status: "missing", name: "projector", file });
+    expect(initial.body.content).toContain("name: projector");
+    expect(initial.body.content).toContain("Тестовая справка по виджетам Projector.");
+    expect(initial.body.content).toContain("Тестовая справка по MCP projector-ide.");
+    expect(initial.body.content).toContain("ide.agent.roles.chat.list");
+
+    const installed = await callRoute("PUT");
+    expect(installed.body.status).toBe("installed");
+    expect(await readFile(file, "utf8")).toBe(installed.body.content);
+
+    await writeFile(file, "---\nname: projector\n---\nstale\n", "utf8");
+    expect((await antigravitySkillState(file)).status).toBe("outdated");
+
+    expect((await installAntigravitySkill(file)).status).toBe("installed");
+    expect((await callRoute("DELETE")).body.status).toBe("missing");
+    expect((await removeAntigravitySkill(file)).status).toBe("missing");
+  } finally {
+    process.env.HOME = previousHome;
+    process.env.USERPROFILE = previousProfile;
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test('Antigravity CLI /usage parser handles real agy -p "/usage" --output-format json and manual cache stays idle until refreshed', async () => {
+  resetAntigravityUsageCache();
+  try {
+    expect(cachedAntigravityUsage()).toMatchObject({ status: "idle", windows: null, checkedAt: 0 });
+
+    const jsonSample = JSON.stringify({
+      conversation_id: "",
+      status: "SUCCESS",
+      response:
+        "Gemini Models\tWeekly Limit Remaining\t88%\t2026-12-01T14:44:02Z\nGemini Models\tFive Hour Limit Remaining\t53%\t2026-11-24T19:44:02Z\n",
+      command: {
+        name: "usage",
+        data: {
+          groups: [
+            {
+              name: "Gemini Models",
+              buckets: [
+                {
+                  id: "gemini-weekly",
+                  window: "weekly",
+                  remaining_fraction: 0.88435,
+                  reset_time: "2026-12-01T14:44:02Z",
+                },
+                {
+                  id: "gemini-5h",
+                  window: "5h",
+                  remaining_fraction: 0.53164,
+                  reset_time: "2026-11-24T19:44:02Z",
+                },
+              ],
+            },
+            {
+              name: "Claude and GPT models",
+              buckets: [
+                {
+                  id: "3p-weekly",
+                  window: "weekly",
+                  remaining_fraction: 1,
+                  reset_time: "1970-01-01T00:00:00Z",
+                },
+                {
+                  id: "3p-5h",
+                  window: "5h",
+                  remaining_fraction: 0,
+                  reset_time: "1970-01-01T00:00:00Z",
+                },
+              ],
+            },
+          ],
+        },
+      },
+    });
+
+    expect(parseAntigravityResetTime("1970-01-01T00:00:00Z")).toBeNull();
+    expect(parseAntigravityResetTime("1970-01-01 05:00 +05")).toBeNull();
+    expect(parseAntigravityResetTime("2026-12-01T14:44:02Z")).toBe(
+      Date.parse("2026-12-01T14:44:02Z") / 1000,
+    );
+
+    const parsed = parseAntigravityCliUsage(jsonSample);
+    expect(parsed).toMatchObject({
+      geminiWeekly: {
+        usedPercent: 11.57,
+        resetsAt: Date.parse("2026-12-01T14:44:02Z") / 1000,
+        limited: false,
+      },
+      geminiRolling: {
+        usedPercent: 46.84,
+        resetsAt: Date.parse("2026-11-24T19:44:02Z") / 1000,
+        limited: false,
+      },
+      thirdPartyWeekly: { usedPercent: 0, resetsAt: null, limited: false },
+      thirdPartyRolling: { usedPercent: 100, resetsAt: null, limited: true },
+    });
+
+    // Plain-text fallback still works if command.data is omitted.
+    expect(
+      parseAntigravityCliUsage(
+        "Gemini Models   Weekly Limit Remaining  91%  2026-12-01 19:44 +05\n",
+      )?.geminiWeekly,
+    ).toMatchObject({
+      usedPercent: 9,
+      resetsAt: Date.parse("2026-12-01T19:44:00+05:00") / 1000,
+      limited: false,
+    });
+
+    const refreshed = await refreshAntigravityUsage(async () => jsonSample);
+    expect(refreshed.status).toBe("ready");
+    expect(refreshed.windows?.geminiRolling?.usedPercent).toBe(46.84);
+
+    // GET /api/antigravity/usage returns only the cached snapshot without spawning agy.
+    const dispatch = createRouteDispatcher(antigravityRoutes);
+    const chunks = [];
+    const res = {
+      statusCode: 0,
+      headers: {},
+      setHeader(name, value) {
+        this.headers[name] = value;
+      },
+      writeHead(code) {
+        this.statusCode = code;
+      },
+      end(body) {
+        chunks.push(body);
+      },
+    };
+    expect(await dispatch({ res, method: "GET", path: "/api/antigravity/usage" })).toBe(true);
+    expect(res.statusCode).toBe(200);
+    expect(JSON.parse(chunks.join(""))).toMatchObject({
+      status: "ready",
+      windows: { geminiWeekly: { usedPercent: 11.57 } },
+    });
+  } finally {
+    resetAntigravityUsageCache();
   }
 });

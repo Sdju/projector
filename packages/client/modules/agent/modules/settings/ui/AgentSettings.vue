@@ -65,6 +65,11 @@ const agent = computed(() => clientAgents().find((item) => item.backend === prop
         <AgentModeSettings :agent-id="agent.backend" />
       </section>
 
+      <section v-if="agent.settings" class="group">
+        <h4>{{ agent.settingsTitle ?? "настройка" }}</h4>
+        <component :is="agent.settings" />
+      </section>
+
       <section class="group">
         <h4>возможности</h4>
         <AgentFeatureDefaults :agent="agent.backend" />

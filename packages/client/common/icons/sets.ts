@@ -142,6 +142,7 @@ import SimpleKimi from "~icons/simple-icons/kimi";
 import SimpleOpenai from "~icons/simple-icons/openai";
 import SimpleOpencode from "~icons/simple-icons/opencode";
 
+import AntigravityIcon from "./AntigravityIcon.vue";
 import DeviconGit from "~icons/devicon/git";
 import type { Component } from "vue";
 
@@ -283,6 +284,7 @@ export const lucideIcons: Record<string, Component> = {
 export const simpleIcons: Record<string, Component> = {
   github: SimpleGithub,
   gitlab: SimpleGitlab,
+  antigravity: AntigravityIcon,
   kimi: SimpleKimi,
   openai: SimpleOpenai,
   opencode: SimpleOpencode,

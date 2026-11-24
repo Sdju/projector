@@ -36,6 +36,10 @@ export interface ClientAgent {
   usageUrl?: string;
   /** Props of the generic indicator a plugin agent uses; built-ins have their own components. */
   usageProps?: Record<string, unknown>;
+  /** Extra agent-specific section rendered on the agent's settings page, if any. */
+  settings?: Component;
+  /** Section heading for `settings` on the agent's settings page. */
+  settingsTitle?: string;
   /** How the agent keeps its task list, if it has one. */
   plan?: AgentPlanReader;
   /** Plugin-provided label for a tool call the shared chat does not name itself. */

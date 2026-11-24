@@ -69,6 +69,7 @@ import { routes as trustNoticesRoutes } from "../routes/api/trust-notices.ts";
 import { routes as pluginsRoutes } from "../routes/api/plugins.ts";
 import { routes as filesExcludeRoutes } from "../routes/api/ide/files-exclude.ts";
 import { routes as dockerRoutes } from "../routes/api/docker.ts";
+import { routes as antigravityRoutes } from "../routes/api/antigravity.ts";
 import { routes as codexRoutes } from "../routes/api/codex.ts";
 import { routes as openCodeRoutes } from "../routes/api/opencode.ts";
 import { routes as kimiRoutes } from "../routes/api/kimi.ts";
@@ -85,6 +86,7 @@ const dispatch = createRouteDispatcher([
   ...mediaRoutes,
   ...browserRoutes,
   ...analyticsRoutes,
+  ...antigravityRoutes,
   ...kimiRoutes,
   ...openCodeRoutes,
   ...codexRoutes,

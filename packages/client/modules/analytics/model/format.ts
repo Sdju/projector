@@ -166,6 +166,14 @@ export function windowLabel(window: string): string {
       return "Авто-модели";
     case "api":
       return "API-модели";
+    case "geminiRolling":
+      return "Gemini · 5 часов";
+    case "geminiWeekly":
+      return "Gemini · неделя";
+    case "thirdPartyRolling":
+      return "Claude/GPT · 5 часов";
+    case "thirdPartyWeekly":
+      return "Claude/GPT · неделя";
     default:
       return window;
   }
