@@ -185,6 +185,11 @@ async function submitTranscribe(
     throw new HttpError(400, "Фоновое распознавание пока не поддерживается");
   const data = dataUri(source);
   if (!data) throw new HttpError(400, "Пустой аудиофайл");
+  const mimeFormat = source.mime?.trim().toLowerCase().split("/")[1] ?? "";
+  const audioFormat =
+    optionString(request.options, "format") ||
+    (mimeFormat === "x-wav" ? "wav" : mimeFormat === "mpeg" ? "mp3" : mimeFormat) ||
+    "wav";
   const body = {
     model: request.model,
     input: {
@@ -196,9 +201,7 @@ async function submitTranscribe(
       ],
     },
     parameters: {
-      ...(optionString(request.options, "format")
-        ? { format: optionString(request.options, "format") }
-        : {}),
+      format: audioFormat,
       ...(optionString(request.options, "sample_rate")
         ? { sample_rate: optionString(request.options, "sample_rate") }
         : {}),

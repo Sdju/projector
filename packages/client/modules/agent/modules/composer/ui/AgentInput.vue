@@ -35,6 +35,7 @@ const emit = defineEmits<{ submit: []; open: [chip: MessageChip]; fail: [message
 
 const host = ref<HTMLElement>();
 const view = shallowRef<EditorView>();
+let dictationRange: { from: number; to: number; valid: boolean } | undefined;
 const { acceptsDrag, dropData, pasteImages, rememberCaret, beginDrag, endDrag } = useComposerDrop({
   projectId: () => props.projectId,
   view,
@@ -158,6 +159,18 @@ onMounted(() => {
           },
         }),
         EditorView.updateListener.of((update) => {
+          if (update.docChanged && dictationRange) {
+            const previous = dictationRange;
+            let valid = previous.valid;
+            update.changes.iterChanges((from, to) => {
+              if (from <= previous.to && to >= previous.from) valid = false;
+            });
+            dictationRange = {
+              from: update.changes.mapPos(previous.from),
+              to: update.changes.mapPos(previous.to),
+              valid,
+            };
+          }
           if (update.docChanged) commit(update.state);
           if (update.selectionSet) rememberCaret();
           if (update.docChanged || update.selectionSet) {
@@ -201,6 +214,33 @@ defineExpose({
   },
   insertQuote: (value: string) => {
     if (view.value) insertEditorQuote(view.value, value);
+  },
+  beginDictation: () => {
+    if (!view.value) return;
+    const { from, to } = view.value.state.selection.main;
+    dictationRange = { from, to, valid: true };
+  },
+  insertDictation: (value: string) => {
+    const target = view.value;
+    const text = value.trim();
+    if (!target || !text) return;
+    const selection = target.state.selection.main;
+    const range = dictationRange?.valid
+      ? dictationRange
+      : { from: selection.from, to: selection.to };
+    dictationRange = undefined;
+    const before = target.state.doc.sliceString(Math.max(0, range.from - 1), range.from);
+    const after = target.state.doc.sliceString(range.to, range.to + 1);
+    const insert = `${before && !/\s/.test(before) ? " " : ""}${text}${after && !/\s/.test(after) ? " " : ""}`;
+    target.dispatch({
+      changes: { from: range.from, to: range.to, insert },
+      selection: EditorSelection.cursor(range.from + insert.length),
+      userEvent: "input.paste",
+    });
+    target.focus();
+  },
+  cancelDictation: () => {
+    dictationRange = undefined;
   },
   acceptsDrag,
   dropData,

@@ -80,6 +80,7 @@ import LucideMessageSquare from "~icons/lucide/message-square";
 import LucideMessageSquarePlus from "~icons/lucide/message-square-plus";
 import LucideMessageSquareShare from "~icons/lucide/message-square-share";
 import LucideMessagesSquare from "~icons/lucide/messages-square";
+import LucideMic from "~icons/lucide/mic";
 import LucideMinimize from "~icons/lucide/minimize";
 import LucideMinimize2 from "~icons/lucide/minimize-2";
 import LucideMinus from "~icons/lucide/minus";
@@ -222,6 +223,7 @@ export const lucideIcons: Record<string, Component> = {
   "message-square-plus": LucideMessageSquarePlus,
   "message-square-share": LucideMessageSquareShare,
   "messages-square": LucideMessagesSquare,
+  mic: LucideMic,
   minimize: LucideMinimize,
   "minimize-2": LucideMinimize2,
   minus: LucideMinus,

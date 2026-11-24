@@ -32,6 +32,9 @@ export async function transcribeMedia(input: {
     model: input.model,
     input: { audio: { base64: input.audio.base64, mime: input.audio.mime } },
     options: {
+      ...(input.audio.mime === "audio/wav" || input.audio.mime === "audio/x-wav"
+        ? { format: "wav", sample_rate: "16000" }
+        : {}),
       ...(input.language ? { language: input.language } : {}),
       ...(input.prompt ? { prompt: input.prompt } : {}),
     },

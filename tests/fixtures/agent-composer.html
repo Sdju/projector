@@ -4,7 +4,8 @@
 <div id="fixture"></div>
 <script type="module">
   import "/packages/client/app/styles.css";
-  import { createApp, h, ref } from "vue";
+  import { createApp, h, provide, ref } from "vue";
+  import { commandHostKey } from "/packages/client/common/utilities/commands.ts";
   import AgentComposer from "/packages/client/modules/agent/modules/composer/ui/AgentComposer.vue";
   import { registerBuiltinWidgets } from "/packages/client/app/widgets.ts";
   registerBuiltinWidgets();
@@ -14,22 +15,42 @@
   const draft = ref("");
   const parts = ref([]);
   window.fixture = { ready: true, submitted: [] };
+  const scope = {
+    id: "composer-fixture",
+    activate() {},
+    registerCommand() {
+      return () => {};
+    },
+    describe() {},
+    executeCommand: async () => {},
+    resolveKeybinding() {},
+    dispose() {},
+  };
   const app = createApp({
-    setup: () => () =>
-      h("div", { style: "padding: 24px; max-width: 600px" }, [
-        h(AgentComposer, {
-          modelValue: draft.value,
-          parts: parts.value,
-          busy: false,
-          error: "",
-          copied: false,
-          form,
-          "onUpdate:modelValue": (value) => (draft.value = value ?? ""),
-          "onUpdate:parts": (value) => (parts.value = value ?? []),
-          onSubmit: () => window.fixture.submitted.push({ text: draft.value }),
-          onFormSubmit: (text, data) => window.fixture.submitted.push({ text, data }),
-        }),
-      ]),
+    setup() {
+      provide(commandHostKey, {
+        revision: ref(0),
+        createScope: () => scope,
+        reportError(error) {
+          throw error;
+        },
+      });
+      return () =>
+        h("div", { style: "padding: 24px; max-width: 600px" }, [
+          h(AgentComposer, {
+            modelValue: draft.value,
+            parts: parts.value,
+            busy: false,
+            error: "",
+            copied: false,
+            form,
+            "onUpdate:modelValue": (value) => (draft.value = value ?? ""),
+            "onUpdate:parts": (value) => (parts.value = value ?? []),
+            onSubmit: () => window.fixture.submitted.push({ text: draft.value }),
+            onFormSubmit: (text, data) => window.fixture.submitted.push({ text, data }),
+          }),
+        ]);
+    },
   });
   app.mount("#fixture");
 </script>

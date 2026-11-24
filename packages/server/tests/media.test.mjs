@@ -19,7 +19,7 @@ import {
   parseQwenText,
   qwenApiBase,
 } from "../modules/media-qwencloud/index.ts";
-import { qwencloudModels } from "../modules/media-qwencloud/index.ts";
+import { qwencloudAdapter, qwencloudModels } from "../modules/media-qwencloud/index.ts";
 import { openAiMediaAdapter } from "../modules/media-openai/index.ts";
 
 registerBuiltinMediaAdapters();
@@ -128,6 +128,34 @@ describe("QwenCloud parsing", () => {
       }).error,
     ).toMatch(/InvalidParameter: bad size/);
     expect(qwencloudModels().some((model) => model.id === "qwen-image-3.0-pro")).toBe(true);
+  });
+
+  test("sends the audio format required by Qwen ASR", async () => {
+    globalThis.fetch = async (_url, options) => {
+      const body = JSON.parse(options.body);
+      expect(body.parameters).toMatchObject({ format: "wav", sample_rate: "16000" });
+      expect(body.input.messages[0].content[0].input_audio.data).toMatch(
+        /^data:audio\/wav;base64,/,
+      );
+      return Response.json({ output: { text: "привет" } });
+    };
+    const result = await qwencloudAdapter.submit(
+      {
+        id: "qwen",
+        name: "Qwen",
+        kind: "qwencloud",
+        url: "https://ap-southeast-1.maas.qwencloudapi.com",
+        apiKey: "sk-test",
+        signal: AbortSignal.timeout(5000),
+      },
+      {
+        capability: "speech.transcribe",
+        model: "qwen-audio-3.1-asr-flash",
+        input: { audio: { base64: "UklGRg==", mime: "audio/wav" } },
+        options: { sample_rate: "16000" },
+      },
+    );
+    expect(result.artifacts[0].text).toBe("привет");
   });
 });
 

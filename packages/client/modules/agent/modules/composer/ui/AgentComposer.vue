@@ -8,6 +8,7 @@ import { AgentFormPanel } from "../../../../agent-turns/index.ts";
 import AgentWorkClock from "./AgentWorkClock.vue";
 import AgentQuote from "./AgentQuote.vue";
 import UiButton from "../../../../../common/ui/UiButton.vue";
+import AgentDictation from "./AgentDictation.vue";
 
 const draft = defineModel<string>({ required: true });
 const parts = defineModel<MessagePart[]>("parts", { default: () => [] });
@@ -76,6 +77,7 @@ function submitForm(text: string, data: unknown, summary?: string) {
   emit("formSubmit", text, data, summary, source);
 }
 const input = ref<InstanceType<typeof AgentInput>>();
+const dictation = ref<InstanceType<typeof AgentDictation>>();
 const formPanel = ref<InstanceType<typeof AgentFormPanel>>();
 const formSubmittable = ref(false);
 watch(
@@ -85,11 +87,12 @@ watch(
   },
 );
 watch(activeForm, () => (formSubmittable.value = false));
-function submitActive() {
+async function submitActive() {
   if (formOpen.value) {
     formPanel.value?.submit();
     return;
   }
+  if ((await dictation.value?.beforeSubmit()) === false) return;
   emit("submit");
 }
 /** Adds chips to the end of the draft; a form gives way to the text field so they are visible. */
@@ -127,7 +130,12 @@ defineExpose({
 </script>
 
 <template>
-  <div class="composer-area">
+  <div
+    class="composer-area"
+    @focusin="dictation?.activate()"
+    @keydown="dictation?.keydown"
+    @keydown.capture="dictation?.escape"
+  >
     <div v-if="error" class="chat-error" role="alert">
       <ProjectorIcon name="circle-alert" aria-hidden="true" />
       <p class="chat-error-text" :class="{ clamped: long && !expanded, open: expanded }">
@@ -186,13 +194,14 @@ defineExpose({
         v-model:parts="parts"
         :project-id="projectId"
         :commands="commands"
-        @submit="emit('submit')"
+        @submit="submitActive"
         @open="(chip) => emit('open', chip)"
         @fail="(message) => emit('fail', message)"
       />
       <UiInline class="composer-footer" justify="normal">
         <slot name="controls" />
         <UiInline class="footer-end" justify="normal">
+          <AgentDictation v-if="!formOpen" ref="dictation" :project-id="projectId" :input="input" />
           <UiButton
             v-if="form && !editing"
             shape="icon"
@@ -240,7 +249,12 @@ defineExpose({
                   ? 'Поставить сообщение в очередь'
                   : 'Отправить сообщение'
             "
-            :disabled="formOpen ? !formSubmittable : !draft.trim()"
+            :disabled="
+              formOpen
+                ? !formSubmittable
+                : dictation?.phase === 'transcribing' ||
+                  (!draft.trim() && dictation?.phase !== 'recording')
+            "
           >
             <ProjectorIcon name="arrow-up" aria-hidden="true" />
           </button>
