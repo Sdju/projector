@@ -1,4 +1,5 @@
 import type {
+  MediaCallUsage,
   MediaCapability,
   MediaJob,
   MediaModelDetails,
@@ -38,6 +39,8 @@ export interface MediaSubmission {
   artifacts?: MediaArtifactSource[];
   progress?: number;
   error?: string;
+  /** What the call consumed, when the provider reports it: seconds or tokens. */
+  usage?: MediaCallUsage;
 }
 
 export interface MediaPollContext {

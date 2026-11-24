@@ -209,7 +209,7 @@ API: `GET /api/agent/project-roles?projectId=`, `POST /api/agent/project-roles`,
 Listener:
 
 - `GET /api/agent/listener` — `{ configured, providerId?, providerName?, model?, auto?, context }`: во что роль разрешается сейчас.
-- `POST /api/agent/listener/transcribe` — `{ audio: { base64, mime }, language?, hints? }`; отвечает `{ text, providerId, providerName, model, contextSent, ms }`. Тело до 22 МБ base64 (16 МБ звука), только `audio/*`, страница и `Origin`; аудио никуда не сохраняется.
+- `POST /api/agent/listener/transcribe` — `{ audio: { base64, mime }, language?, hints? }`; отвечает `{ text, providerId, providerName, model, contextSent, usage, cost?, ms }`. `usage` содержит длительность WAV и/или токены провайдера, `cost` — расчёт по тарифу модели, если он известен. Тело до 22 МБ base64 (16 МБ звука), только `audio/*`, страница и `Origin`; аудио никуда не сохраняется, а вызов попадает в аналитику задачей `dictation`.
 
 ## Команды
 

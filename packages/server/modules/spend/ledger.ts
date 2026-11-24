@@ -1,3 +1,4 @@
+import type { MediaCallCost, MediaCallUsage } from "@ai-projector/core/modules/media/index.ts";
 import {
   modelCost,
   modelTokens,
@@ -46,6 +47,40 @@ export function recordTaskSpend(
     });
   } catch {
     // A chart is not worth failing the call it was recorded from.
+  }
+}
+
+/**
+ * Remembers a media call whose price is on the model's rate card, such as dictation billed per
+ * minute. Tokens are recorded when the provider reports them; a per-minute call may keep its
+ * money without tokens, so the task chart can still show what it cost.
+ */
+export function recordMediaSpend(
+  task: string,
+  spend: { cost?: MediaCallCost; usage?: MediaCallUsage },
+  meta: { provider?: string; model?: string } = {},
+): void {
+  try {
+    const count = (value: number | undefined): number =>
+      typeof value === "number" && Number.isFinite(value) && value > 0 ? Math.round(value) : 0;
+    const input = count(spend.usage?.inputTokens);
+    const output = count(spend.usage?.outputTokens);
+    const cost = spend.cost?.amount ?? 0;
+    if (!input && !output && !(cost > 0)) return;
+    addTaskSample({
+      minute: Date.now(),
+      task,
+      provider: meta.provider ?? "",
+      model: meta.model ?? "",
+      input,
+      output,
+      cacheRead: 0,
+      cacheWrite: 0,
+      cost,
+      priced: spend.cost !== undefined,
+    });
+  } catch {
+    // The text of the dictation matters more than the chart beside it.
   }
 }
 

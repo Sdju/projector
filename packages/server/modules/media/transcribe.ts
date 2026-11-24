@@ -1,4 +1,9 @@
-import type { MediaRequest } from "@ai-projector/core/modules/media/index.ts";
+import {
+  mediaCallCost,
+  type MediaCallCost,
+  type MediaCallUsage,
+  type MediaRequest,
+} from "@ai-projector/core/modules/media/index.ts";
 import { HttpError } from "../http/index.ts";
 import { providerContext, resolveMediaProvider } from "./provider.ts";
 
@@ -10,10 +15,43 @@ export interface MediaTranscription {
   providerName: string;
   model: string;
   contextSent: boolean;
+  /** Seconds or tokens the call consumed, when known. */
+  usage: MediaCallUsage;
+  /** Money at the model's published rate; absent when the rate card or usage is unknown. */
+  cost?: MediaCallCost;
 }
 
 /**
- * One recording read by a media model, without a job or a saved artifact: the caller keeps the
+ * Length of a PCM WAV recording from its header: `data` size divided by the byte rate. Other
+ * formats stay unmeasured, and a broken header is not a guess.
+ */
+export function wavDurationSeconds(base64: string, mime: string): number | undefined {
+  const type = mime.trim().toLowerCase();
+  if (type !== "audio/wav" && type !== "audio/x-wav" && type !== "audio/wave") return undefined;
+  const bytes = Buffer.from(base64, "base64");
+  if (bytes.length < 44) return undefined;
+  if (bytes.toString("ascii", 0, 4) !== "RIFF" || bytes.toString("ascii", 8, 12) !== "WAVE")
+    return undefined;
+  let byteRate = 0;
+  let offset = 12;
+  while (offset + 8 <= bytes.length) {
+    const id = bytes.toString("ascii", offset, offset + 4);
+    const size = bytes.readUInt32LE(offset + 4);
+    const dataAt = offset + 8;
+    if (id === "fmt " && size >= 16 && dataAt + 16 <= bytes.length)
+      byteRate = bytes.readUInt32LE(dataAt + 8);
+    if (id === "data") {
+      if (!byteRate) return undefined;
+      const available = Math.max(0, bytes.length - dataAt);
+      const length = size === 0xffffffff ? available : Math.min(size, available);
+      return length ? length / byteRate : undefined;
+    }
+    offset = dataAt + size + (size % 2);
+  }
+  return undefined;
+}
+
+/** One recording read by a media model, without a job or a saved artifact: the caller keeps the
  * text and the audio is dropped. `prompt` is a hint for the model (names and terms), not
  * instructions, and only adapters that support it send it upstream.
  */
@@ -58,11 +96,29 @@ export async function transcribeMedia(input: {
   for (const artifact of submission.artifacts ?? [])
     if (artifact.kind === "text") text = artifact.text.trim();
   if (!text) throw new HttpError(502, "Провайдер не вернул текст распознавания");
+  const seconds =
+    submission.usage?.seconds ?? wavDurationSeconds(input.audio.base64, input.audio.mime);
+  const usage: MediaCallUsage = {
+    ...submission.usage,
+    ...(seconds !== undefined ? { seconds } : {}),
+  };
+  let cost: MediaCallCost | undefined;
+  try {
+    const models = await adapter.listModels(
+      providerContext(provider.id, provider.name, provider.kind, provider.url, ""),
+    );
+    const known = models.find((model) => model.id === input.model || model.alias === input.model);
+    cost = mediaCallCost(known?.prices, usage);
+  } catch {
+    // A missing rate card leaves the call unpriced; the text is what the caller asked for.
+  }
   return {
     text,
     providerId: provider.id,
     providerName: provider.name,
     model: input.model,
     contextSent: Boolean(input.prompt?.trim() && adapter.transcriptionPrompt),
+    usage,
+    ...(cost ? { cost } : {}),
   };
 }

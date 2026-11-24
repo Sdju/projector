@@ -1,4 +1,5 @@
 import { qwenCloudEndpoint } from "@ai-projector/core/modules/providers/index.ts";
+import type { MediaCallUsage } from "@ai-projector/core/modules/media/index.ts";
 import type { MediaArtifactSource } from "../media/index.ts";
 
 type Dict = Record<string, unknown>;
@@ -128,6 +129,21 @@ export function parseQwenText(payload: unknown): string | null {
     }
   }
   return null;
+}
+
+/** Токены распознавания, если ответ их сообщает: `usage.input_tokens` и `output_tokens`. */
+export function parseQwenUsage(payload: unknown): MediaCallUsage | undefined {
+  const root = asRecord(payload);
+  const usage =
+    asRecord(root?.usage) ?? asRecord(asRecord(root?.output)?.usage) ?? asRecord(root?.data);
+  if (!usage) return undefined;
+  const inputTokens = number(usage.input_tokens) ?? number(usage.prompt_tokens);
+  const outputTokens = number(usage.output_tokens) ?? number(usage.completion_tokens);
+  const result: MediaCallUsage = {
+    ...(inputTokens !== undefined ? { inputTokens } : {}),
+    ...(outputTokens !== undefined ? { outputTokens } : {}),
+  };
+  return Object.keys(result).length ? result : undefined;
 }
 
 export interface QwenTaskResult {

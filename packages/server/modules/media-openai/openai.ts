@@ -1,4 +1,4 @@
-import type { MediaRequest } from "@ai-projector/core/modules/media/index.ts";
+import type { MediaCallUsage, MediaRequest } from "@ai-projector/core/modules/media/index.ts";
 import { HttpError } from "../http/index.ts";
 import type {
   MediaAdapter,
@@ -305,6 +305,25 @@ async function readAudioSource(source: {
   return { bytes, mime: source.mime || "audio/mpeg" };
 }
 
+/** Tokens and duration an OpenAI-compatible transcription response may report. */
+function transcriptionUsage(payload: Record<string, unknown> | null): MediaCallUsage | undefined {
+  const usage =
+    payload?.usage && typeof payload.usage === "object"
+      ? (payload.usage as Record<string, unknown>)
+      : undefined;
+  const number = (value: unknown): number | undefined =>
+    typeof value === "number" && Number.isFinite(value) && value >= 0 ? value : undefined;
+  const inputTokens = number(usage?.input_tokens) ?? number(usage?.prompt_tokens);
+  const outputTokens = number(usage?.output_tokens) ?? number(usage?.completion_tokens);
+  const seconds = number(payload?.duration);
+  const result: MediaCallUsage = {
+    ...(seconds !== undefined ? { seconds } : {}),
+    ...(inputTokens !== undefined ? { inputTokens } : {}),
+    ...(outputTokens !== undefined ? { outputTokens } : {}),
+  };
+  return Object.keys(result).length ? result : undefined;
+}
+
 async function submitTranscribe(
   context: MediaProviderContext,
   request: MediaRequest,
@@ -341,12 +360,14 @@ async function submitTranscribe(
       message,
     );
   }
-  const payload = (await response.json()) as { text?: unknown };
-  const text = typeof payload.text === "string" ? payload.text.trim() : "";
+  const payload = (await response.json().catch(() => null)) as Record<string, unknown> | null;
+  const text = typeof payload?.text === "string" ? payload.text.trim() : "";
   if (!text) throw new HttpError(502, "Провайдер не вернул текст");
+  const usage = transcriptionUsage(payload);
   return {
     status: "succeeded",
     artifacts: [{ kind: "text", mime: "text/plain", text }],
+    ...(usage ? { usage } : {}),
   };
 }
 

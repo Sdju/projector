@@ -251,11 +251,14 @@ export function useUsageAnalytics() {
     },
   );
   const taskItems = computed(() =>
-    taskRows.value.map((item) => ({
-      label: item.label,
-      value: taskMode.value === "cost" ? item.cost : item.tokens,
-      share: taskMode.value === "cost" ? item.shareCost : item.shareTokens,
-    })),
+    taskRows.value
+      .map((item) => ({
+        label: item.label,
+        value: taskMode.value === "cost" ? item.cost : item.tokens,
+        share: taskMode.value === "cost" ? item.shareCost : item.shareTokens,
+      }))
+      .filter((item) => item.value > 0)
+      .sort((left, right) => right.value - left.value),
   );
   const service = computed(() => data.value?.service);
   const serviceCalls = computed(() => data.value?.serviceCalls ?? 0);

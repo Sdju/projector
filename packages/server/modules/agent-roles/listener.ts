@@ -11,6 +11,7 @@ import {
   type MediaTranscription,
 } from "../media/index.ts";
 import { serviceRolePrompt, serviceRoleSelection } from "./store.ts";
+import { recordMediaSpend } from "../spend/index.ts";
 
 /** The built-in role that turns a recording into text. */
 const LISTENER: ServiceRoleId = "listener";
@@ -97,6 +98,10 @@ export async function listenerTranscribe(input: {
     audio: input.audio,
     ...(input.language ? { language: input.language } : {}),
     ...(prompt ? { prompt } : {}),
+  });
+  recordMediaSpend("dictation", result, {
+    provider: result.providerId,
+    model: result.model,
   });
   return result;
 }

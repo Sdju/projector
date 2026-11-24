@@ -108,7 +108,7 @@ const hourEdges = computed(() =>
           frame
           label="Служебные вызовы"
           :value="data.serviceCalls"
-          hint="Lens, Судья, Доктор"
+          hint="Lens, Судья, Доктор, Диктовка"
         />
       </div>
 

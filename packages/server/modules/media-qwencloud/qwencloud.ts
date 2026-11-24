@@ -5,6 +5,7 @@ import {
   parseQwenImages,
   parseQwenTask,
   parseQwenText,
+  parseQwenUsage,
   qwenApiBase,
   qwenErrorText,
 } from "./qwencloud-parse.ts";
@@ -214,9 +215,11 @@ async function submitTranscribe(
       502,
       `QwenCloud не вернул текст: ${qwenErrorText(payload, "пустой ответ")}`,
     );
+  const usage = parseQwenUsage(payload);
   return {
     status: "succeeded",
     artifacts: [{ kind: "text", mime: "text/plain", text: transcript }],
+    ...(usage ? { usage } : {}),
   };
 }
 

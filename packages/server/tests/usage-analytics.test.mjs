@@ -15,7 +15,12 @@ import {
   recordProviderBalance,
   usageAnalytics,
 } from "../modules/usage-analytics/index.ts";
-import { closeSpendStore, recordTaskSpend, taskSpend } from "../modules/spend/index.ts";
+import {
+  closeSpendStore,
+  recordMediaSpend,
+  recordTaskSpend,
+  taskSpend,
+} from "../modules/spend/index.ts";
 import { updateProjects } from "../modules/projects/index.ts";
 
 const usage = (input, output, cacheRead, cost) => ({
@@ -276,4 +281,18 @@ test("service calls combine into task shares and appear in the analytics answer"
     tokens: 300,
     cost: 0.0012,
   });
+});
+
+test("media spend keeps money and the tokens a provider reported", () => {
+  recordMediaSpend(
+    "dictation",
+    {
+      cost: { amount: 0.0006, currency: "USD" },
+      usage: { seconds: 6, inputTokens: 120, outputTokens: 12 },
+    },
+    { provider: "stub", model: "whisper-1" },
+  );
+  const dictation = taskSpend(0).byTask.find((item) => item.key === "dictation");
+  expect(dictation).toMatchObject({ answers: 1, input: 120, output: 12, tokens: 132 });
+  expect(dictation.cost).toBeCloseTo(0.0006, 12);
 });

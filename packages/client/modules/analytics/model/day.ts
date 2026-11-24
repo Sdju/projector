@@ -76,11 +76,13 @@ export function useUsageDay(now: Ref<Date>) {
     const day = dayData.value;
     if (!day) return [];
     const total = day.byTask.reduce((sum, item) => sum + item.tokens, 0) || 1;
-    return day.byTask.map((item) => ({
-      label: taskLabel(item.key),
-      value: item.tokens,
-      share: item.tokens / total,
-    }));
+    return day.byTask
+      .filter((item) => item.tokens > 0)
+      .map((item) => ({
+        label: taskLabel(item.key),
+        value: item.tokens,
+        share: item.tokens / total,
+      }));
   });
   const dayHourlyPoints = computed(() =>
     (dayData.value?.hourly ?? []).map((hour) => ({

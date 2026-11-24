@@ -126,6 +126,66 @@ export function formatMediaPrice(price: MediaModelPrice, locale = "ru-RU"): stri
   return `${money} / ${unit}${variant}${side}${price.estimated ? " · оценка" : ""}`;
 }
 
+/** What one media call consumed, as far as the provider or the caller knows it. */
+export interface MediaCallUsage {
+  /** Audio or video length, for rates per second or per minute. */
+  seconds?: number;
+  /** Text or audio tokens, for rates per million tokens. */
+  inputTokens?: number;
+  outputTokens?: number;
+}
+
+/** Money of one media call at the model's own rate card. */
+export interface MediaCallCost {
+  amount: number;
+  /** ISO code of the rate card; never mixed with another currency. */
+  currency: string;
+}
+
+const finite = (value: number | undefined): number | undefined =>
+  typeof value === "number" && Number.isFinite(value) && value >= 0 ? value : undefined;
+
+/**
+ * Money for one call at a published rate. Per-minute and per-second rates need `seconds`;
+ * token rates need the token side they bill. A rate card with several currencies, or without
+ * the amount a rate bills, stays unpriced: guessing a sum is worse than no sum.
+ */
+export function mediaCallCost(
+  prices: readonly MediaModelPrice[] | undefined,
+  usage: MediaCallUsage,
+): MediaCallCost | undefined {
+  if (!prices?.length) return undefined;
+  const currencies = new Set(prices.map((price) => price.currency));
+  if (currencies.size !== 1) return undefined;
+  const currency = prices[0]!.currency;
+  const seconds = finite(usage.seconds);
+  const inputTokens = finite(usage.inputTokens);
+  const outputTokens = finite(usage.outputTokens);
+  let amount = 0;
+  let used = false;
+  for (const price of prices) {
+    if (price.unit === "minute" || price.unit === "second") {
+      if (seconds === undefined) return undefined;
+      amount += (seconds / (price.unit === "minute" ? 60 : 1)) * price.amount;
+      used = true;
+      continue;
+    }
+    if (price.unit !== "1m-tokens") continue;
+    const tokens =
+      price.appliesTo === "input"
+        ? inputTokens
+        : price.appliesTo === "output" || price.appliesTo === "audio-output"
+          ? outputTokens
+          : inputTokens !== undefined || outputTokens !== undefined
+            ? (inputTokens ?? 0) + (outputTokens ?? 0)
+            : undefined;
+    if (tokens === undefined) return undefined;
+    amount += (tokens / 1_000_000) * price.amount;
+    used = true;
+  }
+  return used ? { amount, currency } : undefined;
+}
+
 /** Что модель принимает и какие значения предлагает форма. */
 export interface MediaModelOptions {
   sizes?: string[];

@@ -1,4 +1,4 @@
-export { recordTaskSpend, taskSpend, type TaskSpendResult } from "./ledger.ts";
+export { recordMediaSpend, recordTaskSpend, taskSpend, type TaskSpendResult } from "./ledger.ts";
 export {
   addTaskSample,
   closeSpendStore,

@@ -46,6 +46,8 @@ export function taskLabel(key: string): string {
       return "Проверка команд";
     case "task":
       return "Task · исследование";
+    case "dictation":
+      return "Диктовка";
     default:
       return key.startsWith("agent:")
         ? `${key === "agent:unknown" ? "Без агента" : agentTitle(key.slice(6))} · чат`

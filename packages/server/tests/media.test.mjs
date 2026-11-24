@@ -17,6 +17,7 @@ import {
   parseQwenImages,
   parseQwenTask,
   parseQwenText,
+  parseQwenUsage,
   qwenApiBase,
 } from "../modules/media-qwencloud/index.ts";
 import { qwencloudAdapter, qwencloudModels } from "../modules/media-qwencloud/index.ts";
@@ -105,6 +106,12 @@ describe("QwenCloud parsing", () => {
       expiresAt: 10,
     });
     expect(parseQwenText({ output: { text: "привет" } })).toBe("привет");
+    expect(
+      parseQwenUsage({
+        output: { text: "привет" },
+        usage: { input_tokens: 120, output_tokens: 12 },
+      }),
+    ).toStrictEqual({ inputTokens: 120, outputTokens: 12 });
     expect(
       parseQwenTask({
         output: {

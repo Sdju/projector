@@ -6,6 +6,7 @@ export {
   parseQwenImages,
   parseQwenTask,
   parseQwenText,
+  parseQwenUsage,
   qwenApiBase,
   qwenErrorText,
 } from "./qwencloud-parse.ts";
