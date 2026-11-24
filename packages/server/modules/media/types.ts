@@ -1,4 +1,5 @@
 import type {
+  MediaCallCost,
   MediaCallUsage,
   MediaCapability,
   MediaJob,
@@ -41,6 +42,8 @@ export interface MediaSubmission {
   error?: string;
   /** What the call consumed, when the provider reports it: seconds or tokens. */
   usage?: MediaCallUsage;
+  /** The money the provider itself charged for this call; wins over the model's rate card. */
+  cost?: MediaCallCost;
 }
 
 export interface MediaPollContext {

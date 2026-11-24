@@ -102,15 +102,18 @@ export async function transcribeMedia(input: {
     ...submission.usage,
     ...(seconds !== undefined ? { seconds } : {}),
   };
-  let cost: MediaCallCost | undefined;
-  try {
-    const models = await adapter.listModels(
-      providerContext(provider.id, provider.name, provider.kind, provider.url, ""),
-    );
-    const known = models.find((model) => model.id === input.model || model.alias === input.model);
-    cost = mediaCallCost(known?.prices, usage);
-  } catch {
-    // A missing rate card leaves the call unpriced; the text is what the caller asked for.
+  // An actual charge beats a rate-card estimate: OpenRouter reports `usage.cost` per call.
+  let cost: MediaCallCost | undefined = submission.cost;
+  if (!cost) {
+    try {
+      const models = await adapter.listModels(
+        providerContext(provider.id, provider.name, provider.kind, provider.url, ""),
+      );
+      const known = models.find((model) => model.id === input.model || model.alias === input.model);
+      cost = mediaCallCost(known?.prices, usage);
+    } catch {
+      // A missing rate card leaves the call unpriced; the text is what the caller asked for.
+    }
   }
   return {
     text,

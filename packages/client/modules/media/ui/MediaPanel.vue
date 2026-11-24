@@ -178,7 +178,7 @@ function statusLabel(): string {
           </li>
         </ul>
         <p v-else-if="selectedModel.description" class="model-note">
-          Провайдер не публикует цену для этой модели.
+          В каталоге Projector нет ставки для этой модели: актуальную цену смотрите у провайдера.
         </p>
         <p v-else class="model-note">
           О модели нет данных: провайдер не передаёт описание и тариф. Запрос всё равно уйдёт с её

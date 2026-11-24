@@ -1,37 +1,14 @@
 import type { MediaCallUsage, MediaRequest } from "@ai-projector/core/modules/media/index.ts";
 import { HttpError } from "../http/index.ts";
-import type {
-  MediaAdapter,
-  MediaAdapterModel,
-  MediaArtifactSource,
-  MediaProviderContext,
-  MediaSubmission,
+import {
+  readAudioResponseBytes,
+  readAudioSource,
+  type MediaAdapter,
+  type MediaAdapterModel,
+  type MediaArtifactSource,
+  type MediaProviderContext,
+  type MediaSubmission,
 } from "../media/index.ts";
-
-const MAX_AUDIO_BYTES = 64 * 1024 * 1024;
-
-async function responseBytes(response: Response): Promise<Buffer> {
-  const declared = Number(response.headers.get("content-length") ?? 0);
-  if (declared > MAX_AUDIO_BYTES) {
-    await response.body?.cancel();
-    throw new HttpError(413, "Аудио больше 64 МиБ");
-  }
-  if (!response.body) return Buffer.alloc(0);
-  const chunks: Buffer[] = [];
-  let size = 0;
-  const reader = response.body.getReader();
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    size += value.byteLength;
-    if (size > MAX_AUDIO_BYTES) {
-      await reader.cancel();
-      throw new HttpError(413, "Аудио больше 64 МиБ");
-    }
-    chunks.push(Buffer.from(value));
-  }
-  return Buffer.concat(chunks, size);
-}
 
 function openAiBase(url: string): string {
   let parsed: URL;
@@ -261,48 +238,13 @@ async function submitSpeech(
       message,
     );
   }
-  const bytes = await responseBytes(response);
+  const bytes = await readAudioResponseBytes(response);
   if (!bytes.length) throw new HttpError(502, "Провайдер вернул пустое аудио");
   const mime = response.headers.get("content-type")?.split(";")[0]?.trim() || "audio/mpeg";
   return {
     status: "succeeded",
     artifacts: [{ kind: "audio", mime, base64: bytes.toString("base64") }],
   };
-}
-
-async function readAudioSource(source: {
-  url?: string;
-  base64?: string;
-  mime?: string;
-}): Promise<{ bytes: Buffer; mime: string }> {
-  if (source.url?.trim()) {
-    let response: Response;
-    try {
-      response = await fetch(source.url.trim(), {
-        redirect: "error",
-        signal: AbortSignal.timeout(60000),
-      });
-    } catch {
-      throw new HttpError(502, "Не удалось скачать аудио для распознавания");
-    }
-    if (!response.ok) {
-      await response.body?.cancel();
-      throw new HttpError(502, `Аудио недоступно: HTTP ${response.status}`);
-    }
-    const length = Number(response.headers.get("content-length") ?? 0);
-    if (length > MAX_AUDIO_BYTES) {
-      await response.body?.cancel();
-      throw new HttpError(413, "Аудио больше 64 МиБ");
-    }
-    const bytes = await responseBytes(response);
-    if (bytes.length > MAX_AUDIO_BYTES) throw new HttpError(413, "Аудио больше 64 МиБ");
-    return { bytes, mime: response.headers.get("content-type")?.split(";")[0] || "audio/mpeg" };
-  }
-  const base64 = source.base64?.trim() ?? "";
-  if (!base64) throw new HttpError(400, "Нужен аудиофайл или ссылка");
-  const bytes = Buffer.from(base64.replace(/^data:[^;]+;base64,/, ""), "base64");
-  if (bytes.length > MAX_AUDIO_BYTES) throw new HttpError(413, "Аудио больше 64 МиБ");
-  return { bytes, mime: source.mime || "audio/mpeg" };
 }
 
 /** Tokens and duration an OpenAI-compatible transcription response may report. */
