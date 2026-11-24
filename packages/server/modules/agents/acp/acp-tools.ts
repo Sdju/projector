@@ -127,8 +127,9 @@ export function acpCommands(
   const announced = new Promise<AgentCommand[]>((resolve) => (resolveAnnounced = resolve));
   let collected: AgentCommand[] | undefined;
   let decided = false;
+  const withheld = acpProgram(id).withheldCommands;
   const take = (list: unknown) => {
-    collected = availableCommands(list);
+    collected = availableCommands(list, withheld);
     // An empty first snapshot is not final: some agents load commands from project files.
     if (collected.length) {
       decided = true;

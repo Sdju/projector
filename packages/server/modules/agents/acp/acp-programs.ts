@@ -1,3 +1,4 @@
+import type { AgentFailure } from "@ai-projector/core/modules/agent-failure/index.ts";
 import type {
   AgentBackendId,
   AgentControl,
@@ -88,6 +89,29 @@ export interface AcpProgram {
   >;
   /** Capture ownership before sending the prompt, including fast autonomous continuations. */
   prepareFollowUp?: (sessionId: string) => AcpFollowUp;
+  /**
+   * Shown when the agent refuses a session with an auth error instead of auto-calling ACP
+   * `authenticate` (for CLIs whose interactive browser login would block stdio).
+   */
+  authHint?: string;
+  /** Ambient env keys stripped before launch overrides are merged (e.g. `GEMINI_API_KEY`). */
+  scrubEnv?: readonly string[];
+  /** Slash command names hidden from chat menus (e.g. `logout` on a shared host CLI). */
+  withheldCommands?: readonly string[];
+  /** Optional handler for non-approval `session/request_permission` prompts (e.g. questions). */
+  permissionRequest?: (
+    options: AgentRunOptions,
+    params: Record<string, unknown>,
+  ) => Promise<unknown> | undefined;
+  /**
+   * Thin-client mode: never inject Projector feature/role/widget instructions, systemPrompt
+   * metadata, or replayed chat history into prompts; the agent owns its prompt and history.
+   */
+  nativePromptOnly?: boolean;
+  /** Optional post-turn check for agents that report upstream errors as `end_turn` or `refusal`. */
+  watchPromptOutcome?: (
+    sessionId: string,
+  ) => Promise<(stopReason: unknown) => Promise<AgentFailure | undefined>>;
 }
 
 export type AcpFollowUpResult =

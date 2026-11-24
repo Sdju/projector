@@ -27,7 +27,25 @@ export interface AcpInitResult {
     promptCapabilities?: { image?: boolean; embeddedContext?: boolean };
     /** Which kinds of MCP server the agent can be given besides stdio ones. */
     mcpCapabilities?: { http?: boolean; sse?: boolean };
+    /** Agent-specific capability extensions (e.g. `_meta.antigravity.systemPrompt.append`). */
+    _meta?: Record<string, unknown>;
   };
+}
+
+function scrubEnvironment(
+  env: Record<string, string | undefined>,
+  keys: readonly string[] | undefined,
+): Record<string, string | undefined> {
+  if (!keys?.length) return env;
+  const blocked = new Set(
+    process.platform === "win32" ? keys.map((key) => key.toUpperCase()) : keys,
+  );
+  const cleaned: Record<string, string | undefined> = {};
+  for (const [key, value] of Object.entries(env)) {
+    const normalized = process.platform === "win32" ? key.toUpperCase() : key;
+    if (!blocked.has(normalized)) cleaned[key] = value;
+  }
+  return cleaned;
 }
 
 /**
@@ -38,7 +56,7 @@ export interface AcpInitResult {
  */
 async function resolveLaunch(program: AcpProgram, cwd: string) {
   // Resolve programs the way a terminal session does, not through the server's own PATH.
-  const baseEnv = await os.tools.agentEnv(agentEnv());
+  const baseEnv = scrubEnvironment(await os.tools.agentEnv(agentEnv()), program.scrubEnv);
   const executable = program.executableEnv;
   if (executable && !baseEnv[executable.name]) {
     // Resolve before npx prepends bundled executables to PATH.

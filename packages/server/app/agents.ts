@@ -6,6 +6,7 @@ import {
 } from "../modules/agent/index.ts";
 import { configureAgentPreferences } from "../modules/preferences/index.ts";
 import { configureTerminalPrograms } from "../modules/terminal/index.ts";
+import { antigravityBackend } from "../modules/agents/antigravity/index.ts";
 import { codexBackend } from "../modules/agents/codex/index.ts";
 import { kimiBackend } from "../modules/agents/kimi/index.ts";
 import { opencodeBackend } from "../modules/agents/opencode/index.ts";
@@ -49,7 +50,13 @@ function registerBackendUsageLog(backend: AgentBackend): void {
  * module stays independent and the generic core never imports one. Registering again replaces.
  */
 export function registerBuiltinAgents(): void {
-  const builtins = [projectorBackend, codexBackend, opencodeBackend, kimiBackend];
+  const builtins = [
+    projectorBackend,
+    codexBackend,
+    opencodeBackend,
+    kimiBackend,
+    antigravityBackend,
+  ];
   registerAgentBackend(projectorBackend, { asDefault: true });
   for (const backend of builtins.slice(1)) registerAgentBackend(backend);
   // Native journals live on the backend itself: built-ins and plugin code use one path.

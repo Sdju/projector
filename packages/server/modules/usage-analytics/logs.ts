@@ -103,28 +103,20 @@ async function scanReader(
       continue;
     }
     if (!info.isFile()) continue;
+    // Active SQLite journals in WAL mode write new turns to `*.db-wal` before checkpointing `.db`.
+    const wal = file.endsWith(".db") ? await stat(`${file}-wal`).catch(() => null) : null;
+    const mtime = wal?.isFile() ? Math.max(info.mtimeMs, wal.mtimeMs) : info.mtimeMs;
+    const size = wal?.isFile() ? info.size + wal.size : info.size;
     // A session that stopped before the selected range cannot add to it; do not read its journal.
-    if (info.mtimeMs < Math.max(since - 86400000, now - STALE_MS)) continue;
+    if (mtime < Math.max(since - 86400000, now - STALE_MS)) continue;
     const cursor = usageFile(file);
     const append = reader.append?.(file) ?? false;
     // An incremental cursor from an older build has no state yet, so its file is read once more.
     const complete = !append || Boolean(cursor?.state);
-    if (
-      cursor &&
-      complete &&
-      cursor.mtime === info.mtimeMs &&
-      cursor.size === info.size &&
-      !cursor.error
-    )
+    if (cursor && complete && cursor.mtime === mtime && cursor.size === size && !cursor.error)
       continue;
     if (info.size > (reader.maxBytes ?? MAX_BYTES)) {
-      markUsageFileError(
-        file,
-        reader.agent,
-        { mtime: info.mtimeMs, size: info.size },
-        "файл слишком велик",
-        now,
-      );
+      markUsageFileError(file, reader.agent, { mtime, size }, "файл слишком велик", now);
       errors += 1;
       errorMessage = "файл слишком велик";
       continue;
@@ -133,19 +125,13 @@ async function scanReader(
       const result = await reader.read(file, cursor?.state ?? undefined);
       const events = Array.isArray(result) ? result : result.events;
       const state = Array.isArray(result) ? undefined : result.state;
-      writeUsageFile(file, reader.agent, { mtime: info.mtimeMs, size: info.size }, events, now, {
+      writeUsageFile(file, reader.agent, { mtime, size }, events, now, {
         append,
         ...(state !== undefined ? { state } : {}),
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      markUsageFileError(
-        file,
-        reader.agent,
-        { mtime: info.mtimeMs, size: info.size },
-        message,
-        now,
-      );
+      markUsageFileError(file, reader.agent, { mtime, size }, message, now);
       errors += 1;
       errorMessage = message;
     }

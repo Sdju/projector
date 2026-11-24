@@ -17,7 +17,8 @@ import { contentText, toolOutput } from "./acp-content.ts";
  * The slash commands of an `available_commands_update` (or of `session/new` in ACP v2) as the
  * chat knows them. The list is a full snapshot, so the caller replaces whatever it had.
  */
-export function availableCommands(list: unknown): AgentCommand[] {
+export function availableCommands(list: unknown, withheld?: readonly string[]): AgentCommand[] {
+  const blocked = withheld?.length ? new Set(withheld.map((name) => name.toLowerCase())) : null;
   const commands = Array.isArray(list) ? list : [];
   return commands.flatMap((item) => {
     const { name, description, input } = item as {
@@ -26,6 +27,7 @@ export function availableCommands(list: unknown): AgentCommand[] {
       input?: { hint?: unknown } | null;
     };
     if (typeof name !== "string" || !name) return [];
+    if (blocked?.has(name.toLowerCase())) return [];
     return [
       {
         name,
@@ -56,6 +58,7 @@ export function createAcpEventMapper(
     /** The run is a `/compact` command: its summary is the answer, not just a note. */
     compactCommand?: boolean;
     sessionId?: () => string;
+    withheldCommands?: readonly string[];
   } = {},
 ) {
   let text = "";
@@ -166,7 +169,9 @@ export function createAcpEventMapper(
       return;
     }
     if (kind === "available_commands_update") {
-      emit("commands", { commands: availableCommands(update.availableCommands) });
+      emit("commands", {
+        commands: availableCommands(update.availableCommands, options.withheldCommands),
+      });
       return;
     }
     if (kind === "usage_update") {

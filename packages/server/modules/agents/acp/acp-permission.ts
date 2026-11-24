@@ -4,6 +4,22 @@ import { contentText } from "./acp-content.ts";
 interface PermissionOption {
   optionId?: string;
   kind?: string;
+  _meta?: Record<string, unknown>;
+}
+
+const WARNING_LIMIT = 512;
+
+/** Surfaces optional agent security warnings attached to `allow_always` (e.g. `agy.security.warning`). */
+function securityWarning(option: PermissionOption | undefined): string | undefined {
+  const raw = option?._meta?.["agy.security.warning"];
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return undefined;
+  const entry = raw as { title?: unknown; message?: unknown };
+  const message =
+    (typeof entry.message === "string" && entry.message.trim()) ||
+    (typeof entry.title === "string" && entry.title.trim()) ||
+    "";
+  if (!message) return undefined;
+  return message.length > WARNING_LIMIT ? `${message.slice(0, WARNING_LIMIT - 3)}...` : message;
 }
 
 /** Longest readable preview sent with a permission request. */
@@ -78,10 +94,12 @@ export async function decidePermission(
     command && (preview?.trim() === commandLine || preview?.trim() === command.trim())
       ? ""
       : preview;
-  const detail =
+  const warning = securityWarning(allowAlways);
+  const detailParts =
     kind === "execute" && command
-      ? [commandLine, note].filter(Boolean).join("\n\n").slice(0, DETAIL_LIMIT)
-      : (preview ?? (command ? commandLine : undefined));
+      ? [commandLine, note, warning]
+      : [preview ?? (command ? commandLine : undefined), warning];
+  const detail = detailParts.filter(Boolean).join("\n\n").slice(0, DETAIL_LIMIT) || undefined;
   const title = kind === "execute" ? "Выполнить команду в оболочке" : rawTitle || undefined;
   const answer = await options
     .approve({

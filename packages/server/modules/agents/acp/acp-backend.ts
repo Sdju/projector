@@ -87,6 +87,7 @@ async function run(options: AgentRunOptions, id: AgentBackendId): Promise<void> 
   const mapper = createAcpEventMapper(options.emit, program.label, program.dialect?.(), {
     compactCommand,
     sessionId: () => sessionId,
+    withheldCommands: program.withheldCommands,
   });
   let followUp: ReturnType<NonNullable<typeof program.prepareFollowUp>> | undefined;
   let settling = false;
@@ -120,6 +121,8 @@ async function run(options: AgentRunOptions, id: AgentBackendId): Promise<void> 
             return elicitForm(options, params, acpProgram(id).forms);
           if (method !== "session/request_permission")
             throw new Error(`Клиент не поддерживает ${method}`);
+          const custom = acpProgram(id).permissionRequest?.(options, params);
+          if (custom) return custom;
           return decidePermission(options, params, acpProgram(id).shellCommand);
         },
       },
@@ -137,8 +140,8 @@ async function run(options: AgentRunOptions, id: AgentBackendId): Promise<void> 
     const init = await initializeAcp(connection, id);
     const [ideEnabled, widgetsEnabled, roleText] = await Promise.all([
       featureEnabled(id, "ide", options.features),
-      featureEnabled(id, "widgets", options.features),
-      roleContext(options.role, options.cwd),
+      program.nativePromptOnly ? false : featureEnabled(id, "widgets", options.features),
+      program.nativePromptOnly ? "" : roleContext(options.role, options.cwd),
     ]);
     const projectWidgets = widgetsEnabled ? await trustedProjectWidgets(options.projectId) : [];
     const extraPrompt = [roleText, projectWidgets.length ? renderWidgetGuide(projectWidgets) : ""]
@@ -165,6 +168,8 @@ async function run(options: AgentRunOptions, id: AgentBackendId): Promise<void> 
       init.agentCapabilities?.mcpCapabilities,
       extraMcp,
       options.role?.mcp,
+      program.authHint,
+      Boolean(init.agentCapabilities?.sessionCapabilities?.resume),
     );
     sessionId = session.sessionId;
     if (sessionId !== options.sessionId)
@@ -184,16 +189,18 @@ async function run(options: AgentRunOptions, id: AgentBackendId): Promise<void> 
         model: shownModel(applied),
       });
     }
-    // A resumed session already holds the history; a fresh one starts from the replayed chat.
-    // Abilities the user switched on for this agent go before the new message, once per session.
-    const prompt = session.resumed
-      ? options.message
-      : promptWithHistory(
-          options.message,
-          options.history ?? [],
-          await featurePrompt(id, options.features, extraPrompt),
-        );
+    const injectedPrompt = program.nativePromptOnly
+      ? ""
+      : await featurePrompt(id, options.features, extraPrompt);
+    const prompt = acpTurnPrompt(
+      options.message,
+      options.history ?? [],
+      injectedPrompt,
+      session.resumed,
+      program.nativePromptOnly,
+    );
     followUp = program.prepareFollowUp?.(sessionId);
+    const checkOutcome = await program.watchPromptOutcome?.(sessionId);
     const result = (await connection.request(
       "session/prompt",
       {
@@ -211,7 +218,10 @@ async function run(options: AgentRunOptions, id: AgentBackendId): Promise<void> 
     )) as { stopReason?: unknown };
     if (options.abort?.aborted) return;
     const stopReason = result?.stopReason;
-    if (stopReason === "end_turn" || stopReason === "cancelled") {
+    const outcomeFailure = await checkOutcome?.(stopReason);
+    if (outcomeFailure) {
+      options.emit("error", { error: outcomeFailure.message, failure: outcomeFailure });
+    } else if (stopReason === "end_turn" || stopReason === "cancelled") {
       // The last child reports as OpenCode wakes the parent: keep the stream and the process.
       settling = true;
       // Preserve the process even if observation itself throws.
@@ -258,6 +268,21 @@ async function run(options: AgentRunOptions, id: AgentBackendId): Promise<void> 
  * replayed history. Any other load error is reported as is. If the agent refuses until
  * authenticated, the first advertised method is used once.
  */
+/**
+ * Builds the text sent to `session/prompt`: thin-client programs (`nativePromptOnly`) always send
+ * only the user's own message; others replay chat history and enabled feature text on a fresh session.
+ */
+export function acpTurnPrompt(
+  message: string,
+  history: NonNullable<AgentRunOptions["history"]>,
+  injectedPrompt: string,
+  resumed: boolean,
+  nativePromptOnly = false,
+): string {
+  if (nativePromptOnly || resumed) return message;
+  return promptWithHistory(message, history, injectedPrompt);
+}
+
 export async function openSession(
   connection: AcpConnection,
   options: AgentRunOptions,
@@ -267,10 +292,27 @@ export async function openSession(
   mcp: McpSupport = {},
   extraMcp: AcpMcpServer[] = [],
   roleMcp?: readonly string[],
+  authHint?: string,
+  canResume = false,
 ): Promise<{ sessionId: string; resumed: boolean; result: unknown }> {
   const servers = () => sessionMcpServers(options.cwd, mcp, extraMcp, roleMcp);
   const start = async () => {
-    if (options.sessionId && canLoad) {
+    let missing = false;
+    if (options.sessionId && canResume) {
+      try {
+        const resumed = await connection.request("session/resume", {
+          sessionId: options.sessionId,
+          cwd: options.cwd,
+          mcpServers: await servers(),
+        });
+        return { sessionId: options.sessionId, resumed: true, result: resumed };
+      } catch (error) {
+        if ((error as AcpError).fatal || isAuthError(error)) throw error;
+        if (isMissingSession(error)) missing = true;
+        else if (!isMethodUnsupported(error)) throw error;
+      }
+    }
+    if (options.sessionId && canLoad && !missing) {
       replay(true);
       try {
         const loaded = await connection.request("session/load", {
@@ -297,11 +339,23 @@ export async function openSession(
   try {
     return await start();
   } catch (error) {
+    if (!isAuthError(error)) throw error;
+    if (authHint) {
+      const hintError = new Error(authHint) as AcpError;
+      hintError.code = 401;
+      throw hintError;
+    }
     const methodId = authMethods.find((method) => method.id)?.id;
-    if (!methodId || !isAuthError(error)) throw error;
+    if (!methodId) throw error;
     await connection.request("authenticate", { methodId });
     return await start();
   }
+}
+
+function isMethodUnsupported(error: unknown): boolean {
+  if ((error as { code?: number } | null)?.code === -32601) return true;
+  const message = error instanceof Error ? error.message : typeof error === "string" ? error : "";
+  return /method not found|not implemented|unsupported/i.test(message);
 }
 
 /** The requested native session is gone; a fresh one is the only way to continue. */
