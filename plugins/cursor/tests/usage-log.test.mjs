@@ -8,10 +8,16 @@ import {
   cursorUsageEvent,
   cursorUsageEvents,
   cursorUsageJournalFile,
-  cursorUsageLog,
+  createCursorUsageLog,
   readCursorUsageJournal,
   resetCursorUsageLogSync,
 } from "../src/usage-log.ts";
+import {
+  assertUsageNetworkContext,
+  resetUsageNetworkContext,
+} from "../../../packages/server/modules/network/index.ts";
+
+const cursorUsageLog = createCursorUsageLog(assertUsageNetworkContext);
 
 const at = 1_775_418_973_898;
 
@@ -84,6 +90,7 @@ beforeEach(async () => {
   process.env.HOME = join(directory, "home");
   process.env.CURSOR_AUTH_CONTENT = JSON.stringify({ accessToken: jwt() });
   resetCursorUsageLogSync();
+  resetUsageNetworkContext();
 });
 
 afterEach(async () => {

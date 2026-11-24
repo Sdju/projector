@@ -1,5 +1,5 @@
 import { os } from "@ai-projector/core/modules/os/index.ts";
-import { assertEuNetworkContext } from "../../network/index.ts";
+import { assertUsageNetworkContext } from "../../network/index.ts";
 
 /** One bounded JSON-RPC request over the authenticated local Codex CLI. */
 export function codexRequest(method: string, params: unknown, timeoutMs = 15000): Promise<unknown> {
@@ -74,6 +74,6 @@ export function codexRequest(method: string, params: unknown, timeoutMs = 15000)
 }
 
 export async function readCodexRateLimits(timeoutMs = 15000) {
-  await assertEuNetworkContext(timeoutMs);
+  await assertUsageNetworkContext(timeoutMs);
   return codexRequest("account/rateLimits/read", { excludeResetCreditDetails: true }, timeoutMs);
 }

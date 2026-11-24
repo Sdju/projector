@@ -1,10 +1,10 @@
-import { afterAll, beforeAll, describe, expect, test } from "vite-plus/test";
+import { afterAll, beforeAll, beforeEach, describe, expect, test } from "vite-plus/test";
 import { mkdtemp, writeFile, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { delimiter, join } from "node:path";
 import { weeklyWindow, codexUsage } from "../modules/agents-integration/codex/usage.ts";
 import { readCodexRateLimits } from "../modules/agents-integration/codex/cli.ts";
-import { NETWORK_CONTEXT_URL } from "../modules/network/index.ts";
+import { NETWORK_CONTEXT_URL, resetUsageNetworkContext } from "../modules/network/index.ts";
 
 const weekly = { usedPercent: 40, windowDurationMins: 10080, resetsAt: 1791574411 };
 test("weekly quota follows duration and codex bucket, never another model's quota", () => {
@@ -35,6 +35,7 @@ test("weekly quota follows duration and codex bucket, never another model's quot
 
 describe("Codex stdio handshake, bounded failures and shared usage cache", () => {
   let directory, originalPath, previousFetch, trace, fixture;
+  beforeEach(() => resetUsageNetworkContext());
   beforeAll(async () => {
     directory = await mkdtemp(join(tmpdir(), "projector-codex-"));
     originalPath = process.env.PATH;
@@ -122,7 +123,7 @@ process.stdin.on('data', chunk => {
     const before = (await readFile(trace, "utf8")).trim().split("\n").filter(Boolean).length;
     for (const body of [
       { success: false, is_eu: true, message: "SECRET" },
-      { success: true, is_eu: false, country_code: "US" },
+      { success: true, is_eu: false, country_code: "GB" },
       { success: true, ip: "SECRET" },
     ]) {
       globalThis.fetch = async () => Response.json(body);
@@ -130,7 +131,7 @@ process.stdin.on('data', chunk => {
       expect(usage.status).toBe("unavailable");
       expect(usage.weekly).toBe(null);
       expect(usage.message).toMatch(/сетевой контекст/);
-      expect(usage.message).not.toMatch(/SECRET|US/);
+      expect(usage.message).not.toMatch(/SECRET|GB/);
       state.value = undefined;
     }
     const after = (await readFile(trace, "utf8")).trim().split("\n").filter(Boolean).length;

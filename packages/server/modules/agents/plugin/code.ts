@@ -22,6 +22,7 @@ import {
 } from "../../agent-mcp/index.ts";
 import { trustedProjectWidgets } from "../../project-widgets/index.ts";
 import { addPluginRoute, type PluginRouteRegistration } from "../../plugin-routes/index.ts";
+import { assertUsageNetworkContext } from "../../network/index.ts";
 import { type PluginHttpContribution } from "@ai-projector/core/modules/plugins/index.ts";
 import { renderWidgetGuide } from "@ai-projector/core/modules/widget-catalog/index.ts";
 import { clearSessionEnv } from "@ai-projector/core/modules/os/index.ts";
@@ -126,6 +127,15 @@ export interface PluginHttpApi {
   register(route: PluginRouteRegistration): void;
 }
 
+/** Network checks owned by the server, so a plugin never probes the region itself. */
+export interface PluginNetworkApi {
+  /**
+   * Resolves when usage requests are allowed from the current region (EU or USA) and rejects
+   * otherwise. The probe and its policy stay in Projector; a plugin only waits for the answer.
+   */
+  assertUsageRegion(timeoutMs?: number): Promise<void>;
+}
+
 /** The narrow runtime a trusted server-side plugin receives; types are its own business. */
 export interface PluginCodeApi {
   version: 1;
@@ -146,6 +156,7 @@ export interface PluginCodeApi {
   roles: PluginRoleApi;
   widgets: PluginWidgetApi;
   mcp: PluginMcpApi;
+  network: PluginNetworkApi;
   providers: PluginProviderApi;
   http: PluginHttpApi;
 }
@@ -305,6 +316,9 @@ export async function loadCodeAgents(
       configs: (cwd) => mcpServerConfigs(cwd),
       byNames: (configs, names) => mcpConfigsForNames(configs, names),
       ide: ideMcpServer,
+    },
+    network: {
+      assertUsageRegion: (timeoutMs = 10_000) => assertUsageNetworkContext(timeoutMs),
     },
     providers: { registerBalance },
     http: { register: registerRoute },

@@ -4,11 +4,15 @@ import { mkdtemp, mkdir, writeFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
-  cursorUsageProvider,
+  createCursorUsageProvider,
   cursorWindows,
   readCursorAccessToken,
   readCursorUsage,
 } from "../src/usage.ts";
+import {
+  assertUsageNetworkContext,
+  resetUsageNetworkContext,
+} from "../../../packages/server/modules/network/index.ts";
 import {
   readAgentUsageLimits,
   resetAgentUsageCache,
@@ -20,6 +24,7 @@ import {
 import { routes } from "../../../packages/server/routes/api/agent-usage.ts";
 
 const agentId = "cursor-usage-fixture";
+const cursorUsageProvider = createCursorUsageProvider(assertUsageNetworkContext);
 const handleUsage = createRouteDispatcher(routes);
 
 const payload = {
@@ -47,7 +52,10 @@ afterAll(() => {
   }
   resetAgentUsageCache();
 });
-beforeEach(() => resetAgentUsageCache());
+beforeEach(() => {
+  resetAgentUsageCache();
+  resetUsageNetworkContext();
+});
 
 test("Cursor windows normalize percentages, billing reset and exhausted limits", () => {
   const parsed = cursorWindows(payload);
@@ -175,6 +183,7 @@ describe("Cursor reads existing auth, bounds and sanitizes requests, shares cach
     );
     expect(res.statusCode).toBe(405);
     resetAgentUsageCache();
+    resetUsageNetworkContext();
     await readAgentUsageLimits(agentId);
     expect(cursorCalls).toBe(2);
     expect(calls).toBe(4);
@@ -183,7 +192,7 @@ describe("Cursor reads existing auth, bounds and sanitizes requests, shares cach
     let cursorCalls = 0;
     for (const body of [
       { success: false, is_eu: true, message: "SECRET" },
-      { success: true, is_eu: false, country_code: "US" },
+      { success: true, is_eu: false, country_code: "GB" },
       { success: true, ip: "SECRET" },
     ]) {
       globalThis.fetch = async (url) => {
@@ -195,7 +204,7 @@ describe("Cursor reads existing auth, bounds and sanitizes requests, shares cach
       expect(result.status).toBe("unavailable");
       expect(result.windows).toBe(null);
       expect(result.message).toMatch(/сетевой контекст/);
-      expect(result.message).not.toMatch(/SECRET|US/);
+      expect(result.message).not.toMatch(/SECRET|GB/);
       resetAgentUsageCache();
     }
     expect(cursorCalls).toBe(0);
@@ -218,7 +227,7 @@ describe("Cursor reads existing auth, bounds and sanitizes requests, shares cach
       if (url === "https://ipwho.is/") return Response.json({ success: true, is_eu: true });
       return new Response("SECRET invalid JSON");
     };
-    await expect(readCursorUsage()).rejects.toThrow(/Некорректный ответ/);
+    await expect(readCursorUsage(assertUsageNetworkContext)).rejects.toThrow(/Некорректный ответ/);
     globalThis.fetch = async (url) => {
       if (url === "https://ipwho.is/") return Response.json({ success: true, is_eu: true });
       return Response.json({ planUsage: { totalPercentUsed: 1 } });
@@ -236,7 +245,9 @@ describe("Cursor reads existing auth, bounds and sanitizes requests, shares cach
     };
     const keepAlive = setInterval(() => {}, 100);
     try {
-      await expect(readCursorUsage(20)).rejects.toThrow(/Не удалось получить лимиты/);
+      await expect(readCursorUsage(assertUsageNetworkContext, 20)).rejects.toThrow(
+        /Не удалось получить лимиты/,
+      );
     } finally {
       clearInterval(keepAlive);
     }

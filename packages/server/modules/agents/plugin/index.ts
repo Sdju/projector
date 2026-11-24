@@ -20,6 +20,7 @@ export {
   type PluginFeatureApi,
   type PluginHostApi,
   type PluginMcpApi,
+  type PluginNetworkApi,
   type PluginProviderApi,
   type PluginRoleApi,
   type PluginWidgetApi,

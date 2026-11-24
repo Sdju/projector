@@ -7,8 +7,8 @@ import { askCursorQuestions } from "./questions.ts";
 import { normalizeCursorSelection } from "./selection.ts";
 import { reportCursorTask } from "./task.ts";
 import { updateCursorTodos } from "./todos.ts";
-import { cursorUsageLog } from "./usage-log.ts";
-import { cursorUsageProvider, cursorUsageWindows } from "./usage.ts";
+import { createCursorUsageLog } from "./usage-log.ts";
+import { createCursorUsageProvider, cursorUsageWindows } from "./usage.ts";
 
 /** Cursor through its ACP mode (`agent acp`), with its own picker flag, questions and plan. */
 export function cursorProgram(api: PluginCodeApi): AcpProgram {
@@ -38,9 +38,10 @@ export function cursorProgram(api: PluginCodeApi): AcpProgram {
 /** The agents this plugin adds to Projector; loaded in-process after the user trusts the package. */
 export function createAgents(api: PluginCodeApi): AgentBackend[] {
   const backend = api.createAcpBackend(cursorProgram(api));
-  backend.usage = cursorUsageProvider;
+  const assertUsageRegion = (timeoutMs?: number) => api.network.assertUsageRegion(timeoutMs);
+  backend.usage = createCursorUsageProvider(assertUsageRegion);
   backend.usageWindows = cursorUsageWindows;
-  backend.usageLog = cursorUsageLog;
+  backend.usageLog = createCursorUsageLog(assertUsageRegion);
   backend.plan = { tools: ["create_plan", "update_todos"] };
   return [backend];
 }

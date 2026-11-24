@@ -20,12 +20,14 @@ import {
 } from "../../../packages/server/modules/plugins/index.ts";
 import { registerBuiltinAgents, syncPluginAgents } from "../../../packages/server/app/agents.ts";
 import { usageLogReaders } from "../../../packages/server/modules/usage-log/index.ts";
+import { resetUsageNetworkContext } from "../../../packages/server/modules/network/index.ts";
 
 const root = fileURLToPath(new URL("../../..", import.meta.url));
 const source = join(root, "plugins/cursor");
 const pluginId = "@projector/cursor-agent";
 
 beforeEach(async () => {
+  resetUsageNetworkContext();
   await rm(pluginsDirectory(), { recursive: true, force: true });
   await rm(join(dataDir(), "plugins.json"), { force: true });
 });

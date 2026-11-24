@@ -1,1 +1,5 @@
-export { assertEuNetworkContext, NETWORK_CONTEXT_URL } from "./eu-context.ts";
+export {
+  assertUsageNetworkContext,
+  NETWORK_CONTEXT_URL,
+  resetUsageNetworkContext,
+} from "./usage-context.ts";

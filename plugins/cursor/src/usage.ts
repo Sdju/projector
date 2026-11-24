@@ -1,7 +1,10 @@
-import type { AgentUsage, AgentUsageWindowDefinition } from "./api.ts";
-import { assertEuNetworkContext, cursorPostJson, readCursorAccessToken } from "./session.ts";
+import type { AgentBackend, AgentUsage, AgentUsageWindowDefinition } from "./api.ts";
+import { cursorPostJson, readCursorAccessToken } from "./session.ts";
 
 export { readCursorAccessToken } from "./session.ts";
+
+/** Server-side region gate passed in by `api.network`; the plugin never probes it itself. */
+export type AssertUsageRegion = (timeoutMs?: number) => Promise<void>;
 
 const USAGE_URL = "https://api2.cursor.sh/aiserver.v1.DashboardService/GetCurrentPeriodUsage";
 const MONTH_SECONDS = 30 * 24 * 60 * 60;
@@ -40,9 +43,12 @@ export const cursorUsageWindows: readonly AgentUsageWindowDefinition[] = [
 ];
 
 /** Fixed official destination, bounded request, no upstream body in errors. */
-export async function readCursorUsage(timeoutMs = 10000): Promise<unknown> {
+export async function readCursorUsage(
+  assertUsageRegion: AssertUsageRegion,
+  timeoutMs = 10000,
+): Promise<unknown> {
   const token = await readCursorAccessToken();
-  await assertEuNetworkContext(timeoutMs);
+  await assertUsageRegion(timeoutMs);
   return cursorPostJson(
     USAGE_URL,
     "{}",
@@ -96,9 +102,12 @@ export function cursorWindows(payload: unknown): CursorWindows | null {
 }
 
 /** The provider Projector's generic `/api/agent/usage/cursor` route calls. */
-export async function readCursorLimits(now = Date.now()): Promise<AgentUsage> {
+export async function readCursorLimits(
+  assertUsageRegion: AssertUsageRegion,
+  now = Date.now(),
+): Promise<AgentUsage> {
   try {
-    const windows = cursorWindows(await readCursorUsage());
+    const windows = cursorWindows(await readCursorUsage(assertUsageRegion));
     return windows
       ? { status: "ready", windows, checkedAt: now }
       : {
@@ -117,8 +126,12 @@ export async function readCursorLimits(now = Date.now()): Promise<AgentUsage> {
   }
 }
 
-export const cursorUsageProvider = {
-  kind: "function" as const,
-  read: readCursorLimits,
-  timeoutMs: 25_000,
-};
+export function createCursorUsageProvider(
+  assertUsageRegion: AssertUsageRegion,
+): NonNullable<AgentBackend["usage"]> {
+  return {
+    kind: "function",
+    read: (checkedAt) => readCursorLimits(assertUsageRegion, checkedAt),
+    timeoutMs: 25_000,
+  };
+}

@@ -2,9 +2,9 @@ import { createReadStream, existsSync } from "node:fs";
 import { appendFile, mkdir, readFile, stat } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import type { UsageLogEvent, UsageLogRead, UsageLogReader, UsageTokens } from "./api.ts";
+import type { AssertUsageRegion } from "./usage.ts";
 import {
   AUTH_UNAVAILABLE,
-  assertEuNetworkContext,
   cursorCacheHome,
   cursorConfigHome,
   cursorHome,
@@ -136,10 +136,11 @@ async function lastCursor(file: string, take = 200): Promise<{ at: number; ids: 
 export async function fetchCursorUsageEvents(
   since: number,
   now: number,
+  assertUsageRegion: AssertUsageRegion,
   timeoutMs = TIMEOUT_MS,
 ): Promise<UsageLogEvent[]> {
   const token = await readCursorAccessToken();
-  await assertEuNetworkContext(timeoutMs);
+  await assertUsageRegion(timeoutMs);
   const cookie = cursorSessionCookie(token);
   const events: UsageLogEvent[] = [];
   let page = 1;
@@ -180,7 +181,10 @@ export async function fetchCursorUsageEvents(
   return events;
 }
 
-async function syncCursorUsageJournal(now = Date.now()): Promise<string | null> {
+async function syncCursorUsageJournal(
+  assertUsageRegion: AssertUsageRegion,
+  now = Date.now(),
+): Promise<string | null> {
   const file = cursorUsageJournalFile();
   const exists = existsSync(file);
   if (exists && now - lastSync < SYNC_MS) return file;
@@ -193,7 +197,7 @@ async function syncCursorUsageJournal(now = Date.now()): Promise<string | null> 
   const start = stored.at > 0 ? stored.at : now - YEAR_MS;
   let fetched: UsageLogEvent[];
   try {
-    fetched = await fetchCursorUsageEvents(start, now);
+    fetched = await fetchCursorUsageEvents(start, now, assertUsageRegion);
   } catch (error) {
     lastSync = now;
     if (exists) return file;
@@ -271,19 +275,21 @@ export async function readCursorUsageJournal(file: string, state?: string): Prom
   return { events, state: String(cursor) };
 }
 
-export const cursorUsageLog: UsageLogReader = {
-  agent: "cursor",
-  label: "Cursor",
-  append: (file) => file.endsWith(".jsonl"),
-  roots: () => [
-    cursorHome(),
-    join(cursorConfigHome(), "cursor"),
-    join(cursorConfigHome(), "Cursor"),
-    dirname(cursorUsageJournalFile()),
-  ],
-  async files() {
-    const file = await syncCursorUsageJournal();
-    return file ? [file] : [];
-  },
-  read: readCursorUsageJournal,
-};
+export function createCursorUsageLog(assertUsageRegion: AssertUsageRegion): UsageLogReader {
+  return {
+    agent: "cursor",
+    label: "Cursor",
+    append: (file) => file.endsWith(".jsonl"),
+    roots: () => [
+      cursorHome(),
+      join(cursorConfigHome(), "cursor"),
+      join(cursorConfigHome(), "Cursor"),
+      dirname(cursorUsageJournalFile()),
+    ],
+    async files() {
+      const file = await syncCursorUsageJournal(assertUsageRegion);
+      return file ? [file] : [];
+    },
+    read: readCursorUsageJournal,
+  };
+}
