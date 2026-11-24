@@ -2,6 +2,7 @@ import { expect, test } from "vite-plus/test";
 import { chatLinkActions } from "../modules/agent-core/model/chat-link-actions.ts";
 import { parseChatLink } from "../modules/agent-core/lib/chat-links.ts";
 import { renderMarkdown } from "../modules/agent-turns/lib/markdown.ts";
+import { renderMarkdown as renderDisplayMarkdown } from "../modules/markdown/lib/markdown.ts";
 import { registerWorkspaceProfile } from "../modules/workspace-api/index.ts";
 import { absoluteLocalPath, fileUrlPath, isLocalPath } from "../common/utilities/file-path.ts";
 
@@ -102,6 +103,18 @@ test("a chat file link is marked for the click handler and keeps its new-tab fal
 test("the sanitizer may drop href, so a Windows path keeps its target in data", () => {
   const html = renderMarkdown("[report](C:/Users/me/report.html)");
   expect(html).toContain('data-chat-file="C:/Users/me/report.html"');
+});
+
+test("a file URL is a markdown link, not literal text", () => {
+  const html = renderMarkdown("[usage](file:///tmp/My%20file.md)");
+  expect(html).toContain("<a ");
+  expect(html).toContain('data-chat-file="file:///tmp/My%20file.md"');
+  expect(html).not.toContain("[usage]");
+});
+
+test("a README without a chat click handler keeps a file URL as written", () => {
+  const html = renderDisplayMarkdown("[usage](file:///tmp/My%20file.md)");
+  expect(html).toContain("[usage](file:///tmp/My%20file.md)");
 });
 
 test("an absolute Windows link inside the project opens as a project file", async () => {

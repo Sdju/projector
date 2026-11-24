@@ -33,7 +33,7 @@ function chatLinkAttributes(href: string, title?: string | null): Record<string,
 }
 
 function withChat(env: MarkdownEnv = {}): MarkdownEnv {
-  return { ...env, linkAttributes: chatLinkAttributes };
+  return { ...env, linkAttributes: chatLinkAttributes, allowFileLinks: true };
 }
 
 /** Markdown as HTML, not yet sanitized. Chat file links are marked for the click handler. */

@@ -13,6 +13,11 @@ export type MarkdownEnv = Env & {
    * Default is `true` so the chat stream stays as it was.
    */
   breaks?: boolean;
+  /**
+   * Parse `file:` destinations as links. Markdown-it blocks them by default; the chat enables
+   * them because agents (Antigravity) link local files that way, and the click handler opens them.
+   */
+  allowFileLinks?: boolean;
 };
 
 /** External addresses open in a new tab; a relative path must not navigate the host page. */
@@ -38,6 +43,11 @@ const markdown = new MarkdownIt({
     return "";
   },
 });
+
+/** Markdown-it's own guard: `file:` is refused so `[file](file:///…)` stays literal text. */
+const defaultValidateLink = markdown.validateLink.bind(markdown);
+const withFileLinks = (url: string) =>
+  url.trim().toLowerCase().startsWith("file:") || defaultValidateLink(url);
 
 function applyLinkAttributes(
   href: string,
@@ -134,6 +144,7 @@ function decorateHtml(root: HTMLElement, env: MarkdownEnv) {
 
 function applyEnv(env: MarkdownEnv) {
   markdown.set({ breaks: env.breaks !== false });
+  markdown.validateLink = env.allowFileLinks ? withFileLinks : defaultValidateLink;
 }
 
 /** Markdown as HTML, not yet sanitized. */
