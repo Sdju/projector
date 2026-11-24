@@ -12,6 +12,17 @@ import { accessAllowed, isLocalRequest } from "../access/index.ts";
 import { hubRelayConnection } from "./hub.ts";
 
 const devicePath = /^\/api\/devices\/[a-z0-9][a-z0-9-]{0,62}\//;
+const RELAY_HEADERS_TIMEOUT_MS = 30_000;
+const HOP_BY_HOP_HEADERS = new Set([
+  "connection",
+  "keep-alive",
+  "proxy-authenticate",
+  "proxy-authorization",
+  "proxy-connection",
+  "te",
+  "trailer",
+  "upgrade",
+]);
 
 function relay(req: IncomingMessage, target: ServerResponse | Duplex, head?: Buffer): void {
   const response = "writeHead" in target ? target : undefined;
@@ -46,6 +57,7 @@ function relay(req: IncomingMessage, target: ServerResponse | Duplex, head?: Buf
   for (const name of Object.keys(headers)) {
     if (
       ["host", "authorization", "cookie", "referer", "forwarded"].includes(name) ||
+      (!head && HOP_BY_HOP_HEADERS.has(name)) ||
       name.startsWith("x-forwarded-") ||
       name.startsWith("x-projector-hub")
     )
@@ -54,17 +66,22 @@ function relay(req: IncomingMessage, target: ServerResponse | Duplex, head?: Buf
   if (headers.origin) headers.origin = config.url;
   headers["x-projector-hub-relay"] = config.token;
   const request = url.protocol === "https:" ? httpsRequest : httpRequest;
-  const upstream = request(url, { method: req.method, headers });
+  // Disable keep-alive pooling so a stale socket closed by an upstream proxy cannot ECONNRESET a POST.
+  const upstream = request(url, { method: req.method, headers, agent: false });
   const abort = addAbortListener(signal, () => target.destroy());
   target.once("close", () => {
     abort[Symbol.dispose]();
     upstream.destroy();
   });
-  const timeout = setTimeout(() => upstream.destroy(), 15_000);
+  let timedOut = false;
+  const timeout = setTimeout(() => {
+    timedOut = true;
+    upstream.destroy();
+  }, RELAY_HEADERS_TIMEOUT_MS);
   timeout.unref();
   upstream.on("error", () => {
     clearTimeout(timeout);
-    fail(502, "Hub connection failed");
+    fail(timedOut ? 504 : 502, timedOut ? "Hub request timed out" : "Hub connection failed");
   });
   upstream.on("response", (incoming) => {
     clearTimeout(timeout);

@@ -1,4 +1,5 @@
 import { INTERRUPTED } from "./load-history.ts";
+import { previousSession } from "./session-tail.ts";
 import type { AgentPart, AgentTurn } from "./types.ts";
 
 /**
@@ -78,6 +79,33 @@ function mergeAnswer(lost: AgentTurn, answer: AgentTurn[]): boolean {
 }
 
 /**
+ * Counts prior occurrences of `question` in the same native session segment so a repeated prompt
+ * that failed before reaching the agent does not match an earlier answer in `native`.
+ */
+function priorQuestionCount(turns: AgentTurn[], lost: AgentTurn, question: string): number {
+  const userIndex = turns.findLastIndex((turn) => turn.role === "user");
+  if (userIndex <= 0) return 0;
+  const sessionId = lost.session?.id ?? previousSession(turns, lost)?.id;
+  let start = 0;
+  for (let i = userIndex - 1; i >= 0; i--) {
+    const item = turns[i]!;
+    if (
+      item.role === "assistant" &&
+      (item.detached || (item.session?.id && sessionId && item.session.id !== sessionId))
+    ) {
+      start = i + 1;
+      break;
+    }
+  }
+  let count = 0;
+  for (let i = start; i < userIndex; i++) {
+    const item = turns[i]!;
+    if (item.role === "user" && item.text.trim() === question) count++;
+  }
+  return count;
+}
+
+/**
  * Copies the answer the agent finished in its own session into the turn the chat lost. The
  * question names the answer in a continued session; harness reminders do not end it, and the
  * answer may arrive as several messages, which are merged back into one.
@@ -87,8 +115,15 @@ export function restoreLostAnswer(turns: AgentTurn[], native: AgentTurn[]): bool
   if (!lost || lost.role !== "assistant" || !answerLost(lost)) return false;
   const question = turns.findLast((turn) => turn.role === "user")?.text.trim();
   if (!question) return false;
-  const asked = native.findLastIndex((turn) => turn.role === "user" && asks(turn.text, question));
-  if (asked < 0) return false;
+  const matches: number[] = [];
+  for (let i = 0; i < native.length; i++) {
+    const turn = native[i]!;
+    if (turn.role === "user" && asks(turn.text, question)) matches.push(i);
+  }
+  if (!matches.length) return false;
+  if (!lost.session?.id && matches.length <= priorQuestionCount(turns, lost, question))
+    return false;
+  const asked = matches.at(-1)!;
   return mergeAnswer(lost, answerTurns(native, asked));
 }
 
@@ -109,16 +144,19 @@ export async function recoverTurn(
   load: (session: string) => Promise<AgentTurn[]>,
   save: () => void,
 ): Promise<boolean> {
-  if (!turn?.session?.id || !answerLost(turn) || attempted.has(turn)) return false;
+  const session =
+    turn?.session ?? (turn && !turn.failureInfo ? previousSession(turns, turn) : undefined);
+  if (!session?.id || !answerLost(turn) || attempted.has(turn!)) return false;
   let native: AgentTurn[];
   try {
-    native = await load(turn.session.id);
+    native = await load(session.id);
   } catch {
     // The session is gone or busy in another agent process: try again when it is available.
     return false;
   }
-  attempted.add(turn);
+  attempted.add(turn!);
   if (!restoreLostAnswer(turns, native)) return false;
+  turn!.session ??= session;
   save();
   return true;
 }

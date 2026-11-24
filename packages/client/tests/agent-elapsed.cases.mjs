@@ -290,3 +290,29 @@ test("a completed child before final done keeps the run available for reconnect"
     vi.useRealTimers();
   }
 });
+
+test("rejoining a previously failed turn clears its stale failure when replay succeeds", async () => {
+  const assistant = {
+    id: "a",
+    role: "assistant",
+    text: "",
+    tools: [],
+    parts: [],
+    failure: "Hub connection failed",
+    run: "run-1",
+  };
+  const state = { permissions: [], questions: [], secrets: [], turns: [assistant] };
+  const onEvent = (event) => applyAgentEvent(state, assistant, event, () => {});
+  await streamAnswer(
+    assistant,
+    async (emit) => {
+      emit({ event: "text", data: { text: "Восстановленный ответ." } });
+      emit({ event: "done", data: { text: "Восстановленный ответ.", added: [] } });
+    },
+    onEvent,
+    new AbortController().signal,
+    "run-1",
+  );
+  expect(assistant.text).toBe("Восстановленный ответ.");
+  expect(assistant.failure).toBeUndefined();
+});
