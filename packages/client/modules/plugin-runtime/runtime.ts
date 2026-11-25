@@ -13,11 +13,30 @@ interface Activation {
 const active = new Map<string, Activation>();
 const failed = new Set<string>();
 let disposed = false;
+let projectId = "";
 let requestRevision = 0;
 let request: AbortController | undefined;
+
+/** The project whose packages are currently active; empty outside a project workspace. */
+export function currentPluginProject(): string {
+  return projectId;
+}
+
+/**
+ * Switches the project scope of the runtime. User plugins stay active; packages of the previous
+ * project are deactivated on the next snapshot, so their panels, languages and agents disappear.
+ */
+export async function setPluginProject(value: string): Promise<void> {
+  const next = value.trim();
+  if (next === projectId) return;
+  projectId = next;
+  await refreshPluginRuntime();
+}
+
 function identityOf(plugin: RuntimePluginInfo): string {
   return [
     deviceBase(),
+    plugin.projectId ?? "",
     plugin.id,
     plugin.version ?? "",
     plugin.hash ?? "",
@@ -29,6 +48,7 @@ function identityOf(plugin: RuntimePluginInfo): string {
 
 function eligible(plugin: RuntimePluginInfo): boolean {
   return (
+    (!plugin.projectId || plugin.projectId === projectId) &&
     plugin.status === "enabled" &&
     plugin.enabled &&
     plugin.trusted &&
@@ -118,8 +138,9 @@ export async function refreshPluginRuntime(): Promise<void> {
   const revision = ++requestRevision;
   request?.abort();
   const controller = (request = new AbortController());
+  const requestedProject = projectId;
   try {
-    const catalog = await fetchRuntimeCatalog(controller.signal);
+    const catalog = await fetchRuntimeCatalog(requestedProject, controller.signal);
     if (disposed || revision !== requestRevision) return;
     failed.clear();
     await reconcile(catalog);
@@ -134,9 +155,10 @@ export async function refreshPluginRuntime(): Promise<void> {
 }
 export function disposePluginRuntime(): void {
   disposed = true;
+  projectId = "";
   requestRevision++;
   request?.abort();
-  for (const id of [...active.keys()]) deactivate(id);
+  for (const id of active.keys()) deactivate(id);
   failed.clear();
   if (typeof window !== "undefined") window.removeEventListener("pagehide", disposePluginRuntime);
 }

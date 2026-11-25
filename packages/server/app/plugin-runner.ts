@@ -4,6 +4,7 @@
 // absent, so the backend does not host itself again).
 //
 // Usage: node plugin-runner.ts <run directory>
+import { parseProjectPluginId } from "@ai-projector/core/modules/plugins/index.ts";
 import type { AgentBackend } from "../modules/agent/index.ts";
 import { registerAgentBackend, runHostedRunner } from "../modules/agent/index.ts";
 import { loadCodeAgents } from "../modules/agents/plugin/index.ts";
@@ -23,7 +24,8 @@ export async function loadPluginAnswer(
   for (const backend of backends) registerAgentBackend(backend);
   registerBuiltinWidgetDefinitions();
   registerBuiltinAgentFeatures();
-  const backend = backends.find((item) => item.id === agentId);
+  const unscoped = parseProjectPluginId(agentId)?.packageName;
+  const backend = backends.find((item) => item.id === agentId || item.id === unscoped);
   if (!backend) throw new Error(`Плагин не вернул агента ${agentId}`);
   return backend;
 }

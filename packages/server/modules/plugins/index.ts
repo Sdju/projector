@@ -16,6 +16,10 @@ import { installedProjectorVersion } from "./version.ts";
 
 export { readPluginIcon } from "./icon.ts";
 export { watchPluginDirectory } from "./watch.ts";
+export { copyPackage } from "./install.ts";
+export { loadPluginPackage, readJson, type LoadedPluginPackage } from "./load.ts";
+export { hashPackage, isTrusted } from "./trust.ts";
+export { installedProjectorVersion } from "./version.ts";
 export { openPluginAsset, type PluginAsset } from "./assets.ts";
 export { openPluginReadmeFile, pluginHasReadme, readPluginReadme } from "./readme.ts";
 export { packagesDirectory, pluginsDataDirectory, pluginsDirectory } from "./directory.ts";

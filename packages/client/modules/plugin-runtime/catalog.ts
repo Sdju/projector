@@ -11,7 +11,13 @@ import type {
 
 /** Catalog shape the browser runtime needs; the settings screen has its own richer copy. */
 export interface RuntimePluginInfo {
+  /** Unique runtime id: a project plugin carries `project:<project-key>:<package>`. */
   id: string;
+  /** Manifest package name; the public `api.packageName` value. */
+  packageName?: string;
+  /** Set for a package from `.projector/plugins` of the named project. */
+  projectId?: string;
+  scope?: "user" | "project";
   version?: string;
   status: "enabled" | "disabled" | "error" | "missing";
   enabled: boolean;
@@ -42,6 +48,9 @@ function normalize(value: unknown): RuntimeCatalog {
       return [
         {
           id: plugin.id,
+          packageName: typeof plugin.packageName === "string" ? plugin.packageName : plugin.id,
+          ...(typeof plugin.projectId === "string" ? { projectId: plugin.projectId } : {}),
+          ...(plugin.scope === "project" || plugin.scope === "user" ? { scope: plugin.scope } : {}),
           version: typeof plugin.version === "string" ? plugin.version : undefined,
           status:
             plugin.status === "enabled" ||
@@ -75,8 +84,12 @@ function normalize(value: unknown): RuntimeCatalog {
 }
 
 /** Reads the device-aware catalog; the same path works directly and through the Hub tunnel. */
-export async function fetchRuntimeCatalog(signal?: AbortSignal): Promise<RuntimeCatalog> {
-  const response = await fetch(deviceUrl("/api/plugins"), {
+export async function fetchRuntimeCatalog(
+  projectId?: string,
+  signal?: AbortSignal,
+): Promise<RuntimeCatalog> {
+  const query = projectId ? `?projectId=${encodeURIComponent(projectId)}` : "";
+  const response = await fetch(deviceUrl(`/api/plugins${query}`), {
     headers: { Accept: "application/json" },
     signal,
   });

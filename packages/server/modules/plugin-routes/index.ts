@@ -2,10 +2,10 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import { addRoute, createRouter, findRoute, removeRoute, type RouterContext } from "rou3";
 import {
   isPluginHttpPath,
+  pluginBasePath,
   pluginHttpAccessOf,
   pluginHttpMethodsOf,
   pluginHttpPath,
-  pluginPackageKey,
   type PluginHttpAccess,
   type PluginHttpContribution,
   type PluginHttpMethod,
@@ -84,10 +84,14 @@ const registry = (): Registry => {
   return fresh;
 };
 
-/** `/api/plugins/<package-key>/<pattern>`: the package never supplies its own prefix. */
+/**
+ * `/api/plugins/<package-key>/<pattern>` for a user plugin and
+ * `/api/projects/<project-key>/plugins/<package-key>/<pattern>` for a project one. The package
+ * never supplies its own prefix.
+ */
 export function pluginRouteUrl(plugin: string, path: string): string {
   if (!isPluginHttpPath(path)) throw new Error("Небезопасный путь маршрута плагина");
-  return `/api/plugins/${pluginPackageKey(plugin)}/${path}`;
+  return `${pluginBasePath(plugin)}/${path}`;
 }
 
 export function beginPluginRoutes(plugin: string): void {

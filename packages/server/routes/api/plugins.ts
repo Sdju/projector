@@ -17,11 +17,18 @@ import {
   writePluginStorageValue,
 } from "../../modules/plugins/index.ts";
 import {
+  parseProjectPluginId,
   pluginPackageName,
   pluginStorageMaxBytes,
 } from "@ai-projector/core/modules/plugins/index.ts";
 import { accessAllowed } from "../../modules/access/index.ts";
 import { HttpError } from "../../modules/http/index.ts";
+import {
+  discoverProjectPlugins,
+  setProjectPluginEnabled,
+  setProjectPluginTrust,
+} from "../../modules/project-plugins/index.ts";
+import { auditProjectTrust } from "../../modules/project-trust/index.ts";
 import { asString, json, readBody, type RouteDefinition } from "../../modules/transport/index.ts";
 
 const assetPath = "/api/plugins/assets/:key/:hash/**";
@@ -34,15 +41,46 @@ const storageBodyLimit = pluginStorageMaxBytes + 64_000;
 /** The key in the URL is base64url of the package name; data never accepts a raw path. */
 async function storagePackage(key: string | undefined): Promise<string> {
   const name = pluginPackageName(key ?? "");
-  if (!name || !(await pluginPackageExists(name))) throw new HttpError(404, "Плагин не найден");
+  if (!name) throw new HttpError(404, "Плагин не найден");
+  const project = parseProjectPluginId(name);
+  if (project) {
+    const catalog = await discoverProjectPlugins(project.projectId, { applyCode: false });
+    if (!catalog.plugins.some((item) => item.id === name))
+      throw new HttpError(404, "Плагин проекта не найден");
+    return name;
+  }
+  if (!(await pluginPackageExists(name))) throw new HttpError(404, "Плагин не найден");
   return name;
 }
 
 async function catalogPlugin(key: string | undefined) {
   const name = pluginPackageName(key ?? "");
   if (!name) return undefined;
+  const project = parseProjectPluginId(name);
+  if (project) {
+    const catalog = await discoverProjectPlugins(project.projectId, { applyCode: false });
+    return catalog.plugins.find((item) => item.id === name);
+  }
   const catalog = await discoverPlugins();
   return catalog.plugins.find((item) => item.id === name);
+}
+
+/** The user catalog plus one project's packages; project entries carry their own scoped ids. */
+async function catalogFor(projectId?: string) {
+  const catalog = await discoverPlugins();
+  if (!projectId) return catalog;
+  const project = await discoverProjectPlugins(projectId);
+  if (project.plugins.some((item) => item.status === "error" || (item.enabled && !item.trusted)))
+    void auditProjectTrust(projectId);
+  return { ...catalog, plugins: [...catalog.plugins, ...project.plugins] };
+}
+
+function projectPackageName(value: string, projectId: string): string {
+  const parsed = parseProjectPluginId(value);
+  if (!parsed) return value;
+  if (parsed.projectId !== projectId)
+    throw new HttpError(400, "Плагин принадлежит другому проекту");
+  return parsed.packageName;
 }
 
 function storageFailure(error: unknown): never {
@@ -133,15 +171,13 @@ export const routes: RouteDefinition[] = [
         throw new HttpError(403, "Плагины доступны только со страницы Projector");
       res.setHeader("Cache-Control", "no-store");
       res.setHeader("X-Content-Type-Options", "nosniff");
-      const name = pluginPackageName(params.key ?? "");
       let relative: string;
       try {
         relative = (params["0"] ?? "").split("/").map(decodeURIComponent).join("/");
       } catch {
         throw new HttpError(400, "Некорректный путь ассета");
       }
-      const catalog = await discoverPlugins();
-      const plugin = name ? catalog.plugins.find((item) => item.id === name) : undefined;
+      const plugin = await catalogPlugin(params.key);
       const asset = await openPluginAsset(plugin, params.hash ?? "", relative);
       if (!asset) {
         json(res, 404, { error: "Ассет плагина недоступен" });
@@ -221,11 +257,12 @@ export const routes: RouteDefinition[] = [
   {
     method: "GET",
     path: "/api/plugins",
-    handler: async ({ req, res }) => {
+    handler: async ({ req, res, url }) => {
       if (!accessAllowed(req, false))
         throw new HttpError(403, "Плагины доступны только со страницы Projector");
       res.setHeader("Cache-Control", "no-store");
-      json(res, 200, await discoverPlugins());
+      const projectId = url.searchParams.get("projectId")?.trim() || undefined;
+      json(res, 200, await catalogFor(projectId));
     },
   },
   {
@@ -237,6 +274,33 @@ export const routes: RouteDefinition[] = [
       res.setHeader("Cache-Control", "no-store");
       const body = await readBody(req);
       const action = asString(body.action);
+      const projectId = asString(body.projectId).trim() || undefined;
+      if (projectId) {
+        const name = projectPackageName(asString(body.id), projectId);
+        try {
+          if (action === "trust") {
+            await setProjectPluginTrust(projectId, name, true);
+            void auditProjectTrust(projectId);
+          } else if (action === "untrust") {
+            await setProjectPluginTrust(projectId, name, false);
+            void auditProjectTrust(projectId);
+          } else if (action === "enable") {
+            await setProjectPluginEnabled(projectId, name, true);
+          } else if (action === "disable") {
+            await setProjectPluginEnabled(projectId, name, false);
+          } else if (action !== "refresh") {
+            throw new HttpError(
+              400,
+              "Проектные плагины лежат в .projector/plugins: установка и удаление выполняются в проекте",
+            );
+          }
+        } catch (error) {
+          if (error instanceof HttpError) throw error;
+          throw new HttpError(400, error instanceof Error ? error.message : "Ошибка плагина");
+        }
+        json(res, 200, await catalogFor(projectId));
+        return;
+      }
       if (action === "refresh") json(res, 200, await discoverPlugins());
       else if (action === "enable") json(res, 200, await setPluginEnabled(asString(body.id), true));
       else if (action === "disable")

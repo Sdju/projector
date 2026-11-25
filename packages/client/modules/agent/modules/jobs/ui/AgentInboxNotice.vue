@@ -20,6 +20,7 @@ const KIND_LABELS: Record<TrustNotice["kind"], string> = {
   widgets: "виджеты",
   presets: "пресеты",
   devcontainer: "dev container",
+  plugins: "плагины",
 };
 
 const kind = computed(() => KIND_LABELS[props.notice.kind]);

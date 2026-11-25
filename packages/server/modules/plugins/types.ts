@@ -17,6 +17,11 @@ export interface PluginDiagnostic {
 
 export interface PluginInfo {
   id: string;
+  /** Manifest package name; differs from `id` for project plugins, whose id carries the project. */
+  packageName?: string;
+  /** `project` when the package was found in `.projector/plugins` of the named project. */
+  scope?: "user" | "project";
+  projectId?: string;
   version?: string;
   description?: string;
   status: PluginStatus;

@@ -12,7 +12,7 @@ import {
   setAppearanceThemes,
 } from "../appearance/index.ts";
 import { refreshClientAgents } from "../agents-integration/catalog/index.ts";
-import { applyRuntimeCatalog, runtimeIssues } from "../plugin-runtime/index.ts";
+import { refreshPluginRuntime, runtimeIssues } from "../plugin-runtime/index.ts";
 import { fetchPlugins, pluginAction, saveAppearance, type PluginCatalog } from "./client.ts";
 import {
   defaultPluginPageTab,
@@ -78,7 +78,8 @@ export function usePluginSettings() {
     // An agent plugin changes the chat catalog too; menus and tabs read it reactively.
     void refreshClientAgents();
     // Browser runtime follows the same catalog: trust, disable and hash changes take effect.
-    void applyRuntimeCatalog(next);
+    // A refresh keeps project packages active when settings are open inside a project.
+    void refreshPluginRuntime();
     if (selectedId.value && !next.plugins.some((item) => item.id === selectedId.value))
       selectedId.value = "";
   }

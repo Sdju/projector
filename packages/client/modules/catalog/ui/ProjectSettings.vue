@@ -13,6 +13,7 @@ import { shortcutKey } from "@ai-projector/core/modules/ide/index.ts";
 import { AgentProjectRoles } from "../../agent-roles/index.ts";
 import { AgentPresetsSettings } from "../../agent-presets/index.ts";
 import { ProjectWidgets } from "../../project-widgets/index.ts";
+import { ProjectPlugins } from "../../project-plugins/index.ts";
 import { ProjectAppearanceSettings } from "../../appearance/index.ts";
 import {
   projectSettingsSection as selected,
@@ -100,6 +101,17 @@ const sections = computed<SettingsSection[]>(() => [
       "Свои компоненты из .projector/widgets.json: шаблон, данные и формы. Файл действует только после доверия.",
     keywords: "виджеты widgets компоненты agent проект шаблон данные доверие trust",
     component: ProjectWidgets,
+    props: { project: props.project },
+  },
+  {
+    id: "plugins",
+    title: "Плагины проекта",
+    group: "Проект",
+    description:
+      "Пакеты из .projector/plugins: панели, вкладки, языки, агенты и HTTP. Код запускается только после доверия в проекте.",
+    keywords:
+      "плагины plugins расширения панели вкладки языки агенты http доверие trust .projector",
+    component: ProjectPlugins,
     props: { project: props.project },
   },
   {

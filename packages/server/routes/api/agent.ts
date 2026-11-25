@@ -209,8 +209,12 @@ export const routes: RouteDefinition[] = [
     );
     json(res, 200, historyState(id, turns));
   }),
-  route("GET", "/api/agent/backends", ({ res }) => {
-    json(res, 200, { backends: listAgentBackends(), revision: agentCatalogRevision() });
+  route("GET", "/api/agent/backends", ({ res, url }) => {
+    const projectId = url.searchParams.get("projectId")?.trim() || undefined;
+    json(res, 200, {
+      backends: listAgentBackends(projectId),
+      revision: agentCatalogRevision(),
+    });
   }),
   route("GET", "/api/agent/modes", async ({ res }) => {
     json(res, 200, await modeState());

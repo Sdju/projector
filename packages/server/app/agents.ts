@@ -18,6 +18,7 @@ import {
 import { projectorBackend } from "../modules/agents/projector/index.ts";
 import {
   isPluginIconFile,
+  isProjectPluginId,
   type PluginAgentContribution,
 } from "@ai-projector/core/modules/plugins/index.ts";
 import {
@@ -188,7 +189,8 @@ async function applyPluginCatalog(candidates: PluginCandidate[]): Promise<Plugin
     pluginBalances.delete(plugin);
   }
   for (const plugin of pluginRoutePlugins()) {
-    if (active.has(plugin)) continue;
+    // Project routes are reconciled by project-plugins, not by the user-wide catalog.
+    if (isProjectPluginId(plugin) || active.has(plugin)) continue;
     dropPluginRoutes(plugin);
   }
 

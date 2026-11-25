@@ -1,7 +1,11 @@
 import { ref, type Component } from "vue";
 import type { AgentUsageWindowDefinition } from "@ai-projector/core/modules/usage-analytics/index.ts";
 import { hasIcon, registerIcon, type IconName } from "../../../common/icons/registry.ts";
-import { findRuntimeAgent, runtimeAgents } from "../../plugin-runtime/index.ts";
+import {
+  currentPluginProject,
+  findRuntimeAgent,
+  runtimeAgents,
+} from "../../plugin-runtime/index.ts";
 import { PluginCustomUsageIndicator } from "../usage/index.ts";
 import { iconFromSvg, iconNodesFromSvg } from "./icon.ts";
 import { readTodosPlan, type AgentPlanReader } from "./plan.ts";
@@ -16,8 +20,10 @@ export { readTodosPlan } from "./plan.ts";
  * the shared code reads this catalog instead of naming them.
  */
 export interface ClientAgent {
-  /** Backend id of the agent (`claude-code`). */
+  /** Backend id of the agent (`claude-code`); a project agent carries the project scope. */
   backend: string;
+  /** The project a project-plugin agent belongs to. */
+  projectId?: string;
   /** Terminal program that starts the agent (`claude`). */
   program: string;
   title: string;
@@ -48,6 +54,8 @@ export interface ClientAgent {
 
 /** The agents a plugin added at runtime; a local descriptor with the same id always wins. */
 const remote = new Set<string>();
+/** Fallback descriptors created from the server catalog, not the rich built-in/plugin ones. */
+const remoteOwned = new Set<string>();
 /** Local descriptors of plugin agents, kept even while the backend is absent. */
 const localPlugins = new Map<string, ClientAgent>();
 /** Bumped on every catalog change, so menus and settings computed from it stay live. */
@@ -106,7 +114,9 @@ function planFromRemote(item: RemoteAgent): AgentPlanReader | undefined {
 }
 
 /** Registers an agent; registering the same backend again replaces it and keeps the order. */
-export function registerClientAgent(agent: ClientAgent): void {
+export function registerClientAgent(agent: ClientAgent, options: { remote?: boolean } = {}): void {
+  if (options.remote) remoteOwned.add(agent.backend);
+  else remoteOwned.delete(agent.backend);
   if (agent.plugin) localPlugins.set(agent.backend, agent);
   agents.set(agent.backend, agent);
   revision.value++;
@@ -140,6 +150,7 @@ export function clientAgentPrograms(): string[] {
 
 interface RemoteAgent {
   id?: unknown;
+  projectId?: unknown;
   label?: unknown;
   caption?: unknown;
   icon?: unknown;
@@ -234,16 +245,22 @@ function withRemoteLaunch(agent: ClientAgent, item: RemoteAgent): ClientAgent {
  * agents keep their icons, plans and limits; only agents the client has never seen get a
  * fallback presentation. A removed plugin agent disappears from every menu on the next refresh.
  */
-export async function refreshClientAgents(): Promise<void> {
+let agentCatalogRequest = 0;
+
+export async function refreshClientAgents(
+  projectId: string = currentPluginProject(),
+): Promise<void> {
   if (typeof fetch !== "function") return;
+  const request = ++agentCatalogRequest;
   let backends: RemoteAgent[];
+  const query = projectId ? `?projectId=${encodeURIComponent(projectId)}` : "";
   try {
-    const response = await fetch("/api/agent/backends", {
+    const response = await fetch(`/api/agent/backends${query}`, {
       headers: { Accept: "application/json" },
     });
-    if (!response.ok) return;
+    if (!response.ok || request !== agentCatalogRequest) return;
     const body = (await response.json()) as { backends?: unknown };
-    if (!Array.isArray(body.backends)) return;
+    if (!Array.isArray(body.backends) || request !== agentCatalogRequest) return;
     backends = body.backends as RemoteAgent[];
   } catch {
     return;
@@ -265,8 +282,9 @@ export async function refreshClientAgents(): Promise<void> {
       seen.add(item.id);
       continue;
     }
-    if (existing && !remote.has(item.id)) {
-      // Local descriptors keep their icon and plan; the server only fills in missing limits.
+    if (existing && !remoteOwned.has(item.id)) {
+      // Built-in and local-plugin descriptors keep their components and icons on every refresh;
+      // only their limits are filled from the server.
       const next = withRemoteLaunch(
         withRemoteUsage(existing, item, existing.title, existing.icon),
         item,
@@ -282,25 +300,30 @@ export async function refreshClientAgents(): Promise<void> {
     const icon = iconFromRemote(item, item.id);
     const plan = planFromRemote(item);
     const usageProps = usagePropsOf(item, label, icon);
-    registerClientAgent({
-      backend: item.id,
-      program: typeof item.program === "string" && item.program ? item.program : item.id,
-      title: label,
-      caption:
-        typeof item.caption === "string" && item.caption
-          ? item.caption
-          : `Запустит агента ${label}`,
-      icon,
-      ...(plan ? { plan } : {}),
-      ...(item.launch === true ? { launch: true } : {}),
-      ...(usageProps ? { usageUrl: usageProps.usageUrl as string, usageProps } : {}),
-    });
+    registerClientAgent(
+      {
+        backend: item.id,
+        ...(typeof item.projectId === "string" ? { projectId: item.projectId } : {}),
+        program: typeof item.program === "string" && item.program ? item.program : item.id,
+        title: label,
+        caption:
+          typeof item.caption === "string" && item.caption
+            ? item.caption
+            : `Запустит агента ${label}`,
+        icon,
+        ...(plan ? { plan } : {}),
+        ...(item.launch === true ? { launch: true } : {}),
+        ...(usageProps ? { usageUrl: usageProps.usageUrl as string, usageProps } : {}),
+      },
+      { remote: true },
+    );
   }
   let removed = false;
   for (const id of remote) {
     if (seen.has(id)) continue;
     if (!agents.get(id)?.builtin) {
       agents.delete(id);
+      remoteOwned.delete(id);
       removed = true;
     }
   }
@@ -309,6 +332,7 @@ export async function refreshClientAgents(): Promise<void> {
   for (const [id, agent] of agents)
     if (agent.plugin && !seen.has(id)) {
       agents.delete(id);
+      remoteOwned.delete(id);
       removed = true;
     }
   if (removed) revision.value++;

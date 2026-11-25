@@ -5,6 +5,7 @@ import { devcontainerTrustDescriptor } from "../devcontainer/index.ts";
 import { projectAppearanceTrustDescriptor } from "../project-appearance/index.ts";
 import { loadProjects } from "../projects/index.ts";
 import { projectWidgetTrustDescriptor } from "../project-widgets/index.ts";
+import { projectPluginsTrustDescriptor } from "../project-plugins/index.ts";
 import type { ProjectTrustDescriptor } from "../trusted-project-file/index.ts";
 import {
   readTrustNotices,
@@ -21,6 +22,7 @@ const sources: readonly ProjectTrustDescriptor[] = [
   projectRoleTrustDescriptor,
   projectWidgetTrustDescriptor,
   projectPresetTrustDescriptor,
+  projectPluginsTrustDescriptor,
   devcontainerTrustDescriptor,
 ];
 

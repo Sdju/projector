@@ -4,6 +4,7 @@ export {
   acpPrograms,
   hasAcpProgram,
   registerAcpProgram,
+  unregisterAcpProgram,
   type AcpFormAdapter,
   type AcpFormField,
   type AcpFormOption,

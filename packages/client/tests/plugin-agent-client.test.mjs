@@ -6,6 +6,7 @@ import { findRuntimeAgent, runtimeAgents, runtimeIssues } from "../modules/plugi
 import {
   clientAgentByBackend,
   readTodosPlan,
+  refreshClientAgents,
   registerClientAgent,
 } from "../modules/agents-integration/catalog/index.ts";
 import { PluginCustomUsageIndicator } from "../modules/agents-integration/usage/index.ts";
@@ -112,6 +113,44 @@ test("api.agents.register contributes plan, tool labels and usage until dispose"
   expect(clientAgentByBackend("acme-bot").plan).toBeUndefined();
   scope.dispose();
   expect(runtimeAgents.value).toEqual([]);
+});
+
+test("repeated agent catalog refreshes keep built-in usage components", async () => {
+  const Usage = () => null;
+  registerClientAgent({
+    backend: "codex-refresh-test",
+    program: "codex-refresh-test",
+    title: "Codex refresh test",
+    caption: "Проверка сохранения индикатора",
+    icon: "terminal",
+    usage: Usage,
+    usageUrl: "/api/codex-refresh-test/usage",
+  });
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () =>
+    new Response(
+      JSON.stringify({
+        backends: [
+          {
+            id: "codex-refresh-test",
+            label: "Codex refresh test",
+            program: "codex-refresh-test",
+            usageUrl: "/api/codex-refresh-test/usage",
+          },
+        ],
+        revision: 1,
+      }),
+      { status: 200, headers: { "Content-Type": "application/json" } },
+    );
+  try {
+    await refreshClientAgents("");
+    await refreshClientAgents("another-project");
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+  const agent = clientAgentByBackend("codex-refresh-test");
+  expect(agent.usage).toBe(Usage);
+  expect(agent.usageUrl).toBe("/api/codex-refresh-test/usage");
 });
 
 test("readTodosPlan keeps activeForm and a generic active string", () => {

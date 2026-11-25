@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import ProjectorIcon from "../../common/icons/ProjectorIcon.vue";
 import UiMessage from "../../common/ui/UiMessage.vue";
-import { computed, h, ref, watch } from "vue";
+import { computed, h, onBeforeUnmount, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import {
   useProjects,
@@ -39,6 +39,8 @@ import { bindProjectAppearance } from "../../modules/appearance/index.ts";
 import UiButton from "../../common/ui/UiButton.vue";
 import { projectInitPrompt, requestChatTab, useAgent } from "../../modules/agent/index.ts";
 import { settingsTabViews } from "../../modules/app-settings/index.ts";
+import { currentPluginProject, setPluginProject } from "../../modules/plugin-runtime/index.ts";
+import { refreshClientAgents } from "../../modules/agents-integration/catalog/index.ts";
 
 const route = useRoute();
 const router = useRouter();
@@ -87,6 +89,14 @@ const tabViews = computed<TabViews>(() => {
 
 const projectId = ref("");
 const workspace = ref<InstanceType<typeof ProjectWorkspace>>();
+/** Project packages follow the open project; user-wide plugins stay active everywhere. */
+async function syncProjectPlugins(id: string) {
+  await setPluginProject(id);
+  // A late reset from the previous project must not remove the next project's agents.
+  if (currentPluginProject() === id) await refreshClientAgents(id);
+}
+watch(projectId, (id) => void syncProjectPlugins(id), { immediate: true });
+onBeforeUnmount(() => void syncProjectPlugins(""));
 // Registered even without a repository so the agent always sees a stable command; disabled until then.
 const githubCommands = useCommandScope("project:github", () => ({
   surface: "project",

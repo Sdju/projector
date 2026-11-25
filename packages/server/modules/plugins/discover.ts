@@ -61,7 +61,7 @@ async function managedCandidates(): Promise<Candidate[]> {
 async function directCandidates(): Promise<Candidate[]> {
   const result: Candidate[] = [];
   for (const path of await directoriesAt(pluginsDirectory())) {
-    if (["packages", "data"].includes(basename(path))) continue;
+    if (["packages", "data", "projects"].includes(basename(path))) continue;
     try {
       if ((await lstat(join(path, "package.json"))).isFile())
         result.push({ path, source: "direct" });
@@ -122,6 +122,8 @@ export async function discoverPlugins(): Promise<PluginCatalog> {
     if (selected.length !== 1 || uniqueSources.size !== versions.length) {
       plugins.push({
         id,
+        packageName: id,
+        scope: "user",
         status: "error",
         enabled: false,
         trusted: false,
@@ -172,6 +174,8 @@ export async function discoverPlugins(): Promise<PluginCatalog> {
         });
       plugins.push({
         id,
+        packageName: id,
+        scope: "user",
         version: loaded.manifest.version,
         description: loaded.manifest.description,
         path: selected[0].candidate.path,
@@ -203,6 +207,8 @@ export async function discoverPlugins(): Promise<PluginCatalog> {
     } catch (error) {
       plugins.push({
         id,
+        packageName: id,
+        scope: "user",
         status: "error",
         enabled: false,
         trusted: false,
@@ -226,6 +232,8 @@ export async function discoverPlugins(): Promise<PluginCatalog> {
     if (!grouped.has(id))
       plugins.push({
         id,
+        packageName: id,
+        scope: "user",
         version: saved.version,
         status: "missing",
         enabled: saved.enabled,

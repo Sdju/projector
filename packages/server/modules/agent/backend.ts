@@ -185,6 +185,8 @@ export type AgentUsageProvider = AgentUsageCommandProvider | AgentUsageFunctionP
  */
 export interface AgentBackend {
   id: AgentBackendId;
+  /** Set for an agent a project plugin brings: it is listed and may run only in that project. */
+  projectId?: string;
   /** Human label for the chat header, the settings and the feature switches. */
   label: string;
   /** One line for the new-session menu; a plugin agent carries its own, built-ins keep theirs client-side. */

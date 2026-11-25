@@ -1,6 +1,7 @@
 /**
  * A system notification about a trust decision that no longer matches the file on disk. Both a
- * local plugin package and a project file (appearance, roles, widgets, presets, devcontainer) are
+ * local plugin package and a project file (appearance, roles, widgets, presets, devcontainer,
+ * project plugins) are
  * inert after their content changes, so the inbox must say what stopped working and where to
  * confirm it again.
  */
@@ -12,7 +13,8 @@ export type TrustNoticeKind =
   | "roles"
   | "widgets"
   | "presets"
-  | "devcontainer";
+  | "devcontainer"
+  | "plugins";
 
 /** A project file kind that carries its own trust hash. */
 export type ProjectTrustKind = Exclude<TrustNoticeKind, "plugin">;

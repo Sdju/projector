@@ -1,6 +1,7 @@
 import { computed, onBeforeUnmount, watchEffect } from "vue";
 import { defineTab, type SidebarType, type TabRegistry } from "../../workspace-api/index.ts";
 import type { SidebarHost, SidebarViews } from "./sidebar-views.ts";
+import { registerProjectPluginCommands } from "../../project-plugins/index.ts";
 import {
   PluginContributionMount,
   pluginPanelCommandId,
@@ -84,6 +85,7 @@ export interface PluginWorkspaceCommands {
 
 /** Adds plugin tab kinds, their open commands and plugin IDE commands for this workspace. */
 export function registerPluginWorkspaceCommands(host: PluginWorkspaceCommands): void {
+  registerProjectPluginCommands(host.registerEditor);
   const tabDisposers = new Map<string, () => void>();
   const commandDisposers = new Map<string, () => void>();
   const tabType = (contribution: (typeof runtimeTabs.value)[number]) => {

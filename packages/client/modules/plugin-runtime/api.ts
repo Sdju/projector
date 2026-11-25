@@ -2,10 +2,12 @@ import {
   isPluginHttpPath,
   externalThemeId,
   pluginCommandPrefix,
+  pluginHttpUrl,
   pluginPackageKey,
   pluginStorageFits,
   pluginStorageKey,
   pluginStorageMaxBytes,
+  projectPluginId,
   serializePluginStorageValue,
 } from "@ai-projector/core/modules/plugins/index.ts";
 import { PLUGIN_API_VERSION, type PluginApi } from "@ai-projector/plugin-api";
@@ -43,6 +45,8 @@ export function createApi(plugin: RuntimePluginInfo, scope: Scope): PluginApi {
   const assetUrl = assetUrlFactory(plugin.id, plugin.hash!);
   const commandPrefix = pluginCommandPrefix(plugin.id);
   const storagePath = storageUrl(plugin);
+  const scopedAgentId = (id: string) =>
+    plugin.projectId ? projectPluginId(plugin.projectId, id) : id;
   const languages = new Set(plugin.languages.map((item) => item.id));
   const panels = new Set(plugin.panels.map((item) => item.id));
   const tabs = new Set(plugin.tabs.map((item) => item.id));
@@ -85,8 +89,9 @@ export function createApi(plugin: RuntimePluginInfo, scope: Scope): PluginApi {
 
   return {
     apiVersion: PLUGIN_API_VERSION,
-    packageName: plugin.id,
+    packageName: plugin.packageName ?? plugin.id,
     packageVersion: plugin.version ?? "0.0.0",
+    ...(plugin.projectId ? { projectId: plugin.projectId } : {}),
     device: deviceBase().split("/")[2] ?? "",
     signal: scope.signal,
     assetUrl,
@@ -200,7 +205,11 @@ export function createApi(plugin: RuntimePluginInfo, scope: Scope): PluginApi {
         if (contribution.toolLabel !== undefined && typeof contribution.toolLabel !== "function")
           throw new Error(`Агент ${contribution.id}: toolLabel должен быть функцией`);
         registeredAgents.add(contribution.id);
-        const remove = addAgent(plugin.id, contribution, assetUrl);
+        const remove = addAgent(
+          plugin.id,
+          { ...contribution, id: scopedAgentId(contribution.id) },
+          assetUrl,
+        );
         scope.add(remove);
         return { dispose: remove };
       },
@@ -208,7 +217,7 @@ export function createApi(plugin: RuntimePluginInfo, scope: Scope): PluginApi {
     httpUrl(path) {
       assertActive();
       if (!isPluginHttpPath(path)) throw new Error("Некорректный путь маршрута плагина");
-      return deviceUrl(`/api/plugins/${pluginPackageKey(plugin.id)}/${path}`);
+      return deviceUrl(pluginHttpUrl(plugin.id, path));
     },
     storage: {
       async get(key) {

@@ -75,6 +75,14 @@ export {
   pluginReadmePath,
 } from "./asset.ts";
 export {
+  isProjectPluginId,
+  parseProjectPluginId,
+  pluginBasePath,
+  pluginHttpUrl,
+  projectPluginId,
+  type ProjectPluginRef,
+} from "./project.ts";
+export {
   parsePluginStorage,
   pluginStorageBytes,
   pluginStorageFits,

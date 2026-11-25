@@ -14,6 +14,10 @@ export type PluginStatus = "enabled" | "disabled" | "error" | "missing";
 
 export interface PluginInfo {
   id: string;
+  /** Manifest name; project entries carry a scoped `id`. */
+  packageName?: string;
+  scope?: "user" | "project";
+  projectId?: string;
   version?: string;
   description?: string;
   status: PluginStatus;

@@ -23,7 +23,11 @@ import {
 import { trustedProjectWidgets } from "../../project-widgets/index.ts";
 import { addPluginRoute, type PluginRouteRegistration } from "../../plugin-routes/index.ts";
 import { assertUsageNetworkContext } from "../../network/index.ts";
-import { type PluginHttpContribution } from "@ai-projector/core/modules/plugins/index.ts";
+import {
+  parseProjectPluginId,
+  projectPluginId,
+  type PluginHttpContribution,
+} from "@ai-projector/core/modules/plugins/index.ts";
 import { renderWidgetGuide } from "@ai-projector/core/modules/widget-catalog/index.ts";
 import { clearSessionEnv } from "@ai-projector/core/modules/os/index.ts";
 import { ideMcpServer } from "../ide-mcp/index.ts";
@@ -264,10 +268,26 @@ export async function loadCodeAgents(
     }
   };
   const requireEntry = createRequire(entry);
+  const project = options.plugin ? parseProjectPluginId(options.plugin) : null;
+  const scopedCreateAcpBackend: typeof createAcpBackend = project
+    ? (program) => {
+        const scopedId = projectPluginId(project.projectId, program.id);
+        return createAcpBackend({
+          ...program,
+          id: scopedId,
+          terminal: {
+            program: program.id,
+            executable: program.id,
+            title: program.label,
+            ...program.terminal,
+          },
+        });
+      }
+    : createAcpBackend;
   const api: PluginCodeApi = {
     version: 1,
     require: (specifier) => requireEntry(specifier) as unknown,
-    createAcpBackend,
+    createAcpBackend: scopedCreateAcpBackend,
     acp: {
       createPlainDialect,
       extendPlainDialect,

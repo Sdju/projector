@@ -12,6 +12,7 @@ import { projectAppUrl } from "@ai-projector/core/modules/app-paths/index.ts";
 import { HttpError } from "../../../../modules/http/index.ts";
 import { isLocalRequest } from "../../../../modules/access/index.ts";
 import { auditProjectTrust } from "../../../../modules/project-trust/index.ts";
+import { clearProjectPluginCode } from "../../../../modules/project-plugins/index.ts";
 import {
   devcontainerState,
   decideDevcontainer,
@@ -78,6 +79,7 @@ export const routes: RouteDefinition[] = [
       if (!project) return;
       stopProject(context.params.id);
       closeProjectTerminals(context.params.id);
+      clearProjectPluginCode(context.params.id);
       await updateProjects((current) => {
         const currentIndex = current.findIndex((item) => item.id === context.params.id);
         if (currentIndex !== -1) current.splice(currentIndex, 1);
@@ -119,6 +121,7 @@ export const routes: RouteDefinition[] = [
         if (duplicate) throw new HttpError(409, `Путь уже занят проектом «${duplicate.name}»`);
         stopProject(params.id);
         closeProjectTerminals(params.id);
+        clearProjectPluginCode(params.id);
         await updateProjects((current) => {
           const item = current.find((entry) => entry.id === params.id);
           if (!item) throw new HttpError(404, "Проект не найден");

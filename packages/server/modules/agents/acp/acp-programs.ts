@@ -140,6 +140,11 @@ export function registerAcpProgram(program: AcpProgram): void {
   programs.set(program.id, program);
 }
 
+/** Removes a dynamic (e.g. project-plugin) ACP program when its plugin is unloaded. */
+export function unregisterAcpProgram(id: AgentBackendId): void {
+  programs.delete(id);
+}
+
 export function acpProgram(id: AgentBackendId): AcpProgram {
   const program = programs.get(id);
   if (!program) throw new Error(`Неизвестный ACP-агент: ${id}`);

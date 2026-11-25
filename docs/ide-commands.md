@@ -110,6 +110,9 @@ The settings endpoint is `GET /api/ide/keybindings` and same-origin `PUT /api/id
 - `ide.plugins.install` `{ path? }` — устанавливает проверенный пакет из локальной папки; без `path` использует поле экрана. Темы включаются сразу, агент ждёт доверия.
 - `ide.plugins.rebuild` `{ path? }` — запускает `projector.build` в папке, устанавливает результат с заменой версии, подтверждает доверие и включает плагин. Выполняет код сборки из папки.
 - `ide.plugin.rebuild` `{ id }` — то же для папки, сохранённой при установке; без `id` берёт открытую карточку.
+
+Плагины проекта (`.projector/plugins`) входят в scope рабочего места проекта: `ide.project.plugins.list` возвращает пакеты, доверие, включённость и диагностику; `ide.project.plugins.trust` `{ id, trusted }`, `ide.project.plugins.enable` `{ id }` и `ide.project.plugins.disable` `{ id }` меняют решение и сразу обновляют browser-runtime и каталог агентов. Раздел настроек — **Проект → Настройки → Плагины проекта**.
+
 - `ide.plugins.folder.open` — открывает системный выбор папки и устанавливает выбранный пакет.
 
 ## Limits and tests

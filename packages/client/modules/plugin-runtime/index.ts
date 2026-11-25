@@ -5,6 +5,8 @@ export {
   applyRuntimeCatalog,
   initPluginRuntime,
   disposePluginRuntime,
+  currentPluginProject,
+  setPluginProject,
 } from "./runtime.ts";
 export {
   languageRevision,

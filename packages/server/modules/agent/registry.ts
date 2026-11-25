@@ -64,6 +64,8 @@ export function agentCatalogRevision(): number {
 /** A registered backend as the settings, the routes and the client see it. */
 export interface AgentBackendSummary {
   id: AgentBackendId;
+  /** Present when the agent belongs to a project plugin. */
+  projectId?: string;
   label: string;
   caption?: string;
   icon?: string;
@@ -79,41 +81,48 @@ export interface AgentBackendSummary {
   usageWindows?: readonly AgentUsageWindowDefinition[];
 }
 
-/** Every registered backend in registration order, without its methods. */
-export function listAgentBackends(): AgentBackendSummary[] {
-  return [...backends.values()].map(
-    ({
-      id,
-      label,
-      caption,
-      icon,
-      iconSvg,
-      plan,
-      program,
-      terminal,
-      launch,
-      builtin,
-      defaultFeatures,
-      capabilities,
-      usageUrl,
-      usageWindows,
-    }) => ({
-      id,
-      label,
-      ...(caption ? { caption } : {}),
-      ...(icon ? { icon } : {}),
-      ...(iconSvg ? { iconSvg } : {}),
-      ...(plan?.tools.length ? { plan } : {}),
-      ...(program ? { program } : {}),
-      ...(terminal ? { terminal } : {}),
-      ...(launch ? { launch } : {}),
-      ...(builtin ? { builtin } : {}),
-      ...(defaultFeatures?.length ? { defaultFeatures } : {}),
-      ...(capabilities ? { capabilities } : {}),
-      ...(usageUrl ? { usageUrl } : {}),
-      ...(usageWindows?.length ? { usageWindows } : {}),
-    }),
-  );
+/**
+ * Every registered backend in registration order, without its methods. Without a project only
+ * user-wide agents are listed: a project plugin must not leak into another project's menu.
+ */
+export function listAgentBackends(projectId?: string): AgentBackendSummary[] {
+  return [...backends.values()]
+    .filter((backend) => !backend.projectId || backend.projectId === projectId)
+    .map(
+      ({
+        id,
+        projectId: owner,
+        label,
+        caption,
+        icon,
+        iconSvg,
+        plan,
+        program,
+        terminal,
+        launch,
+        builtin,
+        defaultFeatures,
+        capabilities,
+        usageUrl,
+        usageWindows,
+      }) => ({
+        id,
+        ...(owner ? { projectId: owner } : {}),
+        label,
+        ...(caption ? { caption } : {}),
+        ...(icon ? { icon } : {}),
+        ...(iconSvg ? { iconSvg } : {}),
+        ...(plan?.tools.length ? { plan } : {}),
+        ...(program ? { program } : {}),
+        ...(terminal ? { terminal } : {}),
+        ...(launch ? { launch } : {}),
+        ...(builtin ? { builtin } : {}),
+        ...(defaultFeatures?.length ? { defaultFeatures } : {}),
+        ...(capabilities ? { capabilities } : {}),
+        ...(usageUrl ? { usageUrl } : {}),
+        ...(usageWindows?.length ? { usageWindows } : {}),
+      }),
+    );
 }
 
 /** Whether a request names an agent this server has registered. */
@@ -233,6 +242,8 @@ export async function loadAgentSession(id: string | undefined, cwd: string, sess
 export async function runAgent(options: AgentRunOptions): Promise<void> {
   // Backends the user switched off in the settings refuse new runs, from chats and jobs alike.
   const backend = backendFor(options.backend);
+  if (backend.projectId && backend.projectId !== options.projectId)
+    throw new Error("Агент доступен только в проекте, который его подключил");
   if ((await preferences()).disabledAgents.includes(backend.id))
     throw new Error("Этот агент отключён в настройках Projector");
   await backend.run(options);

@@ -232,6 +232,8 @@ export interface PluginApi {
   readonly apiVersion: PluginApiVersion;
   readonly packageName: string;
   readonly packageVersion: string;
+  /** The project that keeps this package in `.projector/plugins`, when it is not user-wide. */
+  readonly projectId?: string;
   readonly device: string;
   /** URL relative to the browser entry directory; relative paths only. */
   assetUrl(relative: string): string;

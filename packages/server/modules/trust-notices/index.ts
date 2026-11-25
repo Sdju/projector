@@ -20,6 +20,7 @@ const PROJECT_FILES: Record<ProjectTrustKind, { label: string; file: string; sec
   widgets: { label: "Виджеты", file: ".projector/widgets.json", section: "widgets" },
   presets: { label: "Пресеты", file: ".projector/presets.json", section: "presets" },
   devcontainer: { label: "Dev Container", file: "devcontainer.json" },
+  plugins: { label: "Плагины", file: ".projector/plugins", section: "plugins" },
 };
 
 export function trustNoticeFile(): string {
