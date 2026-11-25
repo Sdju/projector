@@ -6,6 +6,7 @@ export {
 } from "./lib/right-panel.ts";
 export { integrationTabViews, type TabViews, type TabView } from "./lib/tab-views.ts";
 export type { SidebarHost, SidebarView, SidebarViews } from "./lib/sidebar-views.ts";
+export { registerDockItem, type DockItem, type DockItemRegistration } from "./lib/dock-items.ts";
 export {
   EditorSettings,
   IssueView,

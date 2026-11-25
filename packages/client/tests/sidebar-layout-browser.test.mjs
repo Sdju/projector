@@ -8,10 +8,10 @@ const html = `<!doctype html>
 <div id="header-tools"></div><div id="app" style="height: 780px"></div>
 <script type="module">
   import "/packages/client/app/styles.css";
-  import { createApp, h } from "vue";
+  import { createApp, h, onMounted } from "vue";
   import { createMemoryHistory, createRouter } from "vue-router";
   import { provideIdeCommands } from "/packages/client/modules/ide/index.ts";
-  import { ProjectWorkspace } from "/packages/client/modules/workspace/index.ts";
+  import { ProjectWorkspace, registerDockItem } from "/packages/client/modules/workspace/index.ts";
   import { registerWorkspaceProfile, workspaceAside } from "/packages/client/modules/workspace-api/index.ts";
 
   const projectId = "sidebar-test";
@@ -32,6 +32,19 @@ const html = `<!doctype html>
         ? { root: "/tmp/sidebar-test" }
         : { entries: [], items: [], children: [], total: 0 },
     } },
+  });
+  window.dockWidgetMounts = 0;
+  registerDockItem({
+    id: "plugin:stateful",
+    title: "Stateful",
+    icon: "sparkles",
+    edge: "top",
+    component: {
+      setup() {
+        onMounted(() => window.dockWidgetMounts++);
+        return () => h("input", { id: "dock-stateful" });
+      },
+    },
   });
   const fetchApi = window.fetch.bind(window);
   window.fetch = (url, options) => {
@@ -73,7 +86,12 @@ const html = `<!doctype html>
   createApp({
     setup() {
       provideIdeCommands();
-      return () => h(ProjectWorkspace, { projectId, sidebarViews });
+      return () =>
+        h(
+          ProjectWorkspace,
+          { projectId, sidebarViews },
+          { "project-repository": () => h("button", { id: "repository-widget" }, "Repository") },
+        );
     },
   }).use(router).mount("#app");
   const sdk = window.projector.ide;
@@ -115,6 +133,7 @@ test(
     const filesLeft = section(left, "Файлы");
     const terminals = section(right, "Терминалы");
     await waitFor(browser, exists(terminals));
+    await waitFor(browser, exists('[data-item="action:project-repository"] #repository-widget'));
     await browser.evaluate('window.originalFileView = document.querySelector("#file-view")');
 
     const point = (selector, y = 0.5, x = 0.5) =>
@@ -199,9 +218,9 @@ test(
       sessionStorage.setItem("hidden-fixture", JSON.stringify(["toolbar:analytics", "sidebar:hidden-test"]));
     })()`);
     await browser.open(fixture.url("/__sidebar"));
-    const media = '.sortable-action button[aria-label="Генерация медиа"]';
-    const settings = '.sortable-action button[aria-label="Настройки Projector"]';
-    const analytics = '.sortable-action button[aria-label="Аналитика расхода"]';
+    const media = '[data-item="action:media"] button';
+    const settings = '[data-item="action:settings"] button';
+    const analytics = '[data-item="action:analytics"] button';
     const hidden = section(left, "Hidden");
     const anchor = section(left, "Anchor");
     const last = section(left, "Last");
@@ -224,14 +243,14 @@ test(
     const from = await point(settings);
     await mouse("mousePressed", from);
     await mouse("mouseMoved", { ...from, y: from.y + 8 });
-    await waitFor(browser, exists(".sortable-action.dragging"));
+    await waitFor(browser, exists(".dock-item.dragging"));
     const toolbarInsert = await point(media, 0.2, 0.2);
     await mouse("mouseMoved", toolbarInsert);
     await expect
       .poll(
         async () => {
           await mouse("mouseMoved", toolbarInsert);
-          return browser.evaluate(exists(".sortable-action.drop-before"));
+          return browser.evaluate(exists(".dock-item.drop-before"));
         },
         { timeout: 8000 },
       )
@@ -239,7 +258,7 @@ test(
     await mouse("mouseReleased", toolbarInsert);
     await waitFor(
       browser,
-      'JSON.parse(sessionStorage.getItem("order-fixture")).toolbar[0] === "settings"',
+      '(() => { const ids = JSON.parse(sessionStorage.getItem("order-fixture"))["dock-order"]; return ids.indexOf("action:settings") < ids.indexOf("action:media"); })()',
     );
 
     await browser.open(fixture.url("/__sidebar"));
@@ -248,6 +267,7 @@ test(
       `${exists(last)} && ${exists(settings)} && !${exists(hidden)} && !${exists(analytics)}`,
     );
     await browser.click('[data-command="ide.workbench.actions.hidden.toggle"]');
+    await waitFor(browser, exists('[aria-label="Вернуть «Аналитика расхода»"]'));
     await browser.click('[aria-label="Вернуть «Аналитика расхода»"]');
     await waitFor(browser, exists(analytics));
     await browser.click(`${left} [data-command="ide.workbench.section.hidden.toggle"]`);
@@ -255,12 +275,85 @@ test(
     await waitFor(browser, exists(hidden));
     const precedes = (first, second) =>
       `Boolean(document.querySelector(${JSON.stringify(first)}).compareDocumentPosition(document.querySelector(${JSON.stringify(second)})) & Node.DOCUMENT_POSITION_FOLLOWING)`;
-    expect(
-      await browser.evaluate(`${precedes(settings, analytics)} && ${precedes(analytics, media)}`),
-    ).toBe(true);
+    await waitFor(browser, `${precedes(analytics, settings)} && ${precedes(settings, media)}`);
     expect(await browser.evaluate(`${precedes(hidden, last)} && ${precedes(last, anchor)}`)).toBe(
       true,
     );
+
+    const launch = '[data-item="action:session"]';
+    await waitFor(browser, exists(launch));
+    await browser.evaluate(
+      'window.fixture.run("ide.workbench.dock.item.move", { edge: "top", align: "end", from: "action:settings", to: "action:session", after: false })',
+    );
+    await waitFor(
+      browser,
+      '(() => { const ids = JSON.parse(sessionStorage.getItem("order-fixture"))["dock-order"]; return ids.indexOf("action:settings") < ids.indexOf("action:session"); })()',
+    );
+
+    await browser.evaluate('window.originalDockWidget = document.querySelector("#dock-stateful")');
+    await browser.evaluate(
+      'window.fixture.run("ide.workbench.dock.item.place", { item: "plugin:stateful", edge: "bottom", align: "start" })',
+    );
+    await waitFor(browser, exists('.status-bar [data-item="plugin:stateful"] #dock-stateful'));
+    expect(
+      await browser.evaluate(
+        'document.querySelector("#dock-stateful") === window.originalDockWidget && window.dockWidgetMounts === 1',
+      ),
+    ).toBe(true);
+
+    const alignLeftFrom = await point(settings);
+    await mouse("mousePressed", alignLeftFrom);
+    await mouse("mouseMoved", { ...alignLeftFrom, y: alignLeftFrom.y + 8 });
+    await waitFor(browser, exists(".dock-item.dragging"));
+    const alignLeft = await point('.toolbar .dock-items[data-edge="top"][data-align="start"]');
+    await mouse("mouseMoved", alignLeft);
+    await mouse("mouseMoved", { ...alignLeft, x: alignLeft.x + 1 });
+    await mouse("mouseReleased", alignLeft);
+    await waitFor(
+      browser,
+      'JSON.parse(sessionStorage.getItem("order-fixture"))["dock:top:start"]?.includes("action:settings")',
+    );
+    await browser.open(fixture.url("/__sidebar"));
+    await waitFor(browser, `${exists(settings)} && ${precedes(settings, ".toolbar-spacer")}`);
+
+    const alignRightFrom = await point(settings);
+    await mouse("mousePressed", alignRightFrom);
+    await mouse("mouseMoved", { ...alignRightFrom, y: alignRightFrom.y + 8 });
+    await waitFor(browser, exists(".dock-item.dragging"));
+    const alignRight = await point('.toolbar .dock-items[data-edge="top"][data-align="end"]');
+    await mouse("mouseMoved", alignRight);
+    await mouse("mouseMoved", { ...alignRight, x: alignRight.x + 1 });
+    await mouse("mouseReleased", alignRight);
+    await waitFor(
+      browser,
+      'JSON.parse(sessionStorage.getItem("order-fixture"))["dock:top:end"]?.includes("action:settings")',
+    );
+    await browser.open(fixture.url("/__sidebar"));
+    await waitFor(browser, `${exists(settings)} && ${precedes(".toolbar-spacer", settings)}`);
+
+    await startDrag(last);
+    const alignEnd = await point(`${left} .rail-align-drop[data-align="end"]`);
+    await mouse("mouseMoved", alignEnd);
+    await mouse("mouseMoved", { ...alignEnd, y: alignEnd.y + 1 });
+    await mouse("mouseReleased", alignEnd);
+    await waitFor(
+      browser,
+      'JSON.parse(sessionStorage.getItem("order-fixture"))["sidebar-align:sidebar-test"]?.includes("end:last-test")',
+    );
+    await browser.open(fixture.url("/__sidebar"));
+    await waitFor(browser, `${exists(last)} && ${precedes(`${left} .rail-divider`, last)}`);
+
+    await startDrag(last);
+    const alignStart = await point(`${left} .rail-align-drop[data-align="start"]`);
+    await mouse("mouseMoved", alignStart);
+    await mouse("mouseMoved", { ...alignStart, y: alignStart.y + 1 });
+    await mouse("mouseReleased", alignStart);
+    await waitFor(
+      browser,
+      'JSON.parse(sessionStorage.getItem("order-fixture"))["sidebar-align:sidebar-test"]?.includes("start:last-test")',
+    );
+    await browser.open(fixture.url("/__sidebar"));
+    await waitFor(browser, `${exists(last)} && ${precedes(last, `${left} .rail-divider`)}`);
     expect(browser.errors.filter((error) => "exception" in error)).toEqual([]);
   },
 );

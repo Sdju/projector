@@ -10,7 +10,7 @@ import { useCommandScope } from "../../../common/utilities/commands.ts";
 import { useIslandMenu } from "../../../common/utilities/island-menu.ts";
 import { useHiddenActions } from "../lib/hidden-actions.ts";
 import { useActionDrag } from "../lib/action-drag.ts";
-import type { SidebarLayout, SidebarSide } from "../lib/sidebar-layout.ts";
+import type { SidebarAlign, SidebarLayout, SidebarSide } from "../lib/sidebar-layout.ts";
 import { groupSidebar } from "../../workspace-api/index.ts";
 
 export interface SidebarItem {
@@ -83,6 +83,22 @@ const emptyDrop = computed(
     layout.canMove(dragging.value.id, props.side) &&
     !groups.value.some(({ id }) => layout.canMove(dragging.value!.id, props.side, id)),
 );
+function canAlignDrop(align: SidebarAlign): boolean {
+  const item = dragging.value;
+  return !!item && layout.canAlign(item.id) && layout.alignOf(item.id) !== align;
+}
+function alignDragOver(event: DragEvent, align: SidebarAlign) {
+  if (!canAlignDrop(align)) return;
+  event.preventDefault();
+  if (event.dataTransfer) event.dataTransfer.dropEffect = "move";
+}
+function alignDrop(event: DragEvent, align: SidebarAlign) {
+  const item = dragging.value;
+  if (!item || !canAlignDrop(align)) return;
+  event.preventDefault();
+  emit("command", "ide.workbench.section.align", { section: item.id, align });
+  endDrag();
+}
 const keyFor = (id: string) => `sidebar:${id}`;
 const settingsItem: SidebarItem = {
   id: "project-settings",
@@ -102,17 +118,18 @@ const groups = computed(() => {
     .map(([root, ...children]) => ({
       id: root!.id,
       utility: !!root!.utility,
+      align: layout.alignOf(root!.id),
       items: [root!, ...children].filter(
         (item) => !props.vertical || !visibility.hidden.value.includes(keyFor(item.id)),
       ),
     }))
     .filter((group) => group.items.length);
   return [
-    ...layout.sort(all.filter((group) => !group.utility)),
-    ...layout.sort(all.filter((group) => group.utility)),
+    ...layout.sort(all.filter((group) => group.align === "start")),
+    ...layout.sort(all.filter((group) => group.align === "end")),
   ];
 });
-const firstUtility = computed(() => groups.value.find((group) => group.utility));
+const firstEnd = computed(() => groups.value.find((group) => group.align === "end"));
 const ordered = computed(() => groups.value.flatMap((group) => group.items));
 const current = computed(() => ordered.value.find((item) => item.id === props.section));
 const otherBadges = computed(() =>
@@ -164,6 +181,25 @@ const menuItems = computed<ContextMenuItem[]>(() => {
               emit("command", "ide.workbench.section.move", {
                 from: item.id,
                 side: oppositeSide.value,
+              }),
+          },
+        ]
+      : []),
+    ...(layout.canAlign(item.id)
+      ? [
+          {
+            id: "section.align",
+            label: layout.alignOf(item.id) === "start" ? "Вниз" : "Наверх",
+            icon: layout.alignOf(item.id) === "start" ? "arrow-down" : "arrow-up",
+            command: "ide.workbench.section.align",
+            args: {
+              section: item.id,
+              align: layout.alignOf(item.id) === "start" ? "end" : "start",
+            },
+            run: () =>
+              emit("command", "ide.workbench.section.align", {
+                section: item.id,
+                align: layout.alignOf(item.id) === "start" ? "end" : "start",
               }),
           },
         ]
@@ -280,8 +316,18 @@ function choose(item: SidebarItem) {
     </button>
   </UiIsland>
   <nav v-else class="side-tabs vertical" :aria-label="label ?? 'Разделы проекта'">
+    <div
+      v-if="dragging && canAlignDrop('start')"
+      class="rail-align-drop"
+      data-align="start"
+      title="Переместить наверх"
+      @dragover="alignDragOver($event, 'start')"
+      @drop.stop="alignDrop($event, 'start')"
+    >
+      <ProjectorIcon name="arrow-up" aria-hidden="true" />
+    </div>
     <template v-for="group in groups" :key="group.id">
-      <i v-if="group === firstUtility" class="rail-divider" aria-hidden="true" />
+      <i v-if="group === firstEnd" class="rail-divider" aria-hidden="true" />
       <div
         class="side-group"
         :class="{
@@ -326,6 +372,7 @@ function choose(item: SidebarItem) {
       @dragleave="dragLeave"
       @drop.stop="drop($event, undefined)"
     />
+    <i v-if="!firstEnd" class="rail-divider" aria-hidden="true" />
     <span :ref="overflow.trigger" class="overflow-trigger">
       <UiButton
         shape="icon"
@@ -354,6 +401,16 @@ function choose(item: SidebarItem) {
       >
         <ProjectorIcon name="sliders-horizontal" aria-hidden="true" />
       </UiButton>
+    </div>
+    <div
+      v-if="dragging && canAlignDrop('end')"
+      class="rail-align-drop"
+      data-align="end"
+      title="Переместить вниз"
+      @dragover="alignDragOver($event, 'end')"
+      @drop.stop="alignDrop($event, 'end')"
+    >
+      <ProjectorIcon name="arrow-down" aria-hidden="true" />
     </div>
   </nav>
   <UiIsland v-if="vertical" :menu="overflow" label="Скрытые разделы" :width="280">
@@ -415,6 +472,21 @@ function choose(item: SidebarItem) {
   min-height: 28px;
   flex-shrink: 0;
   border: 1px dashed var(--line-strong);
+}
+.rail-align-drop {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  min-height: 28px;
+  flex-shrink: 0;
+  border: 1px dashed var(--focus);
+  border-radius: var(--r-md);
+  color: var(--focus);
+}
+.rail-align-drop svg {
+  width: 14px;
+  height: 14px;
 }
 .side-group.dragging {
   opacity: 0.4;

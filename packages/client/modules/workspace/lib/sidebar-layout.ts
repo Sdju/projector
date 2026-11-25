@@ -10,6 +10,7 @@ import { useHiddenActions } from "./hidden-actions.ts";
 import { reorderVisible, useActionOrder } from "./action-order.ts";
 
 export type SidebarSide = "left" | "right";
+export type SidebarAlign = "start" | "end";
 
 interface SidebarMove {
   from: string;
@@ -27,6 +28,7 @@ function createSidebarLayout(options: {
 }) {
   const legacy = useActionOrder("sidebar");
   const saved = useActionOrder(() => `sidebar-layout:${options.projectId()}`);
+  const alignment = useActionOrder(() => `sidebar-align:${options.projectId()}`);
   const visibility = useHiddenActions();
   const visible = (group: { members: string[] }) =>
     group.members.some((id) => !visibility.hidden.value.includes(`sidebar:${id}`));
@@ -39,6 +41,23 @@ function createSidebarLayout(options: {
     })),
   );
   const groupOf = (id: string) => groups.value.find((group) => group.members.includes(id));
+  const alignOf = (id: string): SidebarAlign => {
+    const group = groupOf(id);
+    if (!group) return "end";
+    const end = alignment.order.value.includes(`end:${group.id}`);
+    const start = alignment.order.value.includes(`start:${group.id}`);
+    return end ? "end" : start ? "start" : group.utility ? "end" : "start";
+  };
+  async function align(id: string, value: SidebarAlign) {
+    const group = groupOf(id);
+    if (!group) return;
+    await alignment.update((order) => {
+      const ids = order.filter(
+        (entry) => entry !== `start:${group.id}` && entry !== `end:${group.id}`,
+      );
+      return [...ids, `${value}:${group.id}`];
+    });
+  }
   const entry = (side: SidebarSide, id: string) => `${side}:${id}`;
   function assigned(id: string, order = saved.order.value): SidebarSide {
     return options.right.has(id) || order.includes(entry("right", id)) ? "right" : "left";
@@ -124,7 +143,16 @@ function createSidebarLayout(options: {
     });
     return transferred;
   }
-  return { drag, sideOf, sort, canMove, move };
+  return {
+    drag,
+    sideOf,
+    sort,
+    canMove,
+    move,
+    alignOf,
+    align,
+    canAlign: (id: string) => !!groupOf(id),
+  };
 }
 
 export type SidebarLayout = ReturnType<typeof createSidebarLayout>;
@@ -222,6 +250,29 @@ export function useWorkspaceSidebarLayout(options: {
         side: "Сторона назначения (left или right). Без стороны сортирует текущую панель.",
         to: "Идентификатор соседней группы. Без него переносит в конец.",
         after: "Поместить после соседней группы",
+      },
+    },
+  );
+  options.register(
+    "ide.workbench.section.align",
+    "Выравнять раздел боковой панели",
+    async (value) => {
+      const { section, align } = commandArgs(value);
+      if (
+        typeof section !== "string" ||
+        (align !== "start" && align !== "end") ||
+        !layout.canAlign(section)
+      )
+        throw new Error("Укажите section и align: start или end");
+      await layout.align(section, align);
+    },
+    () => true,
+    undefined,
+    {
+      description: "Переносит группу разделов в верхнюю или нижнюю часть вертикальной панели.",
+      arguments: {
+        section: "Идентификатор раздела",
+        align: "start (сверху) или end (снизу)",
       },
     },
   );

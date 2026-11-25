@@ -27,6 +27,8 @@ import { registerEditorCommands } from "../lib/editor-commands.ts";
 import { useWorkspaceSession } from "../lib/workspace-session.ts";
 import WorkbenchDock from "./WorkbenchDock.vue";
 import StatusBar from "./StatusBar.vue";
+import DockWidgets from "./DockWidgets.vue";
+import { useDockWorkspace } from "../lib/dock-commands.ts";
 import type { DockTarget } from "../../dock/index.ts";
 import { type OpenFile } from "../open-file.ts";
 import {
@@ -65,8 +67,8 @@ const props = defineProps<{
   sidebarViews?: SidebarViews;
   asideViews?: SidebarViews;
 }>();
-const profile = workspaceProfile(props.projectId);
-const capabilities = profileCapabilities(profile);
+const profile = workspaceProfile(props.projectId),
+  capabilities = profileCapabilities(profile);
 const tabTypes = useWorkspaceTabTypes(profile, props.tabViews, {
   project: {
     dirty: () => !!props.projectSettingsDirty,
@@ -74,8 +76,8 @@ const tabTypes = useWorkspaceTabTypes(profile, props.tabViews, {
     save: () => props.saveProjectSettings?.(),
   },
 });
-const workspaceElement = ref<HTMLElement>();
-const sidebarHidden = ref(false);
+const workspaceElement = ref<HTMLElement>(),
+  sidebarHidden = ref(false);
 const { mobile, mobileSurface, mobileSidebarOpen, sidebarInvisible, showSidebar } =
   useMobileSurfaces(sidebarHidden);
 const { treeWidth, asideWidth, sizes, resizeTree, resizeTreeKey, resizeAside, resizeAsideKey } =
@@ -109,7 +111,7 @@ const registerEditor = (
     run,
     enabled: (args) => (!requires || capabilities[requires]) && enabled(args),
   });
-// The agent chats are tabs that come and go; their commands live as long as this workspace.
+useDockWorkspace(registerEditor, () => tabTypes.has("inbox"));
 registerAgentCommands(registerEditor, props.projectId);
 registerProjectWidgetCommands(editorCommands.scope, () => props.projectId);
 function treeChanged() {
@@ -684,7 +686,19 @@ onBeforeUnmount(() => {
       @cancel="terminals.cancelClose"
       @confirm="terminals.confirmClose"
     />
-    <StatusBar v-if="!mobile" v-show="!zenMode" :inert="zenMode" class="workspace-status" />
+    <StatusBar
+      v-if="!mobile"
+      v-show="!zenMode"
+      :inert="zenMode"
+      :inbox="tabTypes.has('inbox')"
+      class="workspace-status"
+      @command="(id, args) => editorCommands.run(id, args)"
+    />
+    <DockWidgets
+      :inbox="tabTypes.has('inbox')"
+      :mobile="mobile"
+      @command="(id, args) => editorCommands.run(id, args)"
+    />
     <UiButton
       v-if="zenMode"
       shape="icon"

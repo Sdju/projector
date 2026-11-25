@@ -108,6 +108,10 @@ export default {
       largeFiles: {
         thresholds: { default: 400, ".vue": 500 },
         files: {
+          "packages/client/modules/workspace/ui/ProjectWorkspace.vue": {
+            ceiling: 502,
+            plan: "Вынести связку Git, поиска и сессий рабочей области в отдельные композаблы",
+          },
           "packages/server/modules/gitlab/browser.ts": {
             ceiling: 402,
             plan: "Вынести чтение файлов и ассетов GitLab в отдельный files.ts",
