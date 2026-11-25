@@ -275,7 +275,7 @@ export function createAcpEventMapper(
     },
     /** The answer held a background task that can wake the agent into another step. */
     get hadBackground() {
-      return background.held;
+      return background.held || dialect.needsFollowUp?.() === true;
     },
     /** Whether the hosted ACP process must outlive this connection (wait and/or keep-alive). */
     get keepsProcess() {

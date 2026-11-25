@@ -18,6 +18,7 @@ export interface AcpSettleOptions {
   answer: AcpAnswer;
   program: AcpProgram;
   followUp?: AcpFollowUp;
+  onUpdate?: (update: Record<string, unknown>) => void;
   disconnected?: AbortSignal;
   incomingActivity?: AcpFollowUpOptions["incomingActivity"];
   options: Pick<AgentRunOptions, "abort" | "run" | "emit">;
@@ -62,6 +63,7 @@ export async function settleAcpAnswer(options: AcpSettleOptions): Promise<boolea
     signal,
     pending: () => answer.pollBackground(),
     incomingActivity: options.incomingActivity,
+    onUpdate: options.onUpdate,
     onStart: () => {
       if (!abort?.aborted)
         emit("status", { phase: "thinking", provider: program.label, model: "" });
@@ -78,6 +80,7 @@ export async function settleAcpAnswer(options: AcpSettleOptions): Promise<boolea
       added: [],
       ...(result.status === "superseded" ? { stopped: true } : {}),
     });
+    if (program.exclusiveSession) return answer.keepsProcess;
   }
   return true;
 }

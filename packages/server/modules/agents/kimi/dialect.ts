@@ -13,8 +13,15 @@ import {
 const readsFile = (update: AcpUpdate) =>
   update.kind === "read" || (typeof update.title === "string" && /^Reading\b/i.test(update.title));
 
+/** A shell tool call (`Bash`): its `run_in_background` flag must never classify it as `Agent`. */
+function isShellCall(update: AcpUpdate): boolean {
+  const input = inputOf(update);
+  return typeof input.command === "string" || update.kind === "execute";
+}
+
 /** Kimi's `Agent` tool: title is usually `Agent`, input carries the subagent fields. */
 function agentInput(update: AcpUpdate) {
+  if (isShellCall(update)) return undefined;
   const input = inputOf(update);
   const titled = update.title === "Agent";
   const background = input.run_in_background === true;
@@ -36,6 +43,19 @@ function agentInput(update: AcpUpdate) {
     ...(subagent ? { subagent } : {}),
     ...(typeof input.prompt === "string" && input.prompt ? { prompt: input.prompt } : {}),
     ...(typeof input.resume === "string" ? { resume: input.resume } : {}),
+  };
+}
+
+/** Parsed result of Kimi's `WaitFor` tool (`wait_status: completed|timed_out|interrupted|no_tasks`). */
+function waitForResult(output: string) {
+  const waitStatus = /(?:^|\n)wait_status:\s*(\S+)/i.exec(output)?.[1]?.toLowerCase();
+  if (!waitStatus) return undefined;
+  const taskId = /(?:^|\n)task_id:\s*(\S+)/i.exec(output)?.[1];
+  const status = /(?:^|\n)status:\s*(\S+)/i.exec(output)?.[1]?.toLowerCase();
+  return {
+    waitStatus,
+    ...(taskId ? { taskId } : {}),
+    ...(status ? { status } : {}),
   };
 }
 
@@ -94,21 +114,30 @@ function taskStatusOf(status: string): "running" | "done" | "error" | "stopped" 
 /** Kimi can ask permission after end_turn; its local task records provide the final status. */
 export function createKimiDialect(readTask = kimiBackgroundState()): AcpDialect {
   const reads = new Set<string>();
+  const seenTools = new Set<string>();
   const open = new Map<string, { background: boolean; description: string }>();
   const background = new Map<string, { taskId: string; deadline: number }>();
   /** Bash calls by tool id: whether the model asked for a background process, and its command. */
   const bash = new Map<string, { background: boolean; command?: string }>();
+  /**
+   * Kimi 2.7+ ends the current turn (`completionHandoff`) right after `WaitFor` or an in-turn
+   * background Bash completion so it can run an automatic `notify` turn. Reset once the agent
+   * speaks or starts another tool call in the same turn.
+   */
+  let handoffPending = false;
 
   return extendPlainDialect({
     call(update, id) {
+      const isNewTool = !seenTools.has(id);
+      seenTools.add(id);
+      if (isNewTool && update.title !== "WaitFor") handoffPending = false;
       if (readsFile(update)) reads.add(id);
-      if (!bash.has(id)) {
+      if (!bash.has(id) && isShellCall(update)) {
         const input = inputOf(update);
-        if (typeof input.command === "string" || update.kind === "execute")
-          bash.set(id, {
-            background: input.run_in_background === true,
-            ...(typeof input.command === "string" ? { command: input.command } : {}),
-          });
+        bash.set(id, {
+          background: input.run_in_background === true,
+          ...(typeof input.command === "string" ? { command: input.command } : {}),
+        });
       }
       const agent = agentInput(update);
       if (!agent || open.has(id)) return [];
@@ -129,11 +158,19 @@ export function createKimiDialect(readTask = kimiBackgroundState()): AcpDialect 
     result(_update, id, output) {
       return reads.has(id) ? stripReadLineNumbers(output) : output;
     },
+    speak() {
+      handoffPending = false;
+      return [];
+    },
+    needsFollowUp() {
+      return handoffPending;
+    },
     end(update, id, output) {
       const shell = bash.get(id);
       const shellReceipt = bashReceipt(output);
       bash.delete(id);
       if (shellReceipt) {
+        open.delete(id);
         // A timeout-detached command must keep the ACP process alive until its native
         // record is terminal; an explicit `run_in_background` process may outlive the turn.
         background.set(id, { taskId: shellReceipt.taskId, deadline: Date.now() + 121 * 60_000 });
@@ -146,6 +183,38 @@ export function createKimiDialect(readTask = kimiBackgroundState()): AcpDialect 
             background: true,
             ...(shell?.background ? { hold: false } : {}),
             tool: id,
+          },
+        ];
+      }
+
+      const wait = waitForResult(output);
+      if (wait) {
+        if (wait.waitStatus === "completed") {
+          handoffPending = true;
+          if (wait.taskId) {
+            for (const [bgId, entry] of background) {
+              if (entry.taskId !== wait.taskId) continue;
+              background.delete(bgId);
+              open.delete(bgId);
+              const status = (wait.status && taskStatusOf(wait.status)) || "done";
+              return [{ id: bgId, status }];
+            }
+          }
+        }
+        return [];
+      }
+
+      // Kimi sends a second `tool_call_update` with the final output when a background Bash finishes
+      // during the same turn: close the tracked shell task and mark the pending completion handoff.
+      if (background.has(id) && !open.has(id)) {
+        background.delete(id);
+        handoffPending = true;
+        const summary = shorten(output);
+        return [
+          {
+            id,
+            status: update.status === "failed" ? "error" : "done",
+            ...(summary ? { summary } : {}),
           },
         ];
       }

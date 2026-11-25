@@ -134,6 +134,11 @@ export interface AcpDialect {
    * when the agent never reports it on the ACP wire (e.g. OpenCode idle_outcome).
    */
   poll?(sessionId: string): AcpTaskPatch[];
+  /**
+   * Whether the turn ended on an internal handoff (e.g. Kimi `WaitFor` completing a background
+   * task) that triggers a follow-up turn even when no hard background hold remains open.
+   */
+  needsFollowUp?(): boolean;
   /** When a replayed message was written, if its `messageId` tells (ms since the epoch). */
   time(update: AcpUpdate): number | undefined;
   /**

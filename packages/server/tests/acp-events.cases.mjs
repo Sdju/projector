@@ -485,8 +485,10 @@ test("kimi explicit background Bash is a soft hold", () => {
   );
   expect(mapper.pendingBackground).toBe(0);
   expect(mapper.keepsProcess).toBe(true);
+  expect(mapper.hadBackground).toBe(false);
   const tasks = events.filter(([type]) => type === "task").map(([, data]) => data);
-  expect(tasks.at(-1)).toMatchObject({
+  expect(tasks).toHaveLength(1);
+  expect(tasks[0]).toMatchObject({
     id: "b2",
     kind: "shell",
     title: "Dev server",
@@ -495,6 +497,118 @@ test("kimi explicit background Bash is a soft hold", () => {
     hold: false,
     tool: "b2",
   });
+});
+
+test("kimi WaitFor completion closes background Bash and marks follow-up until the model speaks", () => {
+  const events = [];
+  const mapper = createAcpEventMapper(
+    (type, data) => events.push([type, data]),
+    "Kimi",
+    createKimiDialect(),
+  );
+  mapper.handleUpdate("s", {
+    sessionUpdate: "tool_call",
+    toolCallId: "6:b1",
+    title: "Bash",
+    kind: "execute",
+    status: "in_progress",
+    rawInput: {
+      command: "vp run check",
+      run_in_background: true,
+      description: "Полная проверка",
+    },
+  });
+  mapper.handleUpdate(
+    "s",
+    readResult(
+      "6:b1",
+      "task_id: bash-vjuqbd5w\npid: 668838\ndescription: Полная проверка\nstatus: running\nautomatic_notification: true\n",
+    ),
+  );
+  mapper.handleUpdate("s", {
+    sessionUpdate: "tool_call",
+    toolCallId: "6:w1",
+    title: "WaitFor",
+    kind: "other",
+    status: "in_progress",
+    rawInput: { task_id: "bash-vjuqbd5w", timeout: 90 },
+  });
+  mapper.handleUpdate(
+    "s",
+    readResult("6:w1", "wait_status: timed_out\ntask_id: bash-vjuqbd5w\nstatus: running\n"),
+  );
+  expect(mapper.hadBackground).toBe(false);
+
+  mapper.handleUpdate("s", {
+    sessionUpdate: "tool_call",
+    toolCallId: "6:w2",
+    title: "WaitFor",
+    kind: "other",
+    status: "in_progress",
+    rawInput: { task_id: "bash-vjuqbd5w", timeout: 90 },
+  });
+  // Kimi emits a second tool_call_update for the background Bash when the process finishes,
+  // followed by the WaitFor completion result.
+  mapper.handleUpdate(
+    "s",
+    readResult("6:b1", "Command executed successfully.\ntask_id: bash-vjuqbd5w\n"),
+  );
+  mapper.handleUpdate(
+    "s",
+    readResult(
+      "6:w2",
+      "wait_status: completed\ntask_id: bash-vjuqbd5w\nstatus: completed\nexit_code: 0\n",
+    ),
+  );
+  expect(mapper.pendingBackground).toBe(0);
+  expect(mapper.keepsProcess).toBe(false);
+  expect(mapper.hadBackground).toBe(true);
+  const tasks = events.filter(([type]) => type === "task").map(([, data]) => data);
+  expect(tasks.at(-1)).toMatchObject({ id: "6:b1", status: "done" });
+
+  // Once the model speaks (e.g. in the notify turn), the handoff flag clears.
+  mapper.handleUpdate("s", {
+    sessionUpdate: "agent_message_chunk",
+    content: { type: "text", text: "Закоммитил изменения." },
+  });
+  expect(mapper.hadBackground).toBe(false);
+});
+
+test("kimi background state falls back to task.terminated in wire.jsonl (Kimi 2.7+)", async () => {
+  const home = await mkdtemp(join(tmpdir(), "projector-kimi-wire-state-"));
+  try {
+    const agentDir = join(home, ".kimi-code/sessions/wd_test/session_s/agents/main");
+    await mkdir(agentDir, { recursive: true });
+    const wire = join(agentDir, "wire.jsonl");
+    await writeFile(
+      wire,
+      `${JSON.stringify({
+        type: "task.started",
+        agentId: "main",
+        info: { taskId: "bash-w1", kind: "process", status: "running" },
+      })}\n`,
+    );
+    const readState = kimiBackgroundState(home);
+    expect(readState("session_s", "bash-w1")).toBeUndefined();
+    await writeFile(
+      wire,
+      [
+        JSON.stringify({
+          type: "task.started",
+          agentId: "main",
+          info: { taskId: "bash-w1", kind: "process", status: "running" },
+        }),
+        JSON.stringify({
+          type: "task.terminated",
+          agentId: "main",
+          info: { taskId: "bash-w1", kind: "process", status: "completed", endedAt: 456 },
+        }),
+      ].join("\n") + "\n",
+    );
+    expect(readState("session_s", "bash-w1")).toEqual({ status: "completed", endedAt: 456 });
+  } finally {
+    await rm(home, { recursive: true, force: true });
+  }
 });
 
 test("kimi task output receipt does not start another shell task", () => {

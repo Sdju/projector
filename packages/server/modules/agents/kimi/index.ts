@@ -1,6 +1,7 @@
 import { createAcpBackend } from "../acp/index.ts";
 import type { AgentBackend } from "../../agent/index.ts";
 import { createKimiDialect } from "./dialect.ts";
+import { prepareKimiFollowUp } from "./follow-up.ts";
 import { kimiUsageLog } from "./usage-log.ts";
 
 /**
@@ -21,6 +22,7 @@ export const kimiProgram = {
   command: "kimi",
   args: ["acp"],
   dialect: createKimiDialect,
+  prepareFollowUp: prepareKimiFollowUp,
   exclusiveSession: true,
   finishAfterBackground: true,
 };

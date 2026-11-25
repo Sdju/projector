@@ -1,4 +1,7 @@
 import { EventEmitter } from "node:events";
+import { appendFile, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { PassThrough } from "node:stream";
 import { expect, test, vi } from "vite-plus/test";
 import { createAcpConnection } from "../modules/agents/acp/acp-client.ts";
@@ -6,6 +9,8 @@ import { settleAcpAnswer } from "../modules/agents/acp/acp-follow-up.ts";
 import { createAcpEventMapper } from "../modules/agents/acp/acp-events.ts";
 import { createPlainDialect } from "../modules/agents/acp/acp-dialect.ts";
 import { decidePermission } from "../modules/agents/acp/acp-permission.ts";
+import { createKimiDialect } from "../modules/agents/kimi/dialect.ts";
+import { prepareKimiFollowUp } from "../modules/agents/kimi/follow-up.ts";
 import {
   prepareOpenCodeFollowUp,
   watchOpenCodeFollowUp,
@@ -309,5 +314,136 @@ test("streamed continuation and outstanding permission keep the connection open 
     expect(events.some(([event]) => event === "error")).toBe(false);
   } finally {
     vi.useRealTimers();
+  }
+});
+
+test("Kimi follow-up streams notify turn from wire.jsonl after WaitFor handoff and closes exclusive session", async () => {
+  const home = await mkdtemp(join(tmpdir(), "projector-kimi-followup-"));
+  try {
+    const agentDir = join(home, ".kimi-code/sessions/wd_test/session_k1/agents/main");
+    await mkdir(agentDir, { recursive: true });
+    const wire = join(agentDir, "wire.jsonl");
+    await writeFile(
+      wire,
+      `${JSON.stringify({ type: "turn.prompt", turnId: 6, trigger: "normal" })}\n`,
+    );
+
+    const events = [];
+    const emit = (event, data) => events.push([event, data]);
+    const mapper = createAcpEventMapper(emit, "Kimi", createKimiDialect(), {
+      sessionId: () => "session_k1",
+    });
+    const followUp = prepareKimiFollowUp("session_k1", {
+      home,
+      intervalMs: 10,
+      startMs: 500,
+      quietMs: 30,
+      totalMs: 2000,
+    });
+
+    mapper.handleUpdate("session_k1", {
+      sessionUpdate: "agent_message_chunk",
+      content: { type: "text", text: "Запускаю проверку. " },
+    });
+    mapper.handleUpdate("session_k1", {
+      sessionUpdate: "tool_call",
+      toolCallId: "6:b1",
+      title: "Bash",
+      kind: "execute",
+      status: "in_progress",
+      rawInput: { command: "vp run check", run_in_background: true, description: "Gate" },
+    });
+    mapper.handleUpdate("session_k1", {
+      sessionUpdate: "tool_call_update",
+      toolCallId: "6:b1",
+      status: "completed",
+      content: [
+        {
+          type: "content",
+          content: {
+            type: "text",
+            text: "task_id: bash-1\npid: 10\ndescription: Gate\nstatus: running\nautomatic_notification: true\n",
+          },
+        },
+      ],
+    });
+    mapper.handleUpdate("session_k1", {
+      sessionUpdate: "tool_call",
+      toolCallId: "6:w1",
+      title: "WaitFor",
+      kind: "other",
+      status: "in_progress",
+      rawInput: { task_id: "bash-1", timeout: 90 },
+    });
+    mapper.handleUpdate("session_k1", {
+      sessionUpdate: "tool_call_update",
+      toolCallId: "6:w1",
+      status: "completed",
+      content: [
+        {
+          type: "content",
+          content: {
+            type: "text",
+            text: "wait_status: completed\ntask_id: bash-1\nstatus: completed\nexit_code: 0\n",
+          },
+        },
+      ],
+    });
+
+    const settled = settleAcpAnswer({
+      answer: mapper,
+      program: { label: "Kimi", exclusiveSession: true, finishAfterBackground: true },
+      followUp,
+      onUpdate: (update) => mapper.handleUpdate("session_k1", update),
+      options: { emit },
+    });
+
+    await appendFile(
+      wire,
+      [
+        JSON.stringify({ type: "turn.prompt", turnId: 7, trigger: "notify" }),
+        JSON.stringify({
+          type: "context.append_loop_event",
+          event: { type: "content.part", part: { type: "think", think: "Now commit." } },
+        }),
+        JSON.stringify({
+          type: "context.append_loop_event",
+          event: {
+            type: "tool.call",
+            turnId: "7",
+            toolCallId: "tool_commit",
+            name: "Bash",
+            args: { command: "git commit -m fix" },
+            display: { description: "Git commit" },
+          },
+        }),
+        JSON.stringify({
+          type: "context.append_loop_event",
+          event: {
+            type: "tool.result",
+            toolCallId: "tool_commit",
+            result: { output: "[master abc123] fix", isError: false },
+          },
+        }),
+        JSON.stringify({
+          type: "context.append_loop_event",
+          event: { type: "content.part", part: { type: "text", text: "Закоммичено." } },
+        }),
+        JSON.stringify({ type: "turn.ended", turnId: 7, reason: "completed" }),
+      ].join("\n") + "\n",
+    );
+
+    const keepProcess = await settled;
+    expect(keepProcess).toBe(false);
+    expect(events).toContainEqual(["thought", { text: "Now commit." }]);
+    expect(events).toContainEqual([
+      "tool-result",
+      { id: "7:tool_commit", name: "Git commit", output: "[master abc123] fix" },
+    ]);
+    expect(events.filter(([event]) => event === "done")).toEqual([
+      ["done", { text: "Запускаю проверку. Закоммичено.", added: [] }],
+    ]);
+  } finally {
+    await rm(home, { recursive: true, force: true });
   }
 });

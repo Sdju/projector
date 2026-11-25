@@ -121,6 +121,8 @@ export type AcpFollowUpResult =
 export interface AcpFollowUpOptions {
   signal?: AbortSignal;
   onStart?: () => void;
+  /** Inject synthetic `session/update` notifications when the agent only writes them to disk. */
+  onUpdate?: (update: Record<string, unknown>) => void;
   /** Agent requests awaiting a client reply, including user approvals. */
   incomingActivity?: () => { pending: number; lastReplyAt: number };
   /** Poll child completions on every iteration, including children spawned by continuations. */

@@ -230,6 +230,7 @@ async function run(options: AgentRunOptions, id: AgentBackendId): Promise<void> 
         answer: mapper,
         program,
         followUp,
+        onUpdate: (update) => mapper.handleUpdate(sessionId, update),
         disconnected: connection.disconnected,
         incomingActivity: connection.incomingActivity,
         options,
