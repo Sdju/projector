@@ -1,6 +1,6 @@
 # Траектория агента
 
-Панель показывает ход работы агента как журнал записей и обзорную шкалу: запросы, ответы, размышления, инструменты, задачи, контекст и сжатие. Данные приходят **только** из команды агента или из файла `*.trajectory.json`; сама панель ничего не читает у бэкенда и не сохраняет данные на диск.
+Панель показывает ход работы агента как журнал записей и обзорную шкалу: запросы, ответы, размышления, инструменты, задачи, контекст и сжатие. Данные приходят из команды агента (готовый документ или сессия) либо из файла `*.trajectory.json`; сама панель не читает бэкенд и не сохраняет данные на диск.
 
 ## Где открыть
 
@@ -29,6 +29,52 @@
 ### `ide.trajectory.panel`
 
 То же, но показывает документ в правой панели. На телефоне открывает вкладку. Без `data` берёт последний документ.
+
+### Генерация из сессии
+
+Три команды собирают документ из открытого чата или прошлой сессии:
+
+| Команда                           | Что делает                                           |
+| --------------------------------- | ---------------------------------------------------- |
+| `ide.trajectory.session.generate` | Собирает и запоминает документ, вкладку не открывает |
+| `ide.trajectory.session.open`     | Собирает и открывает вкладку                         |
+| `ide.trajectory.session.panel`    | Собирает и открывает правую панель                   |
+
+Аргументы: `chat` (ключ открытого чата) или `session` (прошлая сессия с обязательным `backend`), а также `adapter`, `id`, `title`, `subtitle`. Если источник не указан, берётся открытый чат, с которым работали последним. Для чата используется история его активной ветки. `ide.trajectory.session.generate` возвращает `{ id, title, adapter, counts, warning? }`. Результат можно открыть через `ide.trajectory.open` с этим `id`.
+
+### Адаптеры
+
+Генератор выбирает адаптер по `backend`, затем общий `turns`:
+
+| id          | Что читает                                                                                                                                                  |
+| ----------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `turns`     | История открытого чата или `loadSessionTurns` любого агента                                                                                                 |
+| `projector` | То же для встроенного Projector-агента                                                                                                                      |
+| `opencode`  | Явно указанная сессия OpenCode из каталога проекта или его изолированной копии. SQLite даёт шаги, TTFT/decoding, reasoning, инструменты, usage и compaction |
+
+Если адаптер не может собрать подробную траекторию, генератор пробует `turns` и возвращает `warning` с причиной. Для OpenCode запасной вариант тоже требует подтвердить принадлежность сессии проекту. Старые базы OpenCode могут дать историю через ACP. Отключить запасной вариант можно аргументом `fallback: false` в API генератора.
+
+Свой адаптер регистрируется в клиентском коде:
+
+```ts
+import { registerTrajectoryAdapter } from "@ai-projector/client/modules/agent-trajectory/index.ts";
+
+const detach = registerTrajectoryAdapter({
+  id: "my-agent",
+  label: "My Agent",
+  backends: ["my-agent"],
+  async generate(session, context) {
+    const payload = await context.request("/api/my-agent/trajectory", {
+      projectId: session.projectId,
+      sessionId: session.session,
+    });
+    // data должен иметь форму TrajectoryData; панель сама пересчитает counts/usage
+    return { data: payload.data, title: payload.title, source: "my-agent" };
+  },
+});
+```
+
+`context` даёт `loadTurns()` (чат, переданные turns или прошлая сессия), `chatTurns()` и `request()` для собственного серверного endpoint. Вызов `detach()` убирает адаптер.
 
 ## Формат
 
@@ -111,5 +157,7 @@
 - `packages/client/modules/agent-trajectory/model/types.ts` — контракт `TrajectoryData` и документа.
 - `model/documents.ts` — разбор `.trajectory.json` и команды.
 - `model/store.ts` — общие документы вкладки и панели.
-- `model/commands.ts` — `ide.trajectory.open` и `ide.trajectory.panel`.
+- `model/commands.ts` — команды данных и генерации сессий.
+- `model/generator.ts` — реестр адаптеров, встроенные `turns`/`projector`/`opencode`, fallback.
+- `packages/server/modules/agents/opencode/trajectory.ts` — чтение и сериализация шагов из базы OpenCode в рабочем потоке.
 - `ui/AgentTrajectoryTab.vue`, `ui/AgentTrajectoryAside.vue`, `ui/TrajectoryDocumentView.vue` — три поверхности.

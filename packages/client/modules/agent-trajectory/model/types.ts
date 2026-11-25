@@ -28,7 +28,7 @@ export type TrajectoryRecordStatus = "running" | "done" | "error" | "stopped";
 export interface TrajectoryTool {
   id: string;
   name: string;
-  status: "running" | "done" | "error";
+  status: TrajectoryRecordStatus;
   /** What the agent passed to the tool, as text. */
   input?: string;
   /** The result once it arrived; the input while the call still runs. */
@@ -63,6 +63,12 @@ export interface TrajectoryTask {
   startedAt?: number;
   endedAt?: number;
   log?: string[];
+}
+
+/** TTFT and decoding of one assistant step. */
+export interface TrajectoryTiming {
+  ttftMs?: number;
+  decodingMs?: number;
 }
 
 /** Disjoint token buckets of one record or one turn. */
@@ -103,6 +109,7 @@ export interface TrajectoryRecord {
   tool?: TrajectoryTool;
   task?: TrajectoryTask;
   usage?: TrajectoryUsage;
+  timing?: TrajectoryTiming;
   meta?: Record<string, string | number | boolean | null | undefined>;
 }
 

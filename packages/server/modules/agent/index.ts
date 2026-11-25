@@ -159,6 +159,7 @@ export {
   createWorktree,
   forkWorktree,
   mergeWorktree,
+  projectWorktreeScope,
   removeWorktree,
   worktreeCwd,
   worktreeStatus,

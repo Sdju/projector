@@ -47,6 +47,10 @@ const metaRows = computed(() => {
       label: record.approximate ? "Длительность ≈" : "Длительность",
       value: formatDuration(record.durationMs),
     });
+  if (record.timing?.ttftMs !== undefined)
+    rows.push({ label: "TTFT", value: formatDuration(record.timing.ttftMs) });
+  if (record.timing?.decodingMs !== undefined)
+    rows.push({ label: "Генерация", value: formatDuration(record.timing.decodingMs) });
   if (record.status) rows.push({ label: "Состояние", value: statusLabel(record.status) });
   for (const [key, value] of Object.entries(record.meta ?? {}))
     if (value !== null && value !== undefined && value !== "")

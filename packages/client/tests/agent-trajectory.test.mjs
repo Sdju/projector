@@ -12,6 +12,11 @@ import {
   useTrajectoryDocument,
 } from "../modules/agent-trajectory/model/store.ts";
 import { registerTrajectoryCommands } from "../modules/agent-trajectory/model/commands.ts";
+import { registerChat } from "../modules/agent-core/index.ts";
+import {
+  generateTrajectoryDocument,
+  registerTrajectoryAdapter,
+} from "../modules/agent-trajectory/model/generator.ts";
 import {
   isTrajectoryFilePath,
   trajectoryFileTitle,
@@ -348,6 +353,7 @@ test("the agent commands open a tab or the right panel with the same payload", (
   let mobile = false;
   registerTrajectoryCommands({
     register: (id, title, run) => commands.set(id, { title, run }),
+    projectId: "project",
     openTab: (id, params, options) => calls.push({ surface: "tab", id, params, options }),
     showPanel: (id) => calls.push({ surface: "panel", id }),
     mobile: () => mobile,
@@ -382,4 +388,179 @@ test("only the special file names open the document viewer", () => {
   expect(isTrajectoryFilePath("incident.json")).toBe(false);
   expect(isTrajectoryFilePath("trajectory.json")).toBe(false);
   expect(trajectoryFileTitle("incident.trajectory.json")).toBe("incident");
+});
+
+test("a registered adapter handles its backend until detached", async () => {
+  const source = { projectId: "p", backend: "custom", turns: chatTurns() };
+  const detach = registerTrajectoryAdapter({
+    id: "custom",
+    label: "Custom",
+    backends: [source.backend],
+    generate: () => ({ data: trajectoryFromTurns(source.turns), title: "Из адаптера" }),
+  });
+  try {
+    const generated = await generateTrajectoryDocument(source);
+    expect(generated).toMatchObject({ adapter: "custom", document: { title: "Из адаптера" } });
+  } finally {
+    detach();
+  }
+  expect((await generateTrajectoryDocument(source)).adapter).toBe("turns");
+});
+
+test("the session command opens an OpenCode document and includes compaction in usage", async () => {
+  const commands = new Map();
+  const openTab = vi.fn();
+  registerTrajectoryCommands({
+    register: (id, title, run) => commands.set(id, run),
+    projectId: "p",
+    openTab,
+    showPanel: () => {},
+    mobile: () => false,
+  });
+  const payload = {
+    title: "Сессия OpenCode",
+    subtitle: "OpenCode · test/model",
+    source: "opencode",
+    data: {
+      turns: [
+        {
+          number: 1,
+          records: [
+            { id: "u", kind: "user", title: "Почему?" },
+            {
+              id: "s",
+              kind: "assistant",
+              title: "Шаг 1",
+              status: "done",
+              durationMs: 2_000,
+              timing: { ttftMs: 800, decodingMs: 1_200 },
+              usage: { input: 10, output: 5, cost: 0.01 },
+            },
+            {
+              id: "c",
+              kind: "compaction",
+              title: "Сжатие",
+              usage: { input: 20, output: 2, cost: 0.02 },
+            },
+          ],
+        },
+      ],
+      capabilities: { steps: true, ttft: true, usage: true, costs: true },
+    },
+  };
+  const fetch = vi.fn(async (url, init) => {
+    expect(url).toBe("/api/opencode/trajectory");
+    expect(JSON.parse(init.body)).toEqual({ projectId: "p", sessionId: "ses" });
+    return Response.json(payload);
+  });
+  vi.stubGlobal("fetch", fetch);
+  try {
+    const opened = await commands.get("ide.trajectory.session.open")({
+      session: "ses",
+      backend: "opencode",
+    });
+    expect(opened).toMatchObject({ surface: "tab", adapter: "opencode" });
+    expect(openTab).toHaveBeenCalledWith(
+      "trajectory",
+      { id: opened.id, title: "Сессия OpenCode" },
+      { preview: false },
+    );
+    expect(useTrajectoryDocument(opened.id).value.data.usage).toEqual({
+      input: 30,
+      output: 7,
+      cost: 0.03,
+    });
+  } finally {
+    vi.unstubAllGlobals();
+  }
+});
+
+test("the older OpenCode schema falls back through the project-scoped route", async () => {
+  const legacy = vi.fn(async (url, init) => {
+    expect(url).toBe("/api/opencode/trajectory");
+    const body = JSON.parse(init.body);
+    if (body.format === "turns") return Response.json({ turns: chatTurns() });
+    return Response.json({ error: "Нет данных о шагах" }, { status: 422 });
+  });
+  vi.stubGlobal("fetch", legacy);
+  try {
+    const fallback = await generateTrajectoryDocument({
+      projectId: "p",
+      backend: "opencode",
+      session: "legacy",
+    });
+    expect(fallback.adapter).toBe("turns");
+    expect(fallback.warning).toContain("Нет данных о шагах");
+    expect(fallback.document.data.records.length).toBeGreaterThan(0);
+    expect(JSON.parse(legacy.mock.calls[1][1].body)).toEqual({
+      projectId: "p",
+      sessionId: "legacy",
+      format: "turns",
+    });
+  } finally {
+    vi.unstubAllGlobals();
+  }
+});
+
+test("an out-of-project session never falls back to replaying the chat", async () => {
+  const fetch = vi.fn(async () =>
+    Response.json({ error: "Сессия не найдена в проекте" }, { status: 404 }),
+  );
+  vi.stubGlobal("fetch", fetch);
+  try {
+    await expect(
+      generateTrajectoryDocument({
+        projectId: "p",
+        backend: "opencode",
+        session: "other",
+        turns: chatTurns(),
+      }),
+    ).rejects.toThrow("Сессия не найдена в проекте");
+    expect(fetch).toHaveBeenCalledOnce();
+  } finally {
+    vi.unstubAllGlobals();
+  }
+});
+
+test("an open OpenCode chat uses its active branch after rollback and after a new native session", async () => {
+  const commands = new Map();
+  registerTrajectoryCommands({
+    register: (id, title, run) => commands.set(id, run),
+    projectId: "review-project",
+    openTab: () => {},
+    showPanel: () => {},
+    mobile: () => false,
+  });
+  const retained = { ...chatTurns()[1], detached: true, session: { id: "old-session" } };
+  const turns = [chatTurns()[0], retained];
+  const unregister = registerChat({
+    key: "review-chat",
+    projectId: "review-project",
+    backend: "opencode",
+    label: "Ветка",
+    turns: () => turns,
+    visible: () => true,
+    busy: () => false,
+  });
+  const fetch = vi.fn(() => {
+    throw new Error("Открытый чат не требует запроса");
+  });
+  vi.stubGlobal("fetch", fetch);
+  try {
+    const generate = commands.get("ide.trajectory.session.generate");
+    const before = await generate({ chat: "review-chat" });
+    expect(before).toMatchObject({ adapter: "turns", title: "Ветка", counts: { turns: 1 } });
+
+    turns.push(turn({ id: "u2", text: "Продолжи в новой ветке" }), {
+      ...turn({ id: "a2", role: "assistant" }),
+      session: { id: "new-session" },
+    });
+    const after = await generate({ chat: "review-chat", adapter: "opencode" });
+    expect(after).toMatchObject({ adapter: "turns", counts: { turns: 2 } });
+    await expect(generate({ session: "old-session" })).rejects.toThrow("нужен backend");
+    expect(fetch).not.toHaveBeenCalled();
+  } finally {
+    unregister();
+    vi.unstubAllGlobals();
+  }
 });

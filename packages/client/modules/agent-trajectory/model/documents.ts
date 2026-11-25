@@ -12,6 +12,7 @@ import type {
   TrajectoryRecordKind,
   TrajectoryRecordStatus,
   TrajectoryTask,
+  TrajectoryTiming,
   TrajectoryTool,
   TrajectoryTurn,
   TrajectoryUsage,
@@ -82,10 +83,9 @@ function toolOf(value: unknown): TrajectoryTool | undefined {
   const id = stringOf(raw.id);
   const name = stringOf(raw.name);
   if (!id || !name) return undefined;
-  const status =
-    raw.status === "running" || raw.status === "error" || raw.status === "done"
-      ? raw.status
-      : "done";
+  const status = STATUSES.has(raw.status as TrajectoryRecordStatus)
+    ? (raw.status as TrajectoryRecordStatus)
+    : "done";
   const tool: TrajectoryTool = { id, name, status, detail: stringOf(raw.detail) };
   for (const key of ["input", "output", "kind", "label", "parent"] as const) {
     if (typeof raw[key] === "string") tool[key] = raw[key] as string;
@@ -142,6 +142,18 @@ function taskOf(value: unknown): TrajectoryTask | undefined {
   return task;
 }
 
+function timingOf(value: unknown): TrajectoryTiming | undefined {
+  const raw = objectOf(value);
+  if (!raw) return undefined;
+  const ttftMs = numberOf(raw.ttftMs);
+  const decodingMs = numberOf(raw.decodingMs);
+  if (ttftMs === undefined && decodingMs === undefined) return undefined;
+  return {
+    ...(ttftMs === undefined ? {} : { ttftMs }),
+    ...(decodingMs === undefined ? {} : { decodingMs }),
+  };
+}
+
 function metaOf(value: unknown): TrajectoryRecord["meta"] {
   const raw = objectOf(value);
   if (!raw) return undefined;
@@ -183,6 +195,8 @@ function recordOf(value: unknown, index: number): TrajectoryRecord {
   if (task) record.task = task;
   const usage = usageOf(raw.usage);
   if (usage) record.usage = usage;
+  const timing = timingOf(raw.timing);
+  if (timing) record.timing = timing;
   const meta = metaOf(raw.meta);
   if (meta) record.meta = meta;
   return record;

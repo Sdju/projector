@@ -22,15 +22,16 @@ const html = `<!doctype html>
     data: {
       records: [
         { id: "u", kind: "user", turn: 1, title: "Почему упал тест?", text: "Почему упал тест?" },
-        { id: "a", kind: "assistant", turn: 1, title: "Ответ", text: "Причина в ожидании." },
+        { id: "a", kind: "assistant", turn: 1, title: "Ответ", text: "Причина в ожидании.", timing: { ttftMs: 800, decodingMs: 1200 } },
         {
           id: "t",
           kind: "tool",
           turn: 1,
           title: "Команда",
-          text: "FAIL tests/core",
-          status: "error",
+          text: "Проверка прервана",
+          status: "stopped",
           durationMs: 3500,
+          tool: { id: "example", name: "example", detail: "Проверка прервана", status: "stopped" },
         },
       ],
     },
@@ -106,6 +107,22 @@ test.concurrent(
     ).toBe(0);
     // The file view remembered the document, so the panel shows it too.
     expect(await browser.evaluate("window.fixture.id.length > 0")).toBe(true);
+
+    await browser.click('.trajectory-tab [data-record-id="a"]');
+    await wait(
+      'document.querySelector(".trajectory-tab .inspector")?.textContent.includes("TTFT")',
+    );
+    expect(
+      await browser.evaluate('document.querySelector(".trajectory-tab .inspector").textContent'),
+    ).toContain("Генерация");
+
+    await browser.click('.trajectory-tab [data-record-id="t"]');
+    await wait(
+      "document.querySelector('.trajectory-tab .inspector .tool svg[aria-label=\"Остановлено\"]') !== null",
+    );
+    expect(
+      await browser.evaluate('document.querySelector(".trajectory-tab .inspector .tool.running")'),
+    ).toBeNull();
     expect(browser.errors).toEqual([]);
   },
 );

@@ -108,6 +108,10 @@ export default {
       largeFiles: {
         thresholds: { default: 400, ".vue": 500 },
         files: {
+          "packages/client/modules/agent-trajectory/model/documents.ts": {
+            ceiling: 414,
+            plan: "Вынести нормализацию записей и timing/meta в document-records.ts",
+          },
           "packages/client/modules/workspace/ui/ProjectWorkspace.vue": {
             ceiling: 502,
             plan: "Вынести связку Git, поиска и сессий рабочей области в отдельные композаблы",

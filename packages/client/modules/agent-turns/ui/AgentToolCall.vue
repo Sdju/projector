@@ -20,11 +20,14 @@ import { chatImageSource, chatProjectKey } from "../../chat-images/index.ts";
 import type { AgentToolChip, AgentToolView } from "../../agent-core/index.ts";
 import UiSpinner from "../../../common/ui/UiSpinner.vue";
 
-const props = defineProps<{ tool: AgentToolView; root?: string }>();
+type DisplayedTool = Omit<AgentToolView, "status"> & {
+  status: AgentToolChip["status"] | "stopped";
+};
+const props = defineProps<{ tool: DisplayedTool; root?: string }>();
 const emit = defineEmits<{ open: [path: string] }>();
 
 /** The result as shown: the tools Projector knows get a readable summary instead of raw JSON. */
-function output(tool: AgentToolChip): {
+function output(tool: DisplayedTool): {
   hint: string;
   text: string;
   status?: AgentToolChip["status"];
@@ -126,7 +129,7 @@ const view = computed(() => {
           ? shownPath.value
           : command.value || taskNote.value || inputHint(raw) || result.hint),
     path: path.value ? shownPath.value : "",
-    status: result.status ?? tool.status,
+    status: tool.status === "stopped" ? "stopped" : (result.status ?? tool.status),
     result: running ? "" : shown,
     resultHint: running ? "" : result.hint,
     live: running ? (tool.output ?? "") : "",
@@ -233,6 +236,12 @@ const timeTitle = computed(() =>
         v-else-if="view.status === 'error'"
         class="state-icon error-icon"
         aria-label="Ошибка"
+      />
+      <ProjectorIcon
+        name="circle-slash"
+        v-else-if="view.status === 'stopped'"
+        class="state-icon"
+        label="Остановлено"
       />
       <ProjectorIcon name="chevron-right" class="row-chevron" aria-hidden="true" />
     </UiDisclosureSummary>

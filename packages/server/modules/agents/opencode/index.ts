@@ -36,3 +36,4 @@ export const opencodeBackend: AgentBackend = {
 };
 export { opencodeUsageLog };
 export { settleOpenCodeHistoryTasks } from "./history-tasks.ts";
+export { loadOpenCodeTrajectory } from "./trajectory-response.ts";

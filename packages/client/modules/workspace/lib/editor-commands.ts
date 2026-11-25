@@ -61,6 +61,7 @@ export function registerEditorCommands(ctx: EditorCommandContext) {
   const trajectoryPanel = useTrajectoryPanelOpener();
   registerTrajectoryCommands({
     register,
+    projectId: ctx.projectId,
     openTab,
     showPanel: trajectoryPanel
       ? (id) => trajectoryPanel.show(id)

@@ -137,6 +137,10 @@ function spanTitle(span: TrajectoryTimeline["spans"][number]): string {
   const clock = formatClock(record.startedAt);
   if (clock) lines.push(clock);
   if (record.durationMs) lines.push(formatDuration(record.durationMs));
+  if (record.timing?.ttftMs !== undefined)
+    lines.push(`TTFT: ${formatDuration(record.timing.ttftMs)}`);
+  if (record.timing?.decodingMs !== undefined)
+    lines.push(`генерация: ${formatDuration(record.timing.decodingMs)}`);
   if (record.status && record.status !== "done") lines.push(statusLabel(record.status));
   return lines.filter(Boolean).join("\n");
 }

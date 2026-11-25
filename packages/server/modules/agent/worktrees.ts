@@ -35,8 +35,14 @@ const gitFailure = (error: unknown): string => {
 };
 
 const branchOf = (id: string) => `projector/${id}`;
-const folderOf = (projectId: string, id: string) =>
-  join(dataDir(), "worktrees", `${projectId}-${id}`);
+export function projectWorktreeScope(projectId: string): { root: string; prefix: string } {
+  return { root: join(dataDir(), "worktrees"), prefix: `${projectId}-` };
+}
+
+const folderOf = (projectId: string, id: string) => {
+  const { root, prefix } = projectWorktreeScope(projectId);
+  return join(root, `${prefix}${id}`);
+};
 
 /** Where a project folder lies inside its repository, so the copy can be entered at the same place. */
 async function layout(projectPath: string): Promise<{ root: string; inside: string }> {
