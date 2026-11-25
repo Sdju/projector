@@ -88,6 +88,15 @@ export const baseTabTypes = [
     },
   }),
   mediaTab,
+  defineTab<{ id: string; title?: string }>({
+    id: "trajectory",
+    key: ({ id }) => `trajectory:${id}`,
+    path: ({ title }) => title || "Траектория",
+    title: ({ title }) => title || "Траектория",
+    subtitle: "ходы и вызовы",
+    hint: () => "Данные передаёт агент или файл .trajectory.json",
+    preview: false,
+  }),
   singletonTab("review", "review:changes", "Ревью", "Ревью изменений", {
     subtitle: "замечания к diff",
     read: (_params, content) => ({

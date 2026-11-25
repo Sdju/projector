@@ -43,6 +43,7 @@ import {
 import { ReviewTab } from "../modules/review/index.ts";
 import { PluginContributionMount, pluginTabKind, runtimeTabs } from "../../plugin-runtime/index.ts";
 import { MediaPanel } from "../../media/index.ts";
+import { AgentTrajectoryTab } from "../../agent-trajectory/index.ts";
 
 /** How a tab kind is drawn; the owner of the kind supplies it, the workspace only mounts it. */
 export interface TabView {
@@ -220,6 +221,18 @@ export function baseTabViews(): TabViews {
         onTitle: (title: string) => {
           tab.path = title;
         },
+      }),
+    },
+    trajectory: {
+      component: AgentTrajectoryTab,
+      keepAlive: true,
+      props: (tab, host) => ({
+        id: typeof tab.params?.id === "string" ? tab.params.id : "",
+        onTitle: (title: string) => {
+          tab.path = title;
+          tab.params = { ...tab.params, title };
+        },
+        onOpenFile: (path: string) => host.openFile(path),
       }),
     },
     ...Object.fromEntries(

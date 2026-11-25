@@ -18,6 +18,7 @@ import {
   provideEditorStatus,
   provideEditorTopbar,
 } from "../modules/viewers/index.ts";
+import { isTrajectoryFilePath, TrajectoryDocumentView } from "../../agent-trajectory/index.ts";
 
 /** Содержимое одной вкладки файла: верхняя панель (путь и действия редактора), ошибка сохранения и подходящий просмотрщик. */
 const props = defineProps<{ file: OpenFile; projectId: string; revision: number }>();
@@ -53,9 +54,22 @@ const view = computed(() => (props.file.virtual ? tabs.views[props.file.virtual]
 const subtitle = computed(() =>
   props.file.virtual ? tabs.types.get(props.file.virtual)?.subtitle : undefined,
 );
+/** A trajectory document is shown by its own viewer, not by the code editor. */
+const trajectoryFile = computed(
+  () =>
+    !props.file.virtual &&
+    !props.file.binary &&
+    props.file.original === undefined &&
+    isTrajectoryFilePath(props.file.path),
+);
 /** Текстовый файл: у него есть строка состояния с позицией, языком и переводом строк. */
 const hasStatusLine = computed(
-  () => !props.file.virtual && !props.file.binary && !props.file.image && !props.file.archive,
+  () =>
+    !trajectoryFile.value &&
+    !props.file.virtual &&
+    !props.file.binary &&
+    !props.file.image &&
+    !props.file.archive,
 );
 const body = ref<HTMLElement>();
 const scrollKey = () => (isMarkdown(props.file) ? (props.file.markdownMode ?? "document") : "file");
@@ -161,6 +175,12 @@ onMounted(restoreScroll);
         @change="emit('change', $event)"
         @save="emit('save')"
         @command="(id, args) => host.run(id, args)"
+      />
+      <TrajectoryDocumentView
+        v-else-if="trajectoryFile"
+        :content="file.draft ?? file.content"
+        :path="file.path"
+        :on-open-file="(path) => emit('open', path)"
       />
       <MarkdownViewer
         :key="file.readonly ? revision : undefined"

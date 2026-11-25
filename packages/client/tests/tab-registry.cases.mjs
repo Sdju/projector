@@ -152,3 +152,12 @@ test("CI views of GitHub and GitLab honor the pipeline job preview flag", async 
     expect(Boolean(props.onOpenPull)).toBe(provider === "GitHub");
   }
 });
+
+test("the trajectory tab is keyed by its document and pins its data view", () => {
+  const registry = createTabRegistry(baseTabTypes);
+  const type = registry.get("trajectory");
+  expect(type.key({ id: "incident" })).toBe("trajectory:incident");
+  expect(type.path({ id: "incident" })).toBe("Траектория");
+  expect(type.path({ id: "incident", title: "Разбор" })).toBe("Разбор");
+  expect(type.preview).toBe(false);
+});

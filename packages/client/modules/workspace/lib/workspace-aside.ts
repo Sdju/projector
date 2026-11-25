@@ -1,4 +1,13 @@
-import { computed, provide, shallowRef, watch, type Ref } from "vue";
+import {
+  computed,
+  getCurrentInstance,
+  inject,
+  provide,
+  shallowRef,
+  watch,
+  type InjectionKey,
+  type Ref,
+} from "vue";
 import { dockGroups, type DockLayout } from "../../dock/index.ts";
 import { asideTargetKey } from "./aside-target.ts";
 import type {
@@ -11,6 +20,7 @@ import { useWorkspaceAside } from "./aside-panels.ts";
 import { registerRightPanelCommands, type RegisterWorkspaceCommand } from "./right-panel.ts";
 import { asideSections, type SidebarViews } from "./sidebar-views.ts";
 import TerminalsAside from "../ui/TerminalsAside.vue";
+import { AgentTrajectoryAside } from "../../agent-trajectory/index.ts";
 
 export interface WorkspaceAsidePanelContext {
   profile: WorkspaceProfile;
@@ -27,6 +37,21 @@ export interface WorkspaceAsidePanelContext {
   addedSections?: () => SidebarType[];
   /** Reloads the selected section; the panel ref belongs to the workspace. */
   refresh: (id?: string) => unknown;
+}
+
+/** How the trajectory commands show their section without knowing the workspace internals. */
+export interface TrajectoryPanelOpener {
+  show(id: string): void;
+  mobile(): boolean;
+}
+
+export const trajectoryPanelKey: InjectionKey<TrajectoryPanelOpener> = Symbol(
+  "projector.trajectory-panel",
+);
+
+/** Read by editor commands; provided by the mounted workspace. */
+export function useTrajectoryPanelOpener(): TrajectoryPanelOpener | undefined {
+  return getCurrentInstance() ? inject(trajectoryPanelKey, undefined) : undefined;
 }
 
 /**
@@ -46,6 +71,13 @@ export function useWorkspaceAsidePanel(ctx: WorkspaceAsidePanelContext) {
       props: () => ({}),
       refreshGutter: true,
     },
+    trajectory: {
+      icon: "list-tree",
+      component: AgentTrajectoryAside,
+      props: (host) => ({
+        onOpenFile: (path: string) => host.openFile(path),
+      }),
+    },
     ...ctx.views,
   }));
   const state = useWorkspaceAside({
@@ -55,6 +87,14 @@ export function useWorkspaceAsidePanel(ctx: WorkspaceAsidePanelContext) {
     enabled: ctx.enabled,
     register: ctx.register,
     refresh: ctx.refresh,
+  });
+  provide(trajectoryPanelKey, {
+    show: () => {
+      ctx.override.value = true;
+      state.section.value = "trajectory";
+      state.show();
+    },
+    mobile: () => ctx.mobile.value,
   });
   registerRightPanelCommands({
     override: ctx.override,

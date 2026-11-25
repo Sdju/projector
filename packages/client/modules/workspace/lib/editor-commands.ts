@@ -10,6 +10,8 @@ import { normalizeBrowserInput } from "@ai-projector/core/modules/browser/index.
 import { isEditable, isHtml, isMarkdown, type OpenFile } from "../open-file.ts";
 import { registerSelectionCommands } from "./selection-commands.ts";
 import { createEditorSelection, provideEditorSelection } from "./editor-selection.ts";
+import { registerTrajectoryCommands } from "../../agent-trajectory/index.ts";
+import { useTrajectoryPanelOpener } from "./workspace-aside.ts";
 
 export interface EditorCommandContext {
   projectId: string;
@@ -56,6 +58,17 @@ export function registerEditorCommands(ctx: EditorCommandContext) {
   const selection = provideEditorSelection(
     createEditorSelection(() => editorCommands.run("ide.editor.selection.toChat")),
   );
+  const trajectoryPanel = useTrajectoryPanelOpener();
+  registerTrajectoryCommands({
+    register,
+    openTab,
+    showPanel: trajectoryPanel
+      ? (id) => trajectoryPanel.show(id)
+      : () => {
+          throw new Error("Правая панель недоступна в этом workspace");
+        },
+    mobile: trajectoryPanel ? () => trajectoryPanel.mobile() : () => false,
+  });
   function commandFile(value?: unknown) {
     const args = commandArgs(value);
     if (args.id !== undefined && typeof args.id !== "string")

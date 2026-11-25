@@ -26,12 +26,12 @@ test("the work inbox is a singleton tab with its own command, not a right-rail s
   expect(tabs.keyOf("inbox")).toBe("inbox:works");
 });
 
-test("the local profile offers the inbox tab, the utility sections and the right-rail terminals", () => {
+test("the local profile offers the inbox tab, the utility sections and the right-rail panels", () => {
   const profile = createLocalWorkspaceProfile("project");
   expect(profile.utility).toBe(workspaceUtility);
   expect(profile.tabs?.some((tab) => tab.id === "inbox")).toBe(true);
   expect(profile.aside).toBe(workspaceAside);
-  expect(workspaceAside.map((type) => type.id)).toEqual(["terminals"]);
+  expect(workspaceAside.map((type) => type.id)).toEqual(["terminals", "trajectory"]);
 });
 
 test("the session remembers the last launched program", () => {
