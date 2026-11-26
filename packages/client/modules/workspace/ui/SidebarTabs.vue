@@ -1,9 +1,7 @@
 <script setup lang="ts">
 import ProjectorIcon from "../../../common/icons/ProjectorIcon.vue";
-import UiStatusDot from "../../../common/ui/UiStatusDot.vue";
 import { computed, ref } from "vue";
 import UiButton from "../../../common/ui/UiButton.vue";
-import UiIsland from "../../../common/ui/UiIsland.vue";
 import ContextMenu from "../../../common/ui/ContextMenu.vue";
 import type { ContextMenuItem } from "../../../common/ui/context-menu.ts";
 import { useCommandScope } from "../../../common/utilities/commands.ts";
@@ -13,22 +11,11 @@ import { useActionDrag } from "../lib/action-drag.ts";
 import type { SidebarAlign, SidebarLayout, SidebarSide } from "../lib/sidebar-layout.ts";
 import { groupSidebar } from "../../workspace-api/index.ts";
 
-export interface SidebarItem {
-  id: string;
-  title: string;
-  /** Shared icon name; the rail renders it through the icon service. */
-  icon: string;
-  badge: number;
-  command?: string;
-  /** Родительский раздел: иконка стоит рядом с ним в общей подложке. */
-  group?: string;
-  /** Вид раздела, по которому берутся компонент и подписи. */
-  kind?: string;
-  /** Временный раздел можно закрыть. */
-  closable?: boolean;
-  /** Служебный раздел (Hub, корзина): живёт в нижней группе вертикальной полосы. */
-  utility?: boolean;
-}
+import SidebarHiddenSections from "./SidebarHiddenSections.vue";
+import SidebarSectionPicker from "./SidebarSectionPicker.vue";
+import type { SidebarItem } from "../lib/sidebar-item.ts";
+export type { SidebarItem } from "../lib/sidebar-item.ts";
+
 const props = defineProps<{
   section: string;
   side: SidebarSide;
@@ -57,13 +44,17 @@ const emit = defineEmits<{
 // Compact view: one titled picker instead of a row of bare icons.
 const picker = useIslandMenu({
   anchor: "left",
-  initialFocus: [".section-item.selected", ".section-item"],
-  items: ".section-item",
+  initialFocus: [".sidebar-section-item.selected", ".sidebar-section-item"],
+  items: ".sidebar-section-item",
 });
-const overflow = useIslandMenu({ anchor: "left", initialFocus: ".section-item" });
+const overflow = useIslandMenu({ anchor: "left", initialFocus: ".sidebar-section-item" });
 const visibility = useHiddenActions();
-const layout = props.layout;
-const dragging = layout.drag;
+const dragging = computed({
+  get: () => props.layout.drag.value,
+  set: (value) => {
+    props.layout.drag.value = value;
+  },
+});
 const { dropTarget, dragStart, dragOver, dragLeave, drop, endDrag } = useActionDrag<
   { id: string; side: SidebarSide },
   string | undefined
@@ -72,7 +63,7 @@ const { dropTarget, dragStart, dragOver, dragLeave, drop, endDrag } = useActionD
   axis: "y",
   mime: "application/x-projector-sidebar-section",
   sourceFor: (id) => ({ id, side: props.side }),
-  canDrop: (from, to) => layout.canMove(from.id, props.side, to),
+  canDrop: (from, to) => props.layout.canMove(from.id, props.side, to),
   move: (from, to, after) =>
     emit("command", "ide.workbench.section.move", { from: from.id, side: props.side, to, after }),
 });
@@ -80,12 +71,12 @@ const oppositeSide = computed(() => (props.side === "left" ? "right" : "left"));
 const emptyDrop = computed(
   () =>
     dragging.value &&
-    layout.canMove(dragging.value.id, props.side) &&
-    !groups.value.some(({ id }) => layout.canMove(dragging.value!.id, props.side, id)),
+    props.layout.canMove(dragging.value.id, props.side) &&
+    !groups.value.some(({ id }) => props.layout.canMove(dragging.value!.id, props.side, id)),
 );
 function canAlignDrop(align: SidebarAlign): boolean {
   const item = dragging.value;
-  return !!item && layout.canAlign(item.id) && layout.alignOf(item.id) !== align;
+  return !!item && props.layout.canAlign(item.id) && props.layout.alignOf(item.id) !== align;
 }
 function alignDragOver(event: DragEvent, align: SidebarAlign) {
   if (!canAlignDrop(align)) return;
@@ -118,15 +109,15 @@ const groups = computed(() => {
     .map(([root, ...children]) => ({
       id: root!.id,
       utility: !!root!.utility,
-      align: layout.alignOf(root!.id),
+      align: props.layout.alignOf(root!.id),
       items: [root!, ...children].filter(
         (item) => !props.vertical || !visibility.hidden.value.includes(keyFor(item.id)),
       ),
     }))
     .filter((group) => group.items.length);
   return [
-    ...layout.sort(all.filter((group) => group.align === "start")),
-    ...layout.sort(all.filter((group) => group.align === "end")),
+    ...props.layout.sort(all.filter((group) => group.align === "start")),
+    ...props.layout.sort(all.filter((group) => group.align === "end")),
   ];
 });
 const firstEnd = computed(() => groups.value.find((group) => group.align === "end"));
@@ -170,7 +161,7 @@ const menuItems = computed<ContextMenuItem[]>(() => {
   const item = menuTarget.value;
   if (!item) return [];
   return [
-    ...(layout.canMove(item.id, oppositeSide.value)
+    ...(props.layout.canMove(item.id, oppositeSide.value)
       ? [
           {
             id: "section.move",
@@ -185,21 +176,21 @@ const menuItems = computed<ContextMenuItem[]>(() => {
           },
         ]
       : []),
-    ...(layout.canAlign(item.id)
+    ...(props.layout.canAlign(item.id)
       ? [
           {
             id: "section.align",
-            label: layout.alignOf(item.id) === "start" ? "Вниз" : "Наверх",
-            icon: layout.alignOf(item.id) === "start" ? "arrow-down" : "arrow-up",
+            label: props.layout.alignOf(item.id) === "start" ? "Вниз" : "Наверх",
+            icon: props.layout.alignOf(item.id) === "start" ? "arrow-down" : "arrow-up",
             command: "ide.workbench.section.align",
             args: {
               section: item.id,
-              align: layout.alignOf(item.id) === "start" ? "end" : "start",
+              align: props.layout.alignOf(item.id) === "start" ? "end" : "start",
             },
             run: () =>
               emit("command", "ide.workbench.section.align", {
                 section: item.id,
-                align: layout.alignOf(item.id) === "start" ? "end" : "start",
+                align: props.layout.alignOf(item.id) === "start" ? "end" : "start",
               }),
           },
         ]
@@ -239,82 +230,32 @@ function openSectionMenu(event: MouseEvent, item: SidebarItem) {
 }
 function choose(item: SidebarItem) {
   picker.close();
+  overflow.close();
   if (item.command) emit("command", item.command);
   else emit("update:section", item.id);
+}
+function runPickerCommand(id: string) {
+  picker.close();
+  emit("command", id);
 }
 </script>
 
 <template>
-  <nav v-if="!vertical" class="side-tabs picker-bar" :aria-label="label ?? 'Разделы проекта'">
-    <span :ref="picker.trigger" class="picker">
-      <button
-        class="current"
-        aria-haspopup="dialog"
-        :aria-expanded="picker.open.value"
-        :aria-controls="picker.open.value ? picker.id : undefined"
-        data-command="ide.workbench.section.picker.toggle"
-        @click="commands.run('ide.workbench.section.picker.toggle')"
-      >
-        <ProjectorIcon v-if="current" :name="current.icon" aria-hidden="true" />
-        <span class="name">{{ current?.title ?? "Разделы" }}</span>
-        <span v-if="current?.badge" class="count" aria-hidden="true">{{ current.badge }}</span>
-        <UiStatusDot
-          v-else-if="otherBadges"
-          as="i"
-          class="dot"
-          radius="circle"
-          shrink
-          tone="success"
-          aria-hidden="true"
-        />
-        <ProjectorIcon name="chevron-down" class="chevron" aria-hidden="true" />
-      </button>
-    </span>
-    <div class="side-actions">
-      <UiButton
-        shape="icon"
-        size="sm"
-        title="Обновить раздел"
-        :aria-label="refreshing ? 'Обновление раздела' : 'Обновить раздел'"
-        :data-command="refreshCommand ?? 'ide.workbench.sidebar.refresh'"
-        :busy="refreshing"
-        @click="emit('command', refreshCommand ?? 'ide.workbench.sidebar.refresh')"
-      >
-        <ProjectorIcon name="rotate-cw" aria-hidden="true" />
-      </UiButton>
-    </div>
-  </nav>
-  <UiIsland v-if="!vertical" :menu="picker" :label="label ?? 'Разделы проекта'" :width="260">
-    <button
-      v-for="item in ordered"
-      :key="item.id"
-      class="section-item"
-      :class="{ selected: section === item.id, subgroup: !!item.group }"
-      :aria-current="section === item.id ? 'true' : undefined"
-      @click="choose(item)"
-    >
-      <ProjectorIcon
-        :name="item.icon"
-        :class="{ 'git-logo': item.id === 'git' }"
-        aria-hidden="true"
-      />
-      <span class="label">{{ item.title }}</span>
-      <span v-if="item.badge" class="count" aria-hidden="true">{{ item.badge }}</span>
-      <ProjectorIcon name="check" v-if="section === item.id" class="check" aria-hidden="true" />
-    </button>
-    <button
-      v-if="projectSettings"
-      class="section-item"
-      data-command="ide.workbench.project.settings.open"
-      @click="
-        picker.close();
-        emit('command', 'ide.workbench.project.settings.open');
-      "
-    >
-      <ProjectorIcon name="sliders-horizontal" aria-hidden="true" />
-      <span class="label">Настройки проекта</span>
-    </button>
-  </UiIsland>
+  <SidebarSectionPicker
+    v-if="!vertical"
+    :picker="picker"
+    :label="label"
+    :section="section"
+    :ordered="ordered"
+    :current="current"
+    :other-badges="otherBadges"
+    :refreshing="refreshing"
+    :refresh-command="refreshCommand"
+    :project-settings="projectSettings"
+    @toggle="commands.run('ide.workbench.section.picker.toggle')"
+    @choose="choose"
+    @command="runPickerCommand"
+  />
   <nav v-else class="side-tabs vertical" :aria-label="label ?? 'Разделы проекта'">
     <div
       v-if="dragging && canAlignDrop('start')"
@@ -413,35 +354,16 @@ function choose(item: SidebarItem) {
       <ProjectorIcon name="arrow-down" aria-hidden="true" />
     </div>
   </nav>
-  <UiIsland v-if="vertical" :menu="overflow" label="Скрытые разделы" :width="280">
-    <p v-if="visibility.error.value" role="alert">{{ visibility.error.value }}</p>
-    <p v-if="!hiddenItems.length" class="empty">Скрытых разделов нет</p>
-    <div v-for="item in hiddenItems" :key="item.id" class="hidden-row">
-      <button
-        class="section-item"
-        @click="
-          overflow.close();
-          choose(item);
-        "
-      >
-        <ProjectorIcon :name="item.icon" aria-hidden="true" /><span class="label">{{
-          item.title
-        }}</span>
-        <span v-if="item.badge" class="count">{{ item.badge }}</span>
-      </button>
-      <UiButton
-        shape="icon"
-        size="sm"
-        :title="`Вернуть «${item.title}»`"
-        :aria-label="`Вернуть «${item.title}»`"
-        data-command="ide.workbench.section.visibility.set"
-        @click="
-          commands.run('ide.workbench.section.visibility.set', { section: item.id, visible: true })
-        "
-        ><ProjectorIcon name="eye" aria-hidden="true"
-      /></UiButton>
-    </div>
-  </UiIsland>
+  <SidebarHiddenSections
+    v-if="vertical"
+    :overflow="overflow"
+    :hidden-items="hiddenItems"
+    :error="visibility.error.value"
+    @choose="choose"
+    @restore="
+      (section) => commands.run('ide.workbench.section.visibility.set', { section, visible: true })
+    "
+  />
   <ContextMenu ref="sectionMenu" :items="menuItems" label="Действия раздела" />
 </template>
 
@@ -494,66 +416,14 @@ function choose(item: SidebarItem) {
 .overflow-trigger {
   display: flex;
 }
-.hidden-row {
-  display: flex;
-  align-items: center;
-  border-radius: var(--r-md);
-}
-.hidden-row:hover {
-  background: var(--hover);
-}
-.hidden-row .section-item {
-  flex: 1;
-  min-width: 0;
-}
-.hidden-row .section-item:hover {
-  background: transparent;
-}
-.empty {
-  margin: var(--sp-3);
-  color: var(--muted);
-  font-size: var(--fs-xs);
-}
 .side-tabs {
   display: flex;
-  height: 40px;
   flex-shrink: 0;
-  border-bottom: 1px solid var(--line);
-  align-items: stretch;
-  gap: var(--sp-3);
-  padding: 0 var(--sp-3);
-}
-.side-tabs > button {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--sp-1);
-  min-width: 24px;
-  white-space: nowrap;
-  font-size: var(--fs-xs);
-  color: var(--muted);
-  border-bottom: 2px solid transparent;
-  transition: color var(--t-fast);
-}
-.side-tabs > button:hover {
-  color: var(--text);
-}
-.side-tabs > button.selected {
-  color: var(--text);
-  border-color: var(--focus);
 }
 .side-actions {
   display: flex;
   align-items: center;
-  gap: 2px;
-  margin-left: auto;
-  padding-left: var(--sp-3);
-  border-left: 1px solid var(--line);
   flex-shrink: 0;
-}
-.side-tabs > button svg {
-  width: 14px;
-  height: 14px;
 }
 .git-logo :deep(path) {
   fill: currentColor;
@@ -634,94 +504,5 @@ function choose(item: SidebarItem) {
   padding: 0;
   border-left: 0;
   gap: var(--sp-1);
-}
-/* Мобильная полоса: название раздела с выбором и одна кнопка обновления */
-.picker-bar {
-  height: 48px;
-  align-items: center;
-  gap: var(--sp-2);
-  padding: 0 var(--sp-2);
-}
-.picker {
-  display: flex;
-  min-width: 0;
-}
-.current {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-2);
-  min-height: 40px;
-  padding: 0 var(--sp-3);
-  border-radius: var(--r-md);
-  color: var(--text);
-  font: 600 var(--fs-md) var(--sans);
-}
-.picker-bar .current .name {
-  color: var(--text);
-  font: inherit;
-}
-.picker-bar .current .count {
-  font: var(--fs-2xs) var(--mono);
-}
-.current:active,
-.current[aria-expanded="true"] {
-  background: var(--active);
-}
-.current svg {
-  width: 17px;
-  height: 17px;
-  color: var(--muted);
-}
-.current .chevron {
-  width: 14px;
-  height: 14px;
-}
-.current .count,
-.section-item .count {
-  min-width: 18px;
-  padding: 0 5px;
-  border-radius: var(--r-full);
-  background: var(--bg-3);
-  color: var(--run);
-  font: var(--fs-2xs) var(--mono);
-  line-height: 18px;
-  text-align: center;
-}
-.picker-bar .side-actions {
-  border-left: 0;
-  padding-left: 0;
-}
-.section-item {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-3);
-  min-height: var(--control-h);
-  padding: 0 var(--sp-3);
-  border-radius: var(--r-md);
-  color: var(--text);
-  text-align: left;
-}
-.section-item:hover,
-.section-item:focus-visible {
-  background: var(--hover);
-  outline: none;
-}
-.section-item.selected {
-  background: var(--active);
-}
-.section-item.subgroup {
-  padding-left: calc(var(--sp-3) * 2);
-}
-.section-item svg {
-  width: 17px;
-  height: 17px;
-  flex-shrink: 0;
-  color: var(--muted);
-}
-.section-item .label {
-  flex: 1;
-}
-.section-item .check {
-  color: var(--focus);
 }
 </style>

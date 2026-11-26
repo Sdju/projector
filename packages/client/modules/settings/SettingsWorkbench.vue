@@ -5,8 +5,6 @@ import UiControl, { type UiControlHandle } from "../../common/ui/UiControl.vue";
 import UiInline from "../../common/ui/UiInline.vue";
 import UiControlScope from "../../common/ui/UiControlScope.vue";
 import { computed, nextTick, ref, watch } from "vue";
-import UiIsland from "../../common/ui/UiIsland.vue";
-import UiIslandLabel from "../../common/ui/UiIslandLabel.vue";
 import { useIslandMenu } from "../../common/utilities/island-menu.ts";
 import UiButton from "../../common/ui/UiButton.vue";
 import { commandArgs, useCommandScope } from "../../common/utilities/commands.ts";
@@ -18,6 +16,8 @@ import {
   settingsPageItems,
   settingsPageOf,
 } from "./query.ts";
+import SettingsNavigationMenu from "./SettingsNavigationMenu.vue";
+import SettingsSidebar from "./SettingsSidebar.vue";
 import SettingsPagesIndex from "./SettingsPagesIndex.vue";
 
 const props = withDefaults(
@@ -37,7 +37,7 @@ const props = withDefaults(
 const emit = defineEmits<{ select: [id: string] }>();
 const query = ref("");
 const search = ref<UiControlHandle>();
-const sidebar = ref<HTMLElement>();
+const sidebar = ref<InstanceType<typeof SettingsSidebar>>();
 const menu = useIslandMenu({
   anchor: "left",
   initialFocus: ['[aria-current="page"]', "button"],
@@ -46,7 +46,13 @@ const menu = useIslandMenu({
 const content = ref<HTMLElement>();
 const visited = ref(new Set<string>());
 const filtered = computed(() => filterSettingsSections(props.sections, query.value));
-const groups = computed(() => [...new Set(filtered.value.map((section) => section.group))]);
+const groupedSections = computed(() => {
+  const groups = [...new Set(filtered.value.map((section) => section.group))];
+  return groups.map((group) => ({
+    group,
+    sections: filtered.value.filter((section) => section.group === group),
+  }));
+});
 /** The section that owns the selected page, or the first one when nothing matches. */
 const active = computed(
   () =>
@@ -81,75 +87,11 @@ watch(
     else if (section?.component) visited.value.add(section.id);
     void nextTick(() => {
       content.value?.scrollTo({ top: 0 });
-      const button = sidebar.value?.querySelector<HTMLElement>('[aria-current="page"]');
-      if (!button || !sidebar.value) return;
-      const bounds = button.getBoundingClientRect();
-      const container = sidebar.value.getBoundingClientRect();
-      if (bounds.right > container.right)
-        sidebar.value.scrollLeft += bounds.right - container.right;
-      else if (bounds.left < container.left)
-        sidebar.value.scrollLeft += bounds.left - container.left;
+      sidebar.value?.revealSelection();
     });
   },
   { immediate: true },
 );
-/* Reordering nested items by dragging them, or with Alt + arrows from the keyboard. */
-const itemDrag = ref("");
-const itemTarget = ref("");
-const itemAfter = ref(false);
-function itemDragStart(event: DragEvent, id: string) {
-  itemDrag.value = id;
-  if (event.dataTransfer) {
-    event.dataTransfer.effectAllowed = "move";
-    event.dataTransfer.setData("text/plain", id);
-  }
-}
-function itemDragEnd() {
-  itemDrag.value = "";
-  itemTarget.value = "";
-}
-/** The row under the pointer, or the nearest one above it; gaps between rows take drops too. */
-function rowAt(list: HTMLElement, clientY: number): { id: string; after: boolean } | undefined {
-  let hit: { id: string; after: boolean } | undefined;
-  for (const row of list.querySelectorAll<HTMLElement>(":scope > li")) {
-    const bounds = row.getBoundingClientRect();
-    const id = row.dataset.id ?? "";
-    if (clientY < bounds.top) return hit ?? { id, after: false };
-    hit = { id, after: clientY > bounds.top + bounds.height / 2 };
-  }
-  return hit;
-}
-function listDragOver(event: DragEvent, section: SettingsSection) {
-  if (!itemDrag.value || !section.reorder) return;
-  event.preventDefault();
-  if (event.dataTransfer) event.dataTransfer.dropEffect = "move";
-  const hit = rowAt(event.currentTarget as HTMLElement, event.clientY);
-  itemTarget.value = hit && hit.id !== itemDrag.value ? hit.id : "";
-  itemAfter.value = hit?.after ?? false;
-}
-function listDrop(event: DragEvent, section: SettingsSection) {
-  if (!itemDrag.value || !section.reorder || !section.items) return;
-  event.preventDefault();
-  const hit = rowAt(event.currentTarget as HTMLElement, event.clientY);
-  const dragged = itemDrag.value;
-  itemDragEnd();
-  if (!hit || hit.id === dragged) return;
-  const ids = section.items.map((item) => item.id).filter((key) => key !== dragged);
-  const at = ids.indexOf(hit.id);
-  if (at < 0) return;
-  ids.splice(at + (hit.after ? 1 : 0), 0, dragged);
-  section.reorder(ids);
-}
-function itemKey(event: KeyboardEvent, section: SettingsSection, index: number) {
-  if (!event.altKey || !section.reorder || !section.items) return;
-  const to = event.key === "ArrowUp" ? index - 1 : event.key === "ArrowDown" ? index + 1 : -1;
-  const ids = section.items.map((item) => item.id);
-  if (to < 0 || to >= ids.length) return;
-  event.preventDefault();
-  [ids[index], ids[to]] = [ids[to]!, ids[index]!];
-  section.reorder(ids);
-}
-
 const commands = useCommandScope(props.scope, () => ({
   surface: "settings",
   section: props.selected || active.value?.id || "",
@@ -200,6 +142,9 @@ commands.scope.registerCommand({
     else search.value?.focus();
   },
 });
+function selectSection(id: string) {
+  commands.run("ide.settings.section.open", { id });
+}
 function filter(event: Event) {
   commands.run("ide.settings.search", { query: (event.target as HTMLInputElement).value });
 }
@@ -252,91 +197,20 @@ function filter(event: Event) {
         <ProjectorIcon name="chevron-down" aria-hidden="true" />
       </button>
     </div>
-    <UiIsland :menu="menu" label="Разделы настроек" :width="360">
-      <nav class="island-navigation" aria-label="Разделы настроек">
-        <template v-for="group in groups" :key="group">
-          <UiIslandLabel>{{ group }}</UiIslandLabel>
-          <template
-            v-for="section in filtered.filter((item) => item.group === group)"
-            :key="section.id"
-          >
-            <button
-              type="button"
-              :aria-current="section.id === selected ? 'page' : undefined"
-              :class="{ selected: section.id === selected }"
-              @click="commands.run('ide.settings.section.open', { id: section.id })"
-            >
-              {{ section.title }}
-            </button>
-            <div v-if="section.items?.length" class="island-items">
-              <button
-                v-for="item in section.items"
-                :key="item.id"
-                type="button"
-                :aria-current="item.id === selected ? 'page' : undefined"
-                :class="{ selected: item.id === selected, problem: item.problem }"
-                @click="commands.run('ide.settings.section.open', { id: item.id })"
-              >
-                <span class="item-title">{{ item.title }}</span
-                ><span v-if="item.hint" class="item-hint">{{ item.hint }}</span>
-              </button>
-            </div>
-          </template>
-        </template>
-        <p v-if="!filtered.length" class="no-results" role="status">Нет подходящих разделов</p>
-      </nav>
-    </UiIsland>
+    <SettingsNavigationMenu
+      :menu="menu"
+      :groups="groupedSections"
+      :selected="selected"
+      @select="selectSection"
+    />
     <div class="layout">
-      <nav ref="sidebar" class="sidebar" aria-label="Разделы настроек">
-        <div v-for="group in groups" :key="group" class="group">
-          <h2>{{ group }}</h2>
-          <template
-            v-for="section in filtered.filter((item) => item.group === group)"
-            :key="section.id"
-          >
-            <button
-              type="button"
-              :aria-current="section.id === selected ? 'page' : undefined"
-              :class="{ selected: section.id === selected }"
-              @click="commands.run('ide.settings.section.open', { id: section.id })"
-            >
-              {{ section.title }}
-            </button>
-            <ul
-              v-if="section.items?.length"
-              class="items"
-              @dragover="listDragOver($event, section)"
-              @drop="listDrop($event, section)"
-            >
-              <li
-                v-for="(item, at) in section.items"
-                :key="item.id"
-                :data-id="item.id"
-                :draggable="!!section.reorder"
-                :class="{
-                  dragging: itemDrag === item.id,
-                  'drop-before': itemTarget === item.id && !itemAfter,
-                  'drop-after': itemTarget === item.id && itemAfter,
-                }"
-                @dragstart="itemDragStart($event, item.id)"
-                @dragend="itemDragEnd"
-              >
-                <button
-                  type="button"
-                  :aria-current="item.id === selected ? 'page' : undefined"
-                  :class="{ selected: item.id === selected, problem: item.problem }"
-                  @click="commands.run('ide.settings.section.open', { id: item.id })"
-                  @keydown="itemKey($event, section, at)"
-                >
-                  <span class="item-title">{{ item.title }}</span>
-                  <span v-if="item.hint" class="item-hint">{{ item.hint }}</span>
-                </button>
-              </li>
-            </ul>
-          </template>
-        </div>
-        <p v-if="!filtered.length" class="no-results" role="status">Нет подходящих разделов</p>
-      </nav>
+      <SettingsSidebar
+        ref="sidebar"
+        class="sidebar"
+        :groups="groupedSections"
+        :selected="selected"
+        @select="selectSection"
+      />
       <div ref="content" class="content">
         <header v-if="heading" class="section-heading">
           <h2>{{ heading.title }}</h2>
@@ -484,119 +358,10 @@ svg {
   font-size: var(--fs-xs);
   font-weight: 500;
 }
-.island-navigation button {
-  display: flex;
-  align-items: center;
-  width: 100%;
-  min-height: var(--control-h);
-  padding: var(--sp-2);
-  border-radius: var(--r-sm);
-  text-align: left;
-  color: var(--text-2);
-}
-.island-navigation button:hover {
-  background: var(--hover);
-}
-.island-navigation button.selected {
-  background: var(--selection);
-  color: var(--text);
-}
-.island-items {
-  margin-left: var(--sp-3);
-  padding-left: var(--sp-2);
-  border-left: 1px solid var(--line);
-}
-.island-items button.problem .item-title::after {
-  content: " •";
-  color: var(--err);
-}
 .layout {
   display: grid;
   grid-template-columns: 210px minmax(0, 1fr);
   min-height: 400px;
-}
-.sidebar {
-  padding: var(--sp-2);
-  background: var(--theme-chrome, var(--bg-2));
-  border-right: 1px solid var(--line);
-}
-.group + .group {
-  margin-top: var(--sp-3);
-}
-.group h2 {
-  margin: var(--sp-2);
-  color: var(--faint);
-  font-size: var(--fs-2xs);
-  font-weight: 500;
-}
-.group button {
-  display: flex;
-  align-items: center;
-  width: 100%;
-  min-height: var(--control-h);
-  padding: var(--sp-1) var(--sp-2);
-  border-radius: var(--r-sm);
-  text-align: left;
-  font-size: var(--fs-xs);
-  color: var(--text-2);
-}
-.group button:hover {
-  background: var(--hover);
-}
-.group button.selected {
-  background: var(--selection);
-  color: var(--text);
-}
-.items {
-  display: grid;
-  gap: 1px;
-  margin: 0 0 var(--sp-1) var(--sp-3);
-  padding: 0 0 0 var(--sp-2);
-  border-left: 1px solid var(--line);
-  list-style: none;
-}
-.items button {
-  min-height: 26px;
-  font-size: var(--fs-xs);
-}
-.item-title {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.item-hint {
-  margin-left: auto;
-  padding-left: var(--sp-2);
-  color: var(--faint);
-  font-size: var(--fs-2xs);
-  white-space: nowrap;
-}
-.items li {
-  position: relative;
-}
-.items li.dragging {
-  opacity: 0.45;
-}
-.items li.drop-before::before,
-.items li.drop-after::after {
-  content: "";
-  position: absolute;
-  left: 0;
-  right: 0;
-  height: 2px;
-  background: var(--focus);
-  pointer-events: none;
-}
-.items li.drop-before::before {
-  top: -1px;
-}
-.items li.drop-after::after {
-  bottom: -1px;
-}
-.items button.problem .item-title::after {
-  content: " •";
-  color: var(--err);
 }
 .content {
   min-width: 0;
@@ -632,11 +397,6 @@ svg {
   border-top: 1px solid var(--line);
   background: var(--bg-2);
   z-index: var(--z-sticky);
-}
-.no-results {
-  color: var(--muted);
-  font-size: var(--fs-xs);
-  margin: var(--sp-2);
 }
 .empty {
   display: flex;

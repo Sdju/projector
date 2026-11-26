@@ -1,0 +1,43 @@
+.sidebar-section-item .count {
+  min-width: 18px;
+  padding: 0 5px;
+  border-radius: var(--r-full);
+  background: var(--bg-3);
+  color: var(--run);
+  font: var(--fs-2xs) var(--mono);
+  line-height: 18px;
+  text-align: center;
+}
+.sidebar-section-item {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  min-height: var(--control-h);
+  padding: 0 var(--sp-3);
+  border-radius: var(--r-md);
+  color: var(--text);
+  text-align: left;
+}
+.sidebar-section-item:hover,
+.sidebar-section-item:focus-visible {
+  background: var(--hover);
+  outline: none;
+}
+.sidebar-section-item.selected {
+  background: var(--active);
+}
+.sidebar-section-item.subgroup {
+  padding-left: calc(var(--sp-3) * 2);
+}
+.sidebar-section-item svg {
+  width: 17px;
+  height: 17px;
+  flex-shrink: 0;
+  color: var(--muted);
+}
+.sidebar-section-item .label {
+  flex: 1;
+}
+.sidebar-section-item .check {
+  color: var(--focus);
+}

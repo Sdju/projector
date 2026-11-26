@@ -2,27 +2,20 @@
 import ProjectorIcon from "../../../common/icons/ProjectorIcon.vue";
 import UiInline from "../../../common/ui/UiInline.vue";
 import UiButton from "../../../common/ui/UiButton.vue";
-import { computed, inject, ref } from "vue";
+import { computed, inject } from "vue";
 import { zenMode } from "../../../common/utilities/zen-mode.ts";
 import { chatProjectKey } from "../../chat-images/index.ts";
-import { chipIcon, chipLabel, chipTitle } from "../../agent-core/index.ts";
-import { versionsOf, type ForkMode } from "../../agent-core/index.ts";
-import { legacyParts } from "../../agent-core/index.ts";
+import { type ForkMode } from "../../agent-core/index.ts";
 import { failureTitle, isAgentFailure } from "@ai-projector/core/modules/agent-failure/index.ts";
 import type { AgentLens } from "../model/lens.ts";
-import type {
-  AgentToolChip,
-  AgentTurn,
-  ChatUsage,
-  MessageChip,
-  MessagePart,
-} from "../../agent-core/index.ts";
+import type { AgentTurn, ChatUsage, MessageChip } from "../../agent-core/index.ts";
 import type { AgentDoctorProgress, AgentDoctorReport } from "../../agent-core/index.ts";
+import { segmentsOf } from "../model/turn-segments.ts";
+import { useTurnStamp } from "../model/turn-stamp.ts";
+import AgentUserTurn from "./AgentUserTurn.vue";
 import AgentMessage from "./AgentMessage.vue";
 import AgentDoctorNote from "./AgentDoctorNote.vue";
-import AgentFormAnswer from "./AgentFormAnswer.vue";
 import AgentLensView from "./AgentLens.vue";
-import type { AgentWorkItem } from "../../agent-core/index.ts";
 import AgentWork from "./AgentWork.vue";
 import AgentChanges from "./AgentChanges.vue";
 import AgentUsageInfo from "./AgentUsageInfo.vue";
@@ -80,11 +73,6 @@ const emit = defineEmits<{
   doctorRetry: [id: string];
 }>();
 
-/** A message part that is plain text: the template asks this, so the renderer narrows the union once. */
-function isTextPart(part: MessagePart): part is Extract<MessagePart, { type: "text" }> {
-  return part.type === "text";
-}
-
 const failure = computed(() =>
   isAgentFailure(props.turn.failureInfo) ? props.turn.failureInfo : undefined,
 );
@@ -111,106 +99,10 @@ const flags = computed(() => ({
   phase: "",
   ...props.flags,
 }));
-const versions = computed(() => versionsOf(props.turn));
-const formAnswer = ref<InstanceType<typeof AgentFormAnswer>>();
-const editTitle = computed(() =>
-  props.turn.form ? "Изменить ответ в форме" : "Править и отправить заново",
-);
-function editMessage() {
-  if (props.turn.form) formAnswer.value?.start();
-  else emit("edit", props.turn.id);
-}
-function submitForm(text: string, data: unknown, summary?: string) {
-  emit("formSubmit", props.turn.id, text, data, summary);
-}
+const { written, stamp, stampFull } = useTurnStamp(() => props.turn.at);
 
-const written = computed(() => (props.turn.at ? new Date(props.turn.at) : undefined));
-const stamp = computed(() =>
-  written.value?.toLocaleString("ru", {
-    day: "numeric",
-    month: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-  }),
-);
-const stampFull = computed(() =>
-  written.value?.toLocaleString("ru", { dateStyle: "long", timeStyle: "medium" }),
-);
+const segments = computed(() => segmentsOf(props.turn));
 
-type Segment =
-  | { key: string; type: "text"; text: string }
-  | { key: string; type: "note"; text: string }
-  | { key: string; type: "work"; items: AgentWorkItem[] };
-
-// Text, notes and work in the order they happened; thoughts and calls between texts form one
-// collapsed "Работа" group, with neighbouring calls shown as one row inside it.
-const segments = computed(() => {
-  const result: Segment[] = [];
-  // Calls a subagent made are shown inside its own call, not among the main ones.
-  const known = new Set(props.turn.tools.map((tool) => tool.id));
-  const children = new Map<string, AgentToolChip[]>();
-  for (const tool of props.turn.tools)
-    if (tool.parent && known.has(tool.parent))
-      children.set(tool.parent, [...(children.get(tool.parent) ?? []), tool]);
-  // A task call names the agent and model that work inside it, as the task event reported them.
-  const startedTasks = new Map(
-    (props.turn.tasks ?? []).flatMap((task) => (task.tool ? [[task.tool, task] as const] : [])),
-  );
-  const byId = new Map(
-    props.turn.tools
-      .filter((tool) => !tool.parent || !known.has(tool.parent))
-      .map((tool) => [
-        tool.id,
-        {
-          ...tool,
-          children: children.get(tool.id),
-          ...(startedTasks.has(tool.id) ? { task: startedTasks.get(tool.id) } : {}),
-        },
-      ]),
-  );
-  const addWork = (index: number, item: AgentWorkItem) => {
-    const last = result.at(-1);
-    if (last?.type === "work") last.items.push(item);
-    else result.push({ key: `w${index}`, type: "work", items: [item] });
-  };
-  for (const [index, part] of (props.turn.parts ?? legacyParts(props.turn)).entries()) {
-    if (part.type === "text") {
-      if (part.text.trim()) result.push({ key: `t${index}`, type: "text", text: part.text });
-      continue;
-    }
-    if (part.type === "note") {
-      result.push({ key: `n${index}`, type: "note", text: part.text });
-      continue;
-    }
-    if (part.type === "thought") {
-      if (part.text.trim()) addWork(index, { key: `r${index}`, type: "thought", text: part.text });
-      continue;
-    }
-    if (part.type === "judge") {
-      addWork(index, {
-        key: `j${index}`,
-        type: "judge",
-        tool: part.tool,
-        ...(part.title ? { title: part.title } : {}),
-        verdict: part.verdict,
-        decision: part.decision,
-      });
-      continue;
-    }
-    const tool = byId.get(part.id);
-    if (!tool) continue;
-    const last = result.at(-1);
-    if (last?.type === "work") {
-      const item = last.items.at(-1);
-      if (item?.type === "tools") {
-        item.tools.push(tool);
-        continue;
-      }
-    }
-    addWork(index, { key: `a${index}`, type: "tools", tools: [tool] });
-  }
-  return result;
-});
 // The "Работа" block shows its own current step; dots only fill an answer with nothing yet.
 const waiting = computed(() => segments.value.length === 0);
 const anyRunning = computed(() => props.turn.tools.some((tool) => tool.status === "running"));
@@ -232,127 +124,19 @@ const lastWork = computed(
 
 <template>
   <article class="turn" :class="[turn.role, { faded: flags.faded, zen: zenMode }]">
-    <div v-if="turn.role === 'user'" class="user-row">
-      <UiInline
-        v-if="!flags.readonly && !zenMode"
-        :gap="0.5"
-        justify="normal"
-        class="turn-actions"
-        :class="{ pinned: versions.count > 1 }"
-      >
-        <time
-          v-if="stamp"
-          class="turn-time"
-          :title="stampFull"
-          :datetime="written?.toISOString()"
-          >{{ stamp }}</time
-        >
-        <UiInline
-          as="span"
-          gap="none"
-          justify="normal"
-          v-if="versions.count > 1"
-          class="versions"
-          role="group"
-          aria-label="Версии"
-        >
-          <UiButton
-            shape="icon"
-            size="sm"
-            title="Предыдущая версия"
-            aria-label="Предыдущая версия"
-            :disabled="flags.busy || versions.position === 0"
-            @click="emit('version', turn.id, versions.position - 1)"
-          >
-            <ProjectorIcon name="chevron-left" aria-hidden="true" />
-          </UiButton>
-          <span class="version-count">{{ versions.position + 1 }} / {{ versions.count }}</span>
-          <UiButton
-            shape="icon"
-            size="sm"
-            title="Следующая версия"
-            aria-label="Следующая версия"
-            :disabled="flags.busy || versions.position === versions.count - 1"
-            @click="emit('version', turn.id, versions.position + 1)"
-          >
-            <ProjectorIcon name="chevron-right" aria-hidden="true" />
-          </UiButton>
-        </UiInline>
-        <UiButton
-          shape="icon"
-          size="sm"
-          class="turn-action"
-          :title="editTitle"
-          aria-label="Править сообщение"
-          :disabled="flags.busy"
-          @click="editMessage"
-        >
-          <ProjectorIcon name="pencil" aria-hidden="true" />
-        </UiButton>
-        <UiButton
-          shape="icon"
-          size="sm"
-          class="turn-action"
-          title="Откатить к этому сообщению"
-          aria-label="Откатить к этому сообщению"
-          :disabled="flags.busy"
-          @click="emit('rewind', turn.id)"
-        >
-          <ProjectorIcon name="undo-2" aria-hidden="true" />
-        </UiButton>
-        <UiButton
-          shape="icon"
-          size="sm"
-          class="turn-action"
-          title="Ответвить в новый чат: копия разговора до этого сообщения, текст останется в поле ввода"
-          aria-label="Ответвить в новый чат"
-          @click="emit('fork', turn.id, 'before')"
-        >
-          <ProjectorIcon name="git-fork" aria-hidden="true" />
-        </UiButton>
-      </UiInline>
-      <div v-if="turn.form" class="user-form">
-        <AgentFormAnswer
-          ref="formAnswer"
-          :source="turn.form.source"
-          :values="turn.form.values"
-          :busy="flags.busy"
-          :project-id="projectId"
-          @submit="submitForm"
-        />
-      </div>
-      <p v-else-if="turn.auto" class="user-message" :title="turn.auto">
-        Фоновое задание<template v-if="turn.autoTitle"> «{{ turn.autoTitle }}»</template>
-        завершилось. Проверь результат и скажи, что изменилось.
-      </p>
-      <p v-else class="user-message">
-        <template v-if="turn.content?.length">
-          <template v-for="(part, index) in turn.content" :key="index">
-            <template v-if="isTextPart(part)">{{ part.text }}</template>
-            <span
-              v-else
-              class="chip"
-              :class="part.type"
-              :title="chipTitle(part)"
-              :data-chip="JSON.stringify(part)"
-              role="button"
-              tabindex="0"
-              @click="emit('open', part)"
-              @keydown.enter="emit('open', part)"
-            >
-              <span class="chip-icon" aria-hidden="true" v-html="chipIcon(part)" />{{
-                chipLabel(part)
-              }}</span
-            >
-          </template>
-        </template>
-        <template v-else>{{ turn.text }}</template>
-      </p>
-      <details v-if="turn.injected && !zenMode" class="injected">
-        <summary>Возможности Projector</summary>
-        <pre class="injected-text">{{ turn.injected }}</pre>
-      </details>
-    </div>
+    <AgentUserTurn
+      v-if="turn.role === 'user'"
+      :turn="turn"
+      :busy="flags.busy"
+      :readonly="flags.readonly"
+      :project-id="projectId"
+      @open="emit('open', $event)"
+      @edit="emit('edit', $event)"
+      @form-submit="(...args) => emit('formSubmit', ...args)"
+      @rewind="emit('rewind', $event)"
+      @fork="(...args) => emit('fork', ...args)"
+      @version="(...args) => emit('version', ...args)"
+    />
     <div v-else class="assistant-body">
       <template v-for="segment in segments" :key="segment.key">
         <AgentMessage
@@ -540,108 +324,20 @@ const lastWork = computed(
 .user {
   padding-left: var(--sp-6);
 }
-.user-row {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 2px;
-}
-.turn-actions {
-  min-height: var(--control-h-sm);
-  opacity: 0;
-  color: var(--muted);
-}
-.user:hover .turn-actions,
-.turn-actions:focus-within,
-.turn-actions.pinned {
-  opacity: 1;
-}
-.versions {
-  font-size: var(--fs-2xs);
-  font-variant-numeric: tabular-nums;
-}
 .user-message {
   max-width: 90%;
   margin: 0;
   padding: var(--sp-2) var(--sp-3);
   border-radius: var(--r-lg);
-  background: var(--theme-raised-background, var(--bg-3));
+  background: var(--bg-3);
   color: var(--text);
   font-size: var(--chat-fs);
   line-height: 1.6;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
-.user-form {
-  width: min(90%, 640px);
-  min-width: 0;
-  padding: var(--sp-2) var(--sp-3);
-  border-radius: var(--r-lg);
-  background: var(--theme-raised-background, var(--bg-3));
-}
-.user-form :deep(.ui-card) {
-  background: transparent;
-}
 .note {
   margin: 0 0 var(--sp-3) auto;
-}
-.injected {
-  max-width: 90%;
-  margin: var(--sp-1) 0 0 auto;
-  color: var(--faint);
-  font-size: var(--fs-2xs);
-}
-.injected > summary {
-  cursor: pointer;
-  list-style: none;
-}
-.injected > summary::-webkit-details-marker {
-  display: none;
-}
-.injected[open] > summary {
-  color: var(--muted);
-}
-.injected-text {
-  max-height: 260px;
-  margin: var(--sp-1) 0 0;
-  padding: var(--sp-2);
-  overflow: auto;
-  border: 1px solid var(--line);
-  border-radius: var(--r-md);
-  background: var(--theme-inset-background, var(--bg-2));
-  color: var(--muted);
-  font-family: var(--mono);
-  font-size: var(--fs-2xs);
-  line-height: 1.5;
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-}
-.chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  max-width: 100%;
-  padding: 0 6px;
-  border: 1px solid var(--line-strong);
-  border-radius: var(--r-md);
-  background: var(--theme-inset-background, var(--bg-2));
-  font-size: var(--fs-xs);
-  line-height: 1.5;
-  vertical-align: baseline;
-}
-.chip:hover,
-.chip:focus-visible {
-  border-color: var(--focus);
-  color: var(--text);
-  cursor: pointer;
-}
-.chip-icon {
-  display: flex;
-  color: var(--muted);
-}
-.chip-icon :deep(.chip-thumb) {
-  border-radius: 2px;
-  object-fit: cover;
 }
 .assistant-body {
   min-width: 0;
@@ -755,9 +451,6 @@ const lastWork = computed(
   }
   .user-message {
     max-width: 96%;
-  }
-  .user-form {
-    width: 100%;
   }
 }
 </style>

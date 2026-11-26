@@ -2,13 +2,12 @@
 import ProjectorIcon from "../../../common/icons/ProjectorIcon.vue";
 import UiLoader from "../../../common/ui/UiLoader.vue";
 import UiButton from "../../../common/ui/UiButton.vue";
-import UiResizeHandle from "../../../common/ui/UiResizeHandle.vue";
+import WorkspaceFrame from "./WorkspaceFrame.vue";
 import { computed, nextTick, onBeforeUnmount, ref } from "vue";
 import {
   workspaceProfile,
   profileCapabilities,
   extendSidebarRegistry,
-  type SidebarType,
   type WorkspaceCapability,
 } from "../../workspace-api/index.ts";
 import { commandArgs, useCommandScope } from "../../../common/utilities/commands.ts";
@@ -24,6 +23,7 @@ import { useWorkbenchLayout } from "../lib/workbench-layout.ts";
 import { registerAgentCommands } from "../../agent/index.ts";
 import { onAgentTurnEnd } from "../../agent-core/index.ts";
 import { registerEditorCommands } from "../lib/editor-commands.ts";
+import { useTemporarySidebarSections } from "../lib/temporary-sidebar-sections.ts";
 import { useWorkspaceSession } from "../lib/workspace-session.ts";
 import WorkbenchDock from "./WorkbenchDock.vue";
 import StatusBar from "./StatusBar.vue";
@@ -31,13 +31,7 @@ import DockWidgets from "./DockWidgets.vue";
 import { useDockWorkspace } from "../lib/dock-commands.ts";
 import type { DockTarget } from "../../dock/index.ts";
 import { type OpenFile } from "../open-file.ts";
-import {
-  fileScopeKey,
-  fileScopeNote,
-  fileScopeTitle,
-  isLiveScope,
-  type FileScope,
-} from "@ai-projector/core/modules/workspace/index.ts";
+import { fileScopeKey, isLiveScope } from "@ai-projector/core/modules/workspace/index.ts";
 import { createPanelHosts } from "../panel-hosts.ts";
 import { TerminalCloseDialog } from "../../terminal/index.ts";
 import { useDocker } from "../../docker/index.ts";
@@ -76,8 +70,9 @@ const tabTypes = useWorkspaceTabTypes(profile, props.tabViews, {
     save: () => props.saveProjectSettings?.(),
   },
 });
-const workspaceElement = ref<HTMLElement>(),
-  sidebarHidden = ref(false);
+const frame = ref<InstanceType<typeof WorkspaceFrame>>();
+const workspaceElement = computed(() => frame.value?.element);
+const sidebarHidden = ref(false);
 const { mobile, mobileSurface, mobileSidebarOpen, sidebarInvisible, showSidebar } =
   useMobileSurfaces(sidebarHidden);
 const { treeWidth, asideWidth, sizes, resizeTree, resizeTreeKey, resizeAside, resizeAsideKey } =
@@ -138,7 +133,25 @@ const loadGit = () => (capabilities.git ? overview.load() : Promise.resolve());
 /** An answer of the agent may leave edits and commits: the Git panel reads them again. */
 const releaseAgentTurnEnd = onAgentTurnEnd(props.projectId, () => void loadGit());
 const section = ref("files"),
-  extraSections = ref<SidebarType[]>([]);
+  {
+    extraSections,
+    openTree,
+    openCommitTree,
+    openSearch,
+    restoreSections,
+    closeSection,
+    openSection,
+  } = useTemporarySidebarSections(
+    capabilities,
+    (id) => showSection(id),
+    (id, removed) => {
+      if (removed?.group && sections.value.has(removed.group)) {
+        if (section.value === id) section.value = removed.group;
+        if (asideSection.value === id) asideSection.value = removed.group;
+      } else if (section.value === id && sidebarLayout.sideOf("git") === "left" && capabilities.git)
+        section.value = "git";
+    },
+  );
 const { override: rightPanelOverride, enabled: rightPanelEnabled } = useRightPanelPreference();
 const { pluginSidebarSections, mergedSidebarViews } = usePluginWorkspaceViews(props.sidebarViews);
 const lastSession = ref("shell");
@@ -149,86 +162,6 @@ const sections = computed(() =>
     ...pluginSidebarSections.value,
   ]),
 );
-function openTree(scope: FileScope) {
-  if (!capabilities.snapshots) throw new Error("Источник не умеет показывать файлы снимка");
-  const id = `tree:${fileScopeKey(scope)}`;
-  if (!extraSections.value.some((type) => type.id === id))
-    extraSections.value.push({
-      id,
-      title: fileScopeTitle(scope),
-      source: fileScopeNote(scope),
-      group: capabilities.git ? "git" : undefined,
-      kind: scope.kind === "compare" ? "changes" : "tree",
-      params: { scope },
-      closable: true,
-    });
-  showSection(id);
-}
-function openCommitTree(hash: string) {
-  openTree({ kind: "commit", rev: hash });
-}
-function openSearch(scope: FileScope) {
-  if (scope.kind !== "commit") throw new Error("Поиск доступен только для коммита");
-  if (!capabilities.search) throw new Error("Источник не умеет искать по снимку");
-  const id = `search:${fileScopeKey(scope)}`;
-  if (!extraSections.value.some((type) => type.id === id))
-    extraSections.value.push({
-      id,
-      title: "Поиск по снимку",
-      source: fileScopeNote(scope),
-      group: capabilities.git ? "git" : undefined,
-      kind: "search-scope",
-      params: { scope },
-      closable: true,
-    });
-  showSection(id);
-}
-/** Rebuilds temporary sections from a session; view kinds and scopes are derived, not trusted. */
-function restoreSections(saved: SidebarType[]) {
-  extraSections.value = saved.flatMap((type) => {
-    const raw = type.params?.scope;
-    if (!raw || typeof raw !== "object") return [];
-    const value = raw as { kind?: unknown; rev?: unknown; from?: unknown; to?: unknown };
-    const scope: FileScope | undefined =
-      value.kind === "commit" && typeof value.rev === "string"
-        ? { kind: "commit", rev: value.rev }
-        : value.kind === "compare" && typeof value.from === "string" && typeof value.to === "string"
-          ? { kind: "compare", from: value.from, to: value.to }
-          : undefined;
-    if (!scope) return [];
-    if (scope.kind === "compare" ? !capabilities.compare : !capabilities.snapshots) return [];
-    const search = type.kind === "search-scope";
-    if (search && (scope.kind !== "commit" || !capabilities.search)) return [];
-    return [
-      {
-        id: search ? `search:${fileScopeKey(scope)}` : `tree:${fileScopeKey(scope)}`,
-        title: search ? "Поиск по снимку" : fileScopeTitle(scope),
-        source: fileScopeNote(scope),
-        group: capabilities.git ? "git" : undefined,
-        kind: search ? "search-scope" : scope.kind === "compare" ? "changes" : "tree",
-        params: { scope },
-        closable: true,
-      } satisfies SidebarType,
-    ];
-  });
-}
-function closeSection(id: string) {
-  const index = extraSections.value.findIndex((type) => type.id === id);
-  if (index < 0) return;
-  const [removed] = extraSections.value.splice(index, 1);
-  if (removed?.group && sections.value.has(removed.group)) {
-    if (section.value === id) section.value = removed.group;
-    if (asideSection.value === id) asideSection.value = removed.group;
-  } else if (section.value === id && sidebarLayout.sideOf("git") === "left" && capabilities.git)
-    section.value = "git";
-}
-/** Adds or updates a temporary sidebar section and reveals it; tab views own its contents. */
-function openSection(type: SidebarType) {
-  const index = extraSections.value.findIndex((item) => item.id === type.id);
-  if (index >= 0) extraSections.value.splice(index, 1, type);
-  else extraSections.value.push(type);
-  showSection(type.id);
-}
 const revision = ref(0);
 const isDirty = (file: OpenFile) =>
   file.virtual
@@ -504,20 +437,24 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div
-    ref="workspaceElement"
-    class="workspace"
-    :class="{
-      'sidebar-hidden': sidebarInvisible,
-      'has-aside': asideShown,
-      'aside-hidden': asideHidden,
-      'aside-bottom': asideShown && asideBottom,
-      zen: zenMode,
-    }"
-    :data-surface="mobile ? mobileSurface : undefined"
-    :style="sizes"
+  <WorkspaceFrame
+    ref="frame"
+    :sidebar-invisible="sidebarInvisible"
+    :aside-shown="asideShown"
+    :aside-hidden="asideHidden"
+    :aside-bottom="asideBottom"
+    :zen="zenMode"
+    :mobile="mobile"
+    :mobile-surface="mobileSurface"
+    :mobile-sidebar-open="mobileSidebarOpen"
+    :sizes="sizes"
+    @tree-pointer="resizeTree"
+    @tree-key="resizeTreeKey"
+    @aside-pointer="resizeAside"
+    @aside-key="resizeAsideKey"
+    @close-sidebar="editorCommands.run('ide.workbench.sidebar.toggle')"
   >
-    <div class="toolbar-host">
+    <template #toolbar>
       <Teleport to="#header-tools" defer>
         <WorkbenchToolbar
           :project-id="projectId"
@@ -539,8 +476,8 @@ onBeforeUnmount(() => {
           <template #terminal-status><slot name="terminal-status" /></template>
         </WorkbenchToolbar>
       </Teleport>
-    </div>
-    <Transition name="mobile-left">
+    </template>
+    <template #sidebar>
       <WorkspaceSidebar
         ref="sidebar"
         v-model:section="section"
@@ -574,104 +511,80 @@ onBeforeUnmount(() => {
         @deleted="entryDeleted"
         @moved="entryMoved"
       />
-    </Transition>
-    <UiResizeHandle
-      appearance="gap"
-      orientation="vertical"
-      v-show="!sidebarInvisible"
-      class="resize-handle tree-resize"
-      aria-label="Ширина дерева файлов"
-      tabindex="0"
-      @pointerdown="resizeTree"
-      @keydown="resizeTreeKey"
-    />
-    <button
-      v-if="mobile && mobileSidebarOpen"
-      class="sidebar-backdrop"
-      aria-label="Закрыть боковую панель"
-      data-command="ide.workbench.sidebar.toggle"
-      @click="editorCommands.run('ide.workbench.sidebar.toggle')"
-    />
-    <WorkspaceSidebar
-      v-if="asideShown"
-      ref="asidePanel"
-      class="aside"
-      :inert="zenMode"
-      v-model:section="asideSection"
-      side="right"
-      :project-id="projectId"
-      :capabilities="capabilities"
-      :sections="rightSections"
-      :layout="sidebarLayout"
-      :owned-sections="asideRegistry"
-      :views="rightViews"
-      :external-refreshing="
-        !asideRegistry.has(asideSection) && sidebar?.sectionRefreshing(asideSection)
-      "
-      :hidden="asideHidden"
-      :rail="!asideBottom"
-      :active="active"
-      :revision="revision"
-      :overview="overview"
-      :history="history"
-      :branches="branches"
-      :files="files"
-      :git-sync="gitSync"
-      :execute-command="(id, args) => editorCommands.scope.executeCommand(id, args)"
-      toggle-command="ide.workbench.aside.toggle"
-      refresh-command="ide.workbench.aside.refresh"
-      :close-command="
-        asideRegistry.has(asideSection)
-          ? 'ide.workbench.aside.section.close'
-          : 'ide.workbench.section.close'
-      "
-      @command="
-        (id, args) =>
-          (id.startsWith('ide.docker.') ? docker.commands : editorCommands).run(id, args)
-      "
-      @open-commit-tree="openCommitTree"
-      @open-search="openSearch"
-      @refresh="refresh"
-      @changed="treeChanged"
-      @deleted="entryDeleted"
-      @moved="entryMoved"
-    />
-    <section
-      class="dock-pane"
-      :inert="mobile && mobileSidebarOpen && !zenMode"
-      aria-label="Блоки редактора и терминалов"
-      @focusin="editorFocus"
-      @keydown.capture="editorKeydown"
-    >
-      <UiLoader v-if="loading" class="loading">читаю файл…</UiLoader>
-      <WorkbenchDock
+    </template>
+    <template #aside>
+      <WorkspaceSidebar
+        ref="asidePanel"
+        class="aside"
+        :inert="zenMode"
+        v-model:section="asideSection"
+        side="right"
         :project-id="projectId"
-        :workbench="workbench"
-        :mobile="mobile"
-        :mobile-surface="mobileSurface"
-        :zen="zenMode"
-        :aside="asideShown && !zenMode"
-        :aside-target="asideTarget"
+        :capabilities="capabilities"
+        :sections="rightSections"
+        :layout="sidebarLayout"
+        :owned-sections="asideRegistry"
+        :views="rightViews"
+        :external-refreshing="
+          !asideRegistry.has(asideSection) && sidebar?.sectionRefreshing(asideSection)
+        "
+        :hidden="asideHidden"
+        :rail="!asideBottom"
+        :active="active"
+        :revision="revision"
+        :overview="overview"
+        :history="history"
+        :branches="branches"
         :files="files"
-        :tab-actions="tabActions"
-        :panel-hosts="panelHosts"
-        :gutter-revision="overview.gutterRevision.value"
-        :tabs="tabs"
-        :terminals-busy="terminals.busy.value"
-        :agent="capabilities.agent"
-        @command="(id, args) => editorCommands.run(id, args)"
+        :git-sync="gitSync"
+        :execute-command="(id, args) => editorCommands.scope.executeCommand(id, args)"
+        toggle-command="ide.workbench.aside.toggle"
+        refresh-command="ide.workbench.aside.refresh"
+        :close-command="
+          asideRegistry.has(asideSection)
+            ? 'ide.workbench.aside.section.close'
+            : 'ide.workbench.section.close'
+        "
+        @command="
+          (id, args) =>
+            (id.startsWith('ide.docker.') ? docker.commands : editorCommands).run(id, args)
+        "
+        @open-commit-tree="openCommitTree"
+        @open-search="openSearch"
+        @refresh="refresh"
+        @changed="treeChanged"
+        @deleted="entryDeleted"
+        @moved="entryMoved"
       />
-    </section>
-    <UiResizeHandle
-      v-if="asideShown && !asideHidden && !asideBottom"
-      appearance="gap"
-      orientation="vertical"
-      class="resize-handle aside-resize"
-      aria-label="Ширина правой панели"
-      tabindex="0"
-      @pointerdown="resizeAside"
-      @keydown="resizeAsideKey"
-    />
+    </template>
+    <template #dock>
+      <section
+        class="dock-pane"
+        :inert="mobile && mobileSidebarOpen && !zenMode"
+        aria-label="Блоки редактора и терминалов"
+        @focusin="editorFocus"
+        @keydown.capture="editorKeydown"
+      >
+        <UiLoader v-if="loading" class="loading">читаю файл…</UiLoader>
+        <WorkbenchDock
+          :project-id="projectId"
+          :workbench="workbench"
+          :mobile="mobile"
+          :mobile-surface="mobileSurface"
+          :zen="zenMode"
+          :aside="asideShown && !zenMode"
+          :aside-target="asideTarget"
+          :files="files"
+          :tab-actions="tabActions"
+          :panel-hosts="panelHosts"
+          :gutter-revision="overview.gutterRevision.value"
+          :tabs="tabs"
+          :terminals-busy="terminals.busy.value"
+          :agent="capabilities.agent"
+          @command="(id, args) => editorCommands.run(id, args)"
+        />
+      </section>
+    </template>
     <MobileSurfaces
       v-if="mobile"
       v-show="!zenMode"
@@ -711,70 +624,10 @@ onBeforeUnmount(() => {
     >
       <ProjectorIcon name="minimize-2" aria-hidden="true" />
     </UiButton>
-  </div>
+  </WorkspaceFrame>
 </template>
 
 <style scoped>
-.workspace {
-  --rail-w: 40px;
-  --aside-width: clamp(240px, 21vw, 320px);
-  display: grid;
-  grid-template-columns: var(--tree-width, clamp(240px, 21vw, 320px)) var(--island-gap) minmax(
-      0,
-      1fr
-    );
-  grid-template-rows: auto auto minmax(0, 1fr) auto;
-  flex: 1;
-  min-height: 0;
-  overflow: hidden;
-}
-/* Панель свёрнута, полоса разделов остаётся */
-.workspace.sidebar-hidden {
-  grid-template-columns: calc(var(--rail-w) - var(--island-gap)) var(--island-gap) minmax(0, 1fr);
-  column-gap: 0;
-}
-/* Правая полоса разделов: её колонка остаётся, даже когда панель свёрнута. */
-.workspace.has-aside {
-  grid-template-columns:
-    var(--tree-width, clamp(240px, 21vw, 320px)) var(--island-gap) minmax(0, 1fr)
-    var(--island-gap) var(--aside-width);
-}
-.workspace.sidebar-hidden.has-aside {
-  grid-template-columns:
-    calc(var(--rail-w) - var(--island-gap)) var(--island-gap) minmax(0, 1fr) var(--island-gap)
-    var(--aside-width);
-}
-.workspace.has-aside.aside-hidden {
-  grid-template-columns:
-    var(--tree-width, clamp(240px, 21vw, 320px)) var(--island-gap) minmax(0, 1fr)
-    var(--island-gap) calc(var(--rail-w) - var(--island-gap));
-}
-.workspace.sidebar-hidden.has-aside.aside-hidden {
-  grid-template-columns:
-    calc(var(--rail-w) - var(--island-gap)) var(--island-gap) minmax(0, 1fr) var(--island-gap)
-    calc(var(--rail-w) - var(--island-gap));
-}
-.workspace > .aside {
-  grid-column: 5;
-  grid-row: 3;
-}
-.tree-resize {
-  grid-column: 2;
-  grid-row: 3;
-}
-.aside-resize {
-  grid-column: 4;
-  grid-row: 3;
-}
-.dock-pane {
-  position: relative;
-  min-width: 0;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  grid-column: 3;
-  grid-row: 3;
-}
 .loading {
   position: absolute;
   top: 4px;
@@ -783,149 +636,5 @@ onBeforeUnmount(() => {
   background: var(--bg-2);
   padding: 6px var(--sp-3);
   color: var(--muted);
-}
-@media (max-width: 1050px) and (min-width: 701px) {
-  .dock-pane {
-    overflow: auto;
-  }
-  .workspace {
-    --aside-width: clamp(200px, 24vw, 260px);
-    grid-template-columns: 260px var(--island-gap) minmax(0, 1fr);
-  }
-  .workspace.sidebar-hidden {
-    grid-template-columns: calc(var(--rail-w) - var(--island-gap)) var(--island-gap) minmax(0, 1fr);
-  }
-  .workspace.has-aside {
-    grid-template-columns: 260px var(--island-gap) minmax(0, 1fr) var(--island-gap) var(
-        --aside-width
-      );
-  }
-  .workspace.has-aside.aside-bottom {
-    grid-template-columns: 260px var(--island-gap) minmax(0, 1fr);
-    grid-template-rows: auto auto minmax(0, 1fr) minmax(180px, 34vh) auto;
-  }
-  .workspace.has-aside.aside-bottom > .aside {
-    grid-column: 3;
-    grid-row: 4;
-  }
-  .workspace.has-aside.aside-bottom > .sidebar:not(.aside),
-  .workspace.has-aside.aside-bottom > .tree-resize {
-    grid-row: 3 / 5;
-  }
-  .workspace.has-aside.aside-bottom > .workspace-status {
-    grid-row: 5;
-  }
-  .workspace.sidebar-hidden.has-aside {
-    grid-template-columns:
-      calc(var(--rail-w) - var(--island-gap)) var(--island-gap) minmax(0, 1fr) var(--island-gap)
-      var(--aside-width);
-  }
-  .workspace.has-aside.aside-hidden {
-    grid-template-columns:
-      260px var(--island-gap) minmax(0, 1fr) var(--island-gap)
-      calc(var(--rail-w) - var(--island-gap));
-  }
-  .workspace.sidebar-hidden.has-aside.aside-hidden {
-    grid-template-columns:
-      calc(var(--rail-w) - var(--island-gap)) var(--island-gap) minmax(0, 1fr) var(--island-gap)
-      calc(var(--rail-w) - var(--island-gap));
-  }
-}
-@media (max-width: 700px), (max-width: 1050px) and (max-height: 500px) and (pointer: coarse) {
-  .workspace,
-  .workspace.sidebar-hidden {
-    position: relative;
-    grid-template-columns: minmax(0, 1fr);
-    flex: 1;
-    height: 100%;
-    min-height: 0;
-    padding: 0;
-    background: none;
-    border-radius: 0;
-  }
-  .tree-resize {
-    display: none;
-  }
-  .aside-resize {
-    display: none;
-  }
-  .dock-pane {
-    grid-column: 1;
-    grid-row: 3;
-    overflow: hidden;
-    border: 1px solid var(--line);
-    border-radius: var(--r-lg);
-    background: var(--theme-panel-background, var(--bg));
-  }
-  .mobile-left-enter-active,
-  .mobile-left-leave-active {
-    transition: transform var(--t-base);
-  }
-  .mobile-left-enter-from,
-  .mobile-left-leave-to {
-    transform: translateX(-100%);
-  }
-  .sidebar-backdrop {
-    display: none;
-  }
-}
-.toolbar-host {
-  grid-column: 1 / -1;
-}
-/* Полоса действий вынесена в шапку (Teleport), здесь остаётся только якорь */
-.toolbar-host {
-  display: none;
-}
-.workspace-status {
-  grid-column: 1 / -1;
-  grid-row: 4;
-  margin-top: var(--island-gap);
-}
-.workspace.zen,
-.workspace.zen.sidebar-hidden,
-.workspace.zen.has-aside,
-.workspace.zen.sidebar-hidden.has-aside,
-.workspace.zen.has-aside.aside-hidden,
-.workspace.zen.sidebar-hidden.has-aside.aside-hidden {
-  position: relative;
-  grid-template-columns: minmax(0, 1fr);
-  grid-template-rows: minmax(0, 1fr);
-  column-gap: 0;
-}
-.workspace.zen > .sidebar,
-.workspace.zen > .aside,
-.workspace.zen > .aside-resize,
-.workspace.zen > .tree-resize,
-.workspace.zen > .sidebar-backdrop,
-.workspace.zen > .workspace-status,
-.workspace.zen > .mobile-surfaces {
-  display: none;
-}
-.workspace.zen .dock-pane {
-  grid-column: 1;
-  grid-row: 1;
-  overflow: hidden;
-  border: 0;
-  border-radius: 0;
-}
-.zen-exit {
-  position: absolute;
-  top: max(var(--sp-2), env(safe-area-inset-top));
-  right: max(var(--sp-2), env(safe-area-inset-right));
-  z-index: var(--z-expanded);
-  border: 1px solid var(--line);
-  background: var(--bg-2);
-  box-shadow: var(--shadow-popover);
-  opacity: 0.45;
-  transition:
-    opacity var(--t-fast),
-    background var(--t-fast),
-    color var(--t-fast);
-}
-.zen-exit:hover,
-.zen-exit:focus-visible {
-  opacity: 1;
-  background: var(--bg-3);
-  color: var(--text);
 }
 </style>

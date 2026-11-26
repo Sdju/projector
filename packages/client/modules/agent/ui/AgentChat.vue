@@ -3,10 +3,7 @@ import ProjectorIcon from "../../../common/icons/ProjectorIcon.vue";
 import { computed, nextTick, onBeforeUnmount, onMounted, provide, ref } from "vue";
 import { widgetReplyKey } from "../../widget-runtime/index.ts";
 import { useIdeCommands } from "../../ide/index.ts";
-import { commandArgs, useCommandScope } from "../../../common/utilities/commands.ts";
 import { workspaceRequest } from "../../workspace-api/index.ts";
-import { AgentFeaturesIsland } from "../../agent-features/index.ts";
-import { AgentJudgeIsland } from "../modules/settings/index.ts";
 import {
   activateChat,
   agentCommandHandler,
@@ -52,24 +49,22 @@ import { useStartPreset } from "../model/start-preset.ts";
 import { useAnswerForm } from "../model/answer-form.ts";
 import { useAnswerDoctor } from "../model/answer-doctor.ts";
 import UiPanel from "../../../common/ui/UiPanel.vue";
-import UiInline from "../../../common/ui/UiInline.vue";
 import UiBadge from "../../../common/ui/UiBadge.vue";
 import UiButton from "../../../common/ui/UiButton.vue";
-import UiLoader from "../../../common/ui/UiLoader.vue";
+import { useChatViewport } from "../model/chat-viewport.ts";
+import AgentChatHistory from "./AgentChatHistory.vue";
 import AgentWelcome from "./AgentWelcome.vue";
 import AgentChatTimeline from "./AgentChatTimeline.vue";
 import { AgentComposer, AgentControls } from "../modules/composer/index.ts";
 import AgentContextMeter from "./AgentContextMeter.vue";
 import AgentChipPreview from "./AgentChipPreview.vue";
 import ImageModal from "../../../common/ui/ImageModal.vue";
+import AgentChatOptions from "./AgentChatOptions.vue";
 import AgentSessions from "./AgentSessions.vue";
-import AgentChatMenu from "./AgentChatMenu.vue";
 import { useChipActions } from "../model/use-chip-actions.ts";
 import { downloadChat as saveChatMarkdown } from "../lib/export.ts";
 import { previousUser } from "../lib/previous-user.ts";
 import { AgentSecretShow, useSecretShows } from "../../agent-secret-show/index.ts";
-import { useChatScroll } from "../model/chat-scroll.ts";
-import { useChatWindow } from "../model/chat-window.ts";
 import { useChatZenFocus } from "../model/chat-zen.ts";
 import { useChatCopy } from "../model/use-chat-copy.ts";
 import { useAgentChatTabTitle } from "../model/chat-titles.ts";
@@ -88,9 +83,6 @@ const props = withDefaults(
 const plain = computed(() => !isBuiltinAgent(props.backend));
 const agentName = computed(() => agentLabel(props.backend));
 const { api } = useIdeCommands();
-const chatMenu = ref<InstanceType<typeof AgentChatMenu>>();
-const featuresIsland = ref<InstanceType<typeof AgentFeaturesIsland>>();
-const judgeIsland = ref<InstanceType<typeof AgentJudgeIsland>>();
 const agent = useAgent(
   props.projectId,
   plain.value ? undefined : agentCommandHandler(api, props.projectId),
@@ -257,89 +249,33 @@ useChatReadout({
   controls,
   turns,
 });
-const log = ref<HTMLElement>();
+const history = ref<InstanceType<typeof AgentChatHistory>>();
+const log = computed(() => history.value?.element);
 const controlsMenu = ref<InstanceType<typeof AgentControls>>();
 const composer = ref<InstanceType<typeof AgentComposer>>();
 const chatDrop = chatDropHandlers(() => composer.value);
 const panel = ref<InstanceType<typeof UiPanel>>();
 const root = computed(() => panel.value?.element);
-let rememberScroll = () => {};
-const { PRELOAD_PX, firstShown, shown, hidden, loadEarlier, topUp, reveal } = useChatWindow(
-  turns,
-  log,
-  () => rememberScroll(),
-  loading,
-);
-let tabShown = false;
 const {
+  navigation,
+  showTimeline,
+  firstShown,
+  shown,
+  hidden,
+  loadEarlier,
   away,
   trackScroll,
   toBottom,
-  rememberScroll: rememberChatScroll,
-} = useChatScroll({
+} = useChatViewport({
+  projectId: () => props.projectId,
+  chatKey,
   turns,
+  loading,
+  viewed: () => !!viewed.value,
   log,
-  topUp,
-  preloadPx: PRELOAD_PX,
-  watchSource: () => [
-    turns.value.length,
-    turns.value.at(-1)?.text,
-    permissions.value.length,
-    questions.value.length,
-    secrets.value.length,
-    turns.value
-      .at(-1)
-      ?.tools.map((tool) => `${tool.id}:${tool.status}:${tool.detail}`)
-      .join("|"),
-  ],
-  onShown: () => {
-    const nowShown = !!root.value && root.value.getClientRects().length > 0;
-    if (nowShown && !tabShown) composer.value?.focus();
-    tabShown = nowShown;
-  },
-});
-rememberScroll = rememberChatScroll;
-const navigation = useCommandScope(`chat-navigation:${chatKey}`, () => ({
-  surface: "agent-chat",
-  project: props.projectId,
-  chat: chatKey,
-}));
-const showTimeline = computed(
-  () =>
-    !loading.value &&
-    !viewed.value &&
-    turns.value.filter((turn) => turn.role === "assistant").length >= 3,
-);
-async function goToRequest(id: string) {
-  const wasAway = away.value;
-  away.value = true;
-  if (!(await reveal(id))) {
-    away.value = wasAway;
-    throw new Error("Запрос не найден");
-  }
-  const element = log.value?.querySelector<HTMLElement>(`[data-request-id="${CSS.escape(id)}"]`);
-  if (!element || !log.value) return;
-  log.value.scrollTo({
-    top:
-      log.value.scrollTop +
-      element.getBoundingClientRect().top -
-      log.value.getBoundingClientRect().top -
-      12,
-    behavior: "instant",
-  });
-  rememberChatScroll();
-}
-navigation.scope.registerCommand({
-  id: "ide.agent.chat.request.go",
-  title: "Перейти к запросу в чате",
-  description:
-    "Прокручивает открытый чат к указанному сообщению пользователя, подгружая раннюю историю при необходимости.",
-  arguments: { turnId: "Идентификатор запроса из ide.agent.turns.list" },
-  run: (value) => {
-    const { turnId } = commandArgs(value);
-    if (typeof turnId !== "string") throw new Error("Укажите turnId запроса");
-    return goToRequest(turnId);
-  },
+  root,
+  requestCounts: () => [permissions.value.length, questions.value.length, secrets.value.length],
+  focusComposer: () => composer.value?.focus(),
 });
 const zenMode = useChatZenFocus({
   projectId: props.projectId,
@@ -514,13 +450,23 @@ onBeforeUnmount(() => release());
     @dragleave="chatDrop.dragleave"
     @drop="chatDrop.drop"
   >
-    <UiInline
-      v-show="!zenMode"
-      :inert="zenMode"
-      class="chat-tools"
-      :gap="1"
-      align="normal"
-      justify="end"
+    <AgentChatOptions
+      :zen="zenMode"
+      :lens="lens.state.open"
+      :side="side.state.open"
+      :can-download="turns.length > 0"
+      :can-isolate="plain && !turns.length"
+      v-model:isolate="isolate"
+      :backend="backend"
+      :chat="chatKey"
+      :loading="loading"
+      :feature-overrides="featureOverrides"
+      :judge-override="judgeOverride"
+      @lens="lens.toggle()"
+      @side="side.toggle()"
+      @download="saveChatMarkdown(turns, agentName, backend)"
+      @update:feature-overrides="setFeatureOverrides"
+      @update:judge-override="setJudgeOverride"
     >
       <UiBadge
         v-if="roleSnapshot"
@@ -553,49 +499,19 @@ onBeforeUnmount(() => release());
       >
         <ProjectorIcon name="square-pen" aria-hidden="true" />
       </UiButton>
-      <AgentChatMenu
-        ref="chatMenu"
-        :lens="lens.state.open"
-        :side="side.state.open"
-        :can-download="turns.length > 0"
-        :can-isolate="plain && !turns.length"
-        :isolate="isolate"
-        :features-changed="featureOverrides !== undefined"
-        :judge-changed="judgeOverride !== undefined"
-        @features="featuresIsland?.openAt(chatMenu?.anchor())"
-        @judge="judgeIsland?.openAt(chatMenu?.anchor())"
-        @lens="lens.toggle()"
-        @side="side.toggle()"
-        @download="saveChatMarkdown(turns, agentName, backend)"
-        @isolate="isolate = !isolate"
-      />
-    </UiInline>
-    <AgentFeaturesIsland
-      ref="featuresIsland"
-      :show-trigger="false"
-      :anchor="() => chatMenu?.anchor()"
-      :backend="backend"
-      :chat="chatKey"
-      :overrides="featureOverrides"
-      :disabled="loading"
-      @update:overrides="setFeatureOverrides"
-    />
-    <AgentJudgeIsland
-      ref="judgeIsland"
-      :show-trigger="false"
-      :anchor="() => chatMenu?.anchor()"
-      :chat="chatKey"
-      :override="judgeOverride"
-      :disabled="loading"
-      @update:override="setJudgeOverride"
-    />
-    <div class="chat-area" v-show="!viewed">
-      <div ref="log" class="chat-log" @scroll.passive="trackScroll">
-        <div v-if="loading" class="chat-loading">
-          <UiLoader label="Загружаю чат…" align="center" />
-        </div>
+    </AgentChatOptions>
+    <AgentChatHistory
+      v-show="!viewed"
+      ref="history"
+      :loading="loading"
+      :empty="!turns.length"
+      :hidden="hidden"
+      :zen="zenMode"
+      @scroll="trackScroll"
+      @load-earlier="loadEarlier"
+    >
+      <template #welcome>
         <AgentWelcome
-          v-else-if="!turns.length"
           :plain="plain"
           :agent-name="agentName"
           :role-name="roleSnapshot?.name"
@@ -604,60 +520,50 @@ onBeforeUnmount(() => release());
           @open="openAgent"
           @form="openPresetForm"
         />
-        <div
-          v-else
-          class="conversation"
-          role="log"
-          aria-label="Сообщения"
-          aria-live="polite"
-          aria-relevant="additions text"
-        >
-          <button v-if="hidden" type="button" class="earlier" @click="loadEarlier">
-            Показать ранние запросы · скрыто {{ hidden }}
-          </button>
-          <AgentTurn
-            v-for="(turn, offset) in shown"
-            :key="turn.id"
-            :data-request-id="turn.role === 'user' ? turn.id : undefined"
-            :turn="turn"
-            :chat-usage="chatUsage.get(turn.id)"
-            :root="projectRoot"
-            :promoted-form="answerFormFor(turn).promotedForm"
-            :lens="turn.role === 'assistant' && turn.id === turns.at(-1)?.id ? lens : undefined"
-            :doctor="answerDoctorReport(turn)"
-            :doctor-live="doctorProgress.get(turn.id)"
-            :resume-scheduled="quotaResume.scheduledId.value === turn.id"
-            :flags="{
-              busy,
-              last: firstShown + offset === turns.length - 1,
-              copied: copied === turn.id,
-              faded: editFrom >= 0 && firstShown + offset >= editFrom,
-              canRevert: canRevert(turn.id),
-              formAnswered: answerFormFor(turn).formAnswered,
-              phase: turn.role === 'assistant' && turn.id === turns.at(-1)?.id ? phase : undefined,
-            }"
-            @copy="copyMessage"
-            @open="openChip"
-            @edit="editMessage"
-            @form-submit="submitTurnForm"
-            @rewind="askRewind"
-            @retry="retryMessage"
-            @quota-resume="quotaResume.toggle"
-            @fork="forkMessage"
-            @continue="continueTurn"
-            @version="showVersion"
-            @open-file="(path) => openChip({ type: 'file', path })"
-            @revert="(id) => askRewind(precedingUser(id), 'files')"
-            @doctor-retry="retryDoctor"
-          />
-        </div>
-      </div>
-      <AgentChatTimeline
-        v-if="showTimeline"
-        :turns="turns"
-        @select="(id) => navigation.run('ide.agent.chat.request.go', { turnId: id })"
+      </template>
+      <AgentTurn
+        v-for="(turn, offset) in shown"
+        :key="turn.id"
+        :data-request-id="turn.role === 'user' ? turn.id : undefined"
+        :turn="turn"
+        :chat-usage="chatUsage.get(turn.id)"
+        :root="projectRoot"
+        :promoted-form="answerFormFor(turn).promotedForm"
+        :lens="turn.role === 'assistant' && turn.id === turns.at(-1)?.id ? lens : undefined"
+        :doctor="answerDoctorReport(turn)"
+        :doctor-live="doctorProgress.get(turn.id)"
+        :resume-scheduled="quotaResume.scheduledId.value === turn.id"
+        :flags="{
+          busy,
+          last: firstShown + offset === turns.length - 1,
+          copied: copied === turn.id,
+          faded: editFrom >= 0 && firstShown + offset >= editFrom,
+          canRevert: canRevert(turn.id),
+          formAnswered: answerFormFor(turn).formAnswered,
+          phase: turn.role === 'assistant' && turn.id === turns.at(-1)?.id ? phase : undefined,
+        }"
+        @copy="copyMessage"
+        @open="openChip"
+        @edit="editMessage"
+        @form-submit="submitTurnForm"
+        @rewind="askRewind"
+        @retry="retryMessage"
+        @quota-resume="quotaResume.toggle"
+        @fork="forkMessage"
+        @continue="continueTurn"
+        @version="showVersion"
+        @open-file="(path) => openChip({ type: 'file', path })"
+        @revert="(id) => askRewind(precedingUser(id), 'files')"
+        @doctor-retry="retryDoctor"
       />
-    </div>
+      <template #timeline>
+        <AgentChatTimeline
+          v-if="showTimeline"
+          :turns="turns"
+          @select="(id) => navigation.run('ide.agent.chat.request.go', { turnId: id })"
+        />
+      </template>
+    </AgentChatHistory>
     <AgentTaskView
       v-if="viewed"
       :detail="viewed"
@@ -805,28 +711,6 @@ onBeforeUnmount(() => release());
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.chat-tools {
-  flex: none;
-  width: 100%;
-  max-width: calc(var(--chat-width) + 56px);
-  margin: 0 auto;
-  padding: var(--sp-2) var(--sp-5) 0;
-}
-.chat-area {
-  position: relative;
-  flex: 1;
-  min-height: 0;
-  display: flex;
-}
-.chat-log {
-  flex: 1;
-  min-height: 0;
-  overflow: auto;
-  overflow-anchor: none;
-  scrollbar-width: thin;
-  scrollbar-color: var(--line-strong) transparent;
-  padding: var(--sp-6) var(--sp-5) var(--sp-4);
-}
 .dock {
   position: relative;
   display: grid;
@@ -886,46 +770,8 @@ onBeforeUnmount(() => release());
   text-decoration: underline;
   text-underline-offset: 3px;
 }
-.chat-loading {
-  display: flex;
-  gap: var(--sp-2);
-  align-items: center;
-  justify-content: center;
-  height: 100%;
-  color: var(--muted);
-  font-size: var(--fs-xs);
-}
-.chat-loading svg {
-  width: 16px;
-  height: 16px;
-}
-.earlier {
-  display: block;
-  margin: 0 auto var(--sp-4);
-  padding: var(--sp-1) var(--sp-3);
-  color: var(--muted);
-  font-size: var(--fs-2xs);
-  text-decoration: underline;
-  text-underline-offset: 3px;
-}
-.earlier:hover {
-  color: var(--text);
-}
-.conversation {
-  width: 100%;
-  max-width: var(--chat-width);
-  margin: auto;
-}
-.agent-chat.zen .chat-log {
-  padding-bottom: var(--sp-6);
-}
 .agent-chat.zen .dock:has(.requests) {
   padding-bottom: var(--sp-4);
-}
-@container (max-width: 500px) {
-  .chat-log {
-    padding: var(--sp-5) var(--sp-4);
-  }
 }
 @media (prefers-reduced-motion: reduce) {
   .agent-chat *,
