@@ -162,7 +162,7 @@ projector-install-desktop
 Скачайте выпуск и установите зависимости:
 
 ```bash
-git clone --branch v0.14.0 https://github.com/Sdju/projector.git
+git clone --branch v0.15.0 https://github.com/Sdju/projector.git
 cd projector
 vp install --frozen-lockfile
 vp run build
@@ -172,7 +172,7 @@ vp run build
 Исходники также доступны в [GitHub Releases](https://github.com/Sdju/projector/releases).
 Сборка проверяет код и создаёт веб-ресурсы. По умолчанию сервер работает на `vp dev`
 из этой папки; `projector mode prod` переключает его на собственный Node-сервер по
-собранному `dist`. Отдельного бинарного установщика в версии 0.14.0 нет.
+собранному `dist`. Отдельного бинарного установщика в версии 0.15.0 нет.
 
 Откроется окно поиска приложений и проектов. Чтобы использовать Projector в обычном браузере:
 
